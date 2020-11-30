@@ -1,0 +1,159 @@
+% Writing a script for analyzing the effect of laser of on neuronal data (multi-unit)
+% Author - Abhishek De, 6/18
+close all; clearvars;
+filename_M = {'M051318008.nex';'M051318009.nex';'M051618004.nex';'M051618005.nex';'M051618006.nex';'M051618007.nex';'M051618008.nex';'M051618010.nex';...
+    'M051618011.nex';'M051618012.nex';'M051618013.nex';'M051618014.nex';'M051818004.nex';'M051818005.nex';'M051818006.nex';'M051818007.nex';...
+    'M051818010.nex';'M051818011.nex';'M051818012.nex';'M051818013.nex';'M051818014.nex';'M052318001.nex';'M052318002.nex';'M052318003.nex';'M052318004.nex'};
+filename_A = {'A011719009.nex';'A011719010.nex';'A011719011.nex';'A011719012.nex';'A012219006.nex';'A012219009.nex';'A012219010.nex';'A012219011.nex';'A012219012.nex';...
+    'A012219013.nex';'A012319004.nex';'A012319005.nex';'A012319006.nex'};
+filename = [filename_M; filename_A];
+% filename = {'A012319007.nex';'A012319008.nex';'A012319009.nex';'A012319010.nex';'A012319011.nex'};
+firstletters_filename = char(filename);
+Maui_idxs = firstletters_filename(:,1)=='M';
+Apollo_idxs = firstletters_filename(:,1)=='A';
+plot_counter = 1;
+N = numel(filename); 
+L = ceil(sqrt(N));
+showstimpresenttrials = 0;
+showstimabsentnolasertrials = 0;
+figure(plot_counter); set(gcf,'Name','Stimabsent-laser trials');
+if showstimabsentnolasertrials
+    figure(plot_counter+1); set(gcf,'Name','Stimabsent-nolaser trials');
+end
+if showstimpresenttrials
+    figure(plot_counter+2); set(gcf,'Name','Stimpresent-laser trials');
+    figure(plot_counter+3); set(gcf,'Name','Stimpresent-nolaser trials');
+end
+binwidth = .005;
+bins = -0.4:binwidth:0.6;
+baselinebins = (bins>-0.3 & bins<0);
+baselineFR = [];
+laserFR = [];
+statstestresult = []; % Performing a wilcoxon rank sum test and storing the p value
+ISI = [];
+
+for jj = 1:N
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    lasertrials = logical(stro.trial(:,optstim));
+    samplerate = stro.sum.analog.storeRates{3}; % sample rate at which laser analog pulses are stored in file
+    
+    % Stimulus absent trials
+    idxs = find(~stimpresent);
+    count1 = 1;
+    count2 = 1;
+    PSTHlaser = zeros(1,length(bins));
+    PSTHnolaser = zeros(1,length(bins));
+    tmp_baselineFR = [];
+    tmp_laserFR = [];
+    tmp_spikecountsbaseline = [];
+    tmp_spikecountslaserstimabsent = [];
+
+    for ii = 1:numel(idxs)
+        ind = idxs(ii);
+        analogstartime = stro.ras{ind,5};
+        spiketimes = stro.ras{ind,1};
+        if lasertrials(ind)
+            % Pulling out the laseron and off timings from analog traces
+            t = stro.ras{ind,5}+[0:1:length(stro.ras{ind,4})-1]/samplerate;
+            laserontime = t(find(stro.ras{ind,4}>0.1,1));
+            laserofftime = t(find(stro.ras{ind,4}>0.1,1,'last'));
+           
+            timedurlaser = laserofftime - laserontime;
+            figure(plot_counter); subplot(L,L,jj); plot(spiketimes(spiketimes>laserontime-0.3 & spiketimes<laserofftime+0.2)-laserontime,count1*ones(size(spiketimes(spiketimes>laserontime-0.3 & spiketimes<laserofftime+0.2))),'k.'); hold on;
+            PSTHlaser = PSTHlaser + hist(spiketimes-laserontime, bins);
+            count1 = count1 + 1;
+            laserbins = bins>=0 & bins<=timedurlaser;
+            tmp_baselineFR = [tmp_baselineFR; mean(PSTHlaser(baselinebins))/0.3];
+            tmp_laserFR = [tmp_laserFR; mean(PSTHlaser(laserbins))/timedurlaser];
+            ISI = [ISI; diff(spiketimes(spiketimes>laserontime & spiketimes<laserofftime))]; 
+            tmp_spikecountsbaseline = [tmp_spikecountsbaseline; sum(spiketimes>laserontime-0.3 & spiketimes<laserontime)];
+            tmp_spikecountslaserstimabsent = [tmp_spikecountslaserstimabsent; sum(spiketimes>laserontime & spiketimes<laserofftime)];
+
+        else 
+            if showstimabsentnolasertrials
+                stimontime = stro.trial(ind,stimonidx);
+                stimofftime = stro.trial(ind,stimoffidx);
+                timedurnolaser = stimofftime - stimontime;
+                figure(plot_counter+1); subplot(L,L,jj); plot(spiketimes(spiketimes>stimontime-0.3 & spiketimes<stimofftime+0.2)-stimontime,count2*ones(size(spiketimes(spiketimes>stimontime-0.3 & spiketimes<stimofftime+0.2))),'k.'); hold on;
+                PSTHnolaser = PSTHnolaser + hist(spiketimes-stimontime, bins);
+                count2 = count2 + 1;
+            end
+        end
+    end
+    baselineFR = [baselineFR; mean(tmp_baselineFR)];
+    laserFR = [laserFR; mean(tmp_laserFR)];
+    figure(plot_counter); subplot(L,L,jj); plot(bins,PSTHlaser,'b','Linewidth',2); 
+    line([0 0],[0 count1]); line([timedurlaser timedurlaser],[0 count1]); xlabel('time'); ylabel('trials'); title(char(filename{jj}(1:10))); set(gca,'Xlim',[-0.3 0.5]); hold off;
+    if showstimabsentnolasertrials
+        figure(plot_counter+1); subplot(L,L,jj); plot(bins,PSTHnolaser,'r','Linewidth',2);
+        line([0 0],[0 count2]); line([timedurnolaser timedurnolaser],[0 count2]); xlabel('time'); ylabel('trials'); title(char(filename{jj}(1:10))); set(gca,'Xlim',[-0.3 0.5]); hold off;
+    end
+    statstestresult = [statstestresult; ranksum(tmp_spikecountsbaseline,tmp_spikecountslaserstimabsent)];
+    
+    % stimulus present trials 
+    if showstimpresenttrials
+        idxs = find(stimpresent);
+        count3 = 1;
+        count4 = 1;
+        PSTHlaser = zeros(1,length(bins));
+        PSTHnolaser = zeros(1,length(bins));
+        for ii = 1:numel(idxs)
+            ind = idxs(ii);
+            analogstartime = stro.ras{ind,5};
+            spiketimes = stro.ras{ind,1};
+            if lasertrials(ind)
+                laserontime = stro.trial(ind,laseron);
+                laserofftime = stro.trial(ind,laseroff);
+                timedurlaser = laserofftime - laserontime;
+                figure(plot_counter+2); subplot(L,L,jj); plot(spiketimes(spiketimes>laserontime-0.2 & spiketimes<laserofftime+0.2)-laserontime,count3*ones(size(spiketimes(spiketimes>laserontime-0.2 & spiketimes<laserofftime+0.2))),'k.'); hold on;
+                PSTHlaser = PSTHlaser + hist(spiketimes-laserontime, bins);
+                count3 = count3 + 1;
+            else
+                stimontime = stro.trial(ind,stimonidx);
+                stimofftime = stro.trial(ind,stimoffidx);
+                timedurnolaser = stimofftime - stimontime;
+                figure(plot_counter+3); subplot(L,L,jj); plot(spiketimes(spiketimes>stimontime-0.2 & spiketimes<stimofftime+0.2)-stimontime,count4*ones(size(spiketimes(spiketimes>stimontime-0.2 & spiketimes<stimofftime+0.2))),'k.'); hold on;
+                PSTHnolaser = PSTHnolaser + hist(spiketimes-stimontime, bins);
+                count4 = count4 + 1;
+            end
+        end
+        figure(plot_counter+2); subplot(L,L,jj); plot(bins,PSTHlaser,'b','Linewidth',2);
+        line([0 0],[0 count3]); line([timedurlaser timedurlaser],[0 count3]); xlabel('time'); ylabel('trials'); title(char(filename{jj}(1:10))); set(gca,'Xlim',[-0.2 0.5]); hold off;
+        figure(plot_counter+3); subplot(L,L,jj); plot(bins,PSTHnolaser,'r','Linewidth',2);
+        line([0 0],[0 count4]); line([timedurnolaser timedurnolaser],[0 count4]); xlabel('time'); ylabel('trials'); title(char(filename{jj}(1:10))); set(gca,'Xlim',[-0.2 0.5]); hold off;
+    end
+  
+end
+plot_counter = plot_counter + 4;
+
+figure(plot_counter); set(gcf,'Name','FR analysis:laser vs baseline'); 
+subplot(221); plot(log(baselineFR(Apollo_idxs)),log(laserFR(Apollo_idxs)),'o','MarkerSize',7,'LineWidth',1.0,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(log(baselineFR(Maui_idxs)),log(laserFR(Maui_idxs)),'o','MarkerSize',7,'LineWidth',1.0,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; 
+axis square;xlabel('baseline'); ylabel('laser'); set(gca,'Xlim',[-5 5],'Ylim',[-5 5]); line([-5 5],[-5 5]); legend('A','M'); hold off;
+subplot(222); hist(ISI,50); xlabel('ISI'); ylabel('frequency'); axis square; 
+subplot(223); hist(log(baselineFR)-log(laserFR),20); axis square; ylabel('files'); xlabel('diff in  FR'); 
+plot_counter = plot_counter + 1;

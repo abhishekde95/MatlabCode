@@ -1,0 +1,178 @@
+% Waveform analysis for all the cells along with their baseline FR
+% Author - Abhishek De, 3/19
+close all; clearvars;
+load filename_c.mat
+load filename_l.mat
+filename = [filename_c; filename_l];
+plot_counter = 1;
+N = numel(filename);
+numsubplots = ceil(sqrt(N));
+figure(plot_counter); set(gcf,'Name','Waveforms');
+peak_waveform = []; trough_waveform = []; timediff = [];
+peak_hw = []; trough_hw = []; % storing the half-widths
+peak_time = []; trough_time = []; % storing the peak and trough times
+peak_noise_waveform = []; trough_noise_waveform = [];
+color = [0 0 0];
+all_waveforms = cell(N,1);
+all_noise_waveforms = cell(N,1);
+euclid_waveform = [];
+euclid_noise_waveform = [];
+baselineFR = [];
+varFR = [];
+
+for ii = 1:N
+    stro = nex2stro(findfile(char(filename(ii))));
+    samplingrate = stro.sum.waves.storeRates{1};
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),'sig001a'); 
+    leastcount = 10^6/samplingrate; % in us
+    waveform = mean(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001a_wf')))',2);
+    std_waveform = std(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001a_wf')))',0,2);
+    noise_waveform = mean(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001U_wf')))',2);
+    std_noise_waveform = std(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001U_wf')))',0,2);
+    time1 = 0:25:25*(numel(waveform)-1);
+    time = 0:2.5:25*(numel(waveform)-1);
+    waveform = spline(time1,waveform,time);
+    std_waveform = spline(time1,std_waveform,time);
+    noise_waveform = spline(time1,noise_waveform,time);
+    std_noise_waveform = spline(time1,std_noise_waveform,time);
+    
+    FR = [];
+    for jj = 1:size(stro.ras,1)
+        FR = [FR; sum(stro.ras{jj,spikeidx}>stro.trial(jj,fpacqidx) & stro.ras{jj,spikeidx}<stro.trial(jj,stimonidx))/(stro.trial(jj,stimonidx) - stro.trial(jj,fpacqidx))];
+    end
+    baselineFR = [baselineFR; nanmean(FR)];
+    varFR = [varFR; nanvar(FR)];
+    
+    % waveform
+    [val1,t1] = max(waveform);
+    [val2,t2] = min(waveform);
+    % Making sure that peak time is before the trough time
+    flip = 0;
+    if t1 > t2
+        waveform = -1*waveform;
+        [val1,t1] = max(waveform);
+        [val2,t2] = min(waveform);
+        flip = 1;
+    end
+    peak_waveform = [peak_waveform; val1]; 
+    trough_waveform = [trough_waveform; val2];
+    timediff = [timediff; abs(time(t2)-time(t1))];
+    peak_hw = [peak_hw; range(time(waveform>val1/2))];
+    trough_hw = [trough_hw; range(time(waveform<val2/2))];
+    peak_time = [peak_time; time(t1)];
+    trough_time = [trough_time; time(t2)];
+    
+    % Noise_waveform
+    if flip
+        noise_waveform = -1*noise_waveform;
+    end
+    
+    [val1,~] = max(noise_waveform);
+    [val2,~] = min(noise_waveform);
+    peak_noise_waveform = [peak_noise_waveform; val1]; 
+    trough_noise_waveform = [trough_noise_waveform; val2];
+    
+    subplot(numsubplots,numsubplots,ii); plot(time,waveform,'-','color',color,'Linewidth',2); hold on; plot(time,noise_waveform,'-','color',[0.5 0.5 0.5],'Linewidth',2);
+    plot(time,waveform-std_waveform,'-','color',color,'Linewidth',1); plot(time,waveform+std_waveform,'-','color',color,'Linewidth',1);
+    plot(time,noise_waveform-std_noise_waveform,'-','color',[0.5 0.5 0.5],'Linewidth',1); plot(time,noise_waveform+std_noise_waveform,'-','color',[0.5 0.5 0.5],'Linewidth',1);
+    line([0 max(time)],[0 0]); set(gca,'Xlim',[min(time) max(time)],'XTick',0:800:800); drawnow; axis square; hold off;
+    
+    % Storing the waveforms
+    all_waveforms{ii} = waveform; % each row is a waveform
+    all_noise_waveforms{ii} = noise_waveform;
+    euclid_waveform = [euclid_waveform; sqrt(sum(waveform.^2))];
+    euclid_noise_waveform = [euclid_noise_waveform; sqrt(sum(noise_waveform.^2))];
+end
+plot_counter = plot_counter + 1;
+
+% Need to quantify the quality of isolation: comparing singal and noise
+figure(plot_counter); 
+subplot(121); plot(euclid_waveform,euclid_noise_waveform,'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on; % plotting the waveform in PC space
+set(gca,'TickDir','out','Xlim',[0 5],'Ylim',[0 5],'XTick',0:1:5,'YTick',0:1:5); line([0 5],[0 5]); xlabel('Waveform'); ylabel('Noise'); title('Euclidean distance'); axis square; hold off;
+subplot(122); plot(abs(peak_waveform),abs(trough_waveform),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(abs(peak_noise_waveform),abs(trough_noise_waveform),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); 
+set(gca,'TickDir','out','Xlim',[0 1],'Ylim',[0 1]); xlabel('Peak'); ylabel('Trough'); axis square; hold off; 
+plot_counter = plot_counter + 1;
+
+% Checking whether the spike width is non-unimodal
+[dip_stat,pval_dip] = HartigansDipSignifTest(peak_hw+trough_hw,1000);
+[dip_stat2,pval_dip2] = HartigansDipSignifTest(timediff,1000);
+
+% Analyses of waveforms
+figure(plot_counter); 
+subplot(331); plot(abs(peak_waveform)./abs(trough_waveform),abs(timediff),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+set(gca,'TickDir','out'); xlabel('Peak/Trough'); ylabel('peak-trough time'); axis square; hold off; 
+subplot(332); plot(peak_hw,trough_hw,'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+set(gca,'TickDir','out'); xlabel('peak half-width'); ylabel('trough half-width'); axis square; hold off; 
+subplot(333); plot(abs(peak_waveform)./abs(trough_waveform), peak_hw+trough_hw,'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+set(gca,'Tickdir','out'); xlabel('peak/trough'); ylabel('peak-hw+trough-hw'); axis square; hold off;
+subplot(334); histogram(peak_hw+trough_hw,100:30:700,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); set(gca,'Tickdir','out','Xlim',[100 700]); 
+xlabel('peak-hw+trough-hw'); ylabel('# cells'); title(strcat('dip p=',num2str(pval_dip,2))); axis square;
+subplot(335); plot(peak_time, peak_hw,'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+set(gca,'Tickdir','out'); xlabel('peak time'); ylabel('peak half-width'); axis square; hold off;
+subplot(336); plot(trough_time, trough_hw,'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+set(gca,'Tickdir','out'); xlabel('trough time'); ylabel('trough half-width'); axis square; hold off;
+subplot(337), histogram(timediff,100:30:700,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); set(gca,'Tickdir','out','Xlim',[100 700]); xlabel('peak-trough time'); 
+ylabel('# cells'); title(strcat('dip p=',num2str(pval_dip2,2))); axis square;
+subplot(338),
+for ii = 1:N
+    plot(all_waveforms{ii}./max(all_waveforms{ii}),'k');  hold on;
+end
+set(gca,'Tickdir','out','XTick',[]); axis square; xlabel('time'); hold off;
+subplot(339), histogram(log(abs(peak_waveform)./abs(trough_waveform)),10,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); set(gca,'Tickdir','out'); xlabel('peak/trough'); ylabel('# cells'); axis square;
+plot_counter = plot_counter + 1;
+
+% Checking whether there is any pattern that correlates waveform shape with different cells
+% loading the indices for DO, SO, LUM and hardtoclassifycells
+load newOCidx.mat
+load newLMidx.mat
+load newLUMidx.mat
+load newSOidx.mat
+load newhardtoclassifyidx.mat
+filename = [filename_c; filename_l];
+DOidx = [newOCidx newLMidx];
+LUMidx = newLUMidx';
+SOidx = newSOidx;
+hardtoclassifyidx = [newSOidx newhardtoclassifyidx];
+idx = [DOidx LUMidx hardtoclassifyidx]; % First DO, then simple cells, then SO and then hardtoclassify cells
+group = [ones(numel(DOidx),1);2*ones(numel(LUMidx),1);3*ones(numel(hardtoclassifyidx),1)];
+
+% Doing a bunch of Kruskal-Wallis Test
+p1 = kruskalwallis(abs(peak_waveform(idx))./abs(trough_waveform(idx)),group,'off'); % comparing peak/trough 
+p2 = kruskalwallis(peak_hw(idx)+trough_hw(idx),group,'off'); % comparing spike width
+p3 = kruskalwallis(timediff(idx),group,'off'); % comparing trough-peak time
+
+figure(plot_counter); 
+subplot(321); boxplot(abs(peak_waveform(idx))./abs(trough_waveform(idx)),group); set(gca,'Tickdir','out','XTicklabel',{'DO','Lum','oth'}); ylabel('peak/trough'); 
+title(strcat('p=',num2str(p1,2))); axis square;
+subplot(322); boxplot(peak_hw(idx)+trough_hw(idx),group); set(gca,'Tickdir','out','XTicklabel',{'DO','Lum','oth'}); ylabel('peak-hw+trough-hw'); 
+title(strcat('p=',num2str(p2,2))); axis square;
+subplot(323); boxplot(timediff(idx),group); set(gca,'Tickdir','out','XTicklabel',{'DO','Lum','oth'}); ylabel('peak-trough time'); 
+title(strcat('p=',num2str(p3,2))); axis square;
+subplot(324),
+for ii = 1:N
+    inds = 1:numel(all_waveforms{ii});
+    [~,jj] = max(all_waveforms{ii});
+    inds = inds - jj;
+    if any(ismember(DOidx,ii))
+        plot(inds,all_waveforms{ii}./max(all_waveforms{ii}),'r');  hold on;
+    elseif any(ismember(LUMidx,ii))
+        plot(inds,all_waveforms{ii}./max(all_waveforms{ii}),'g');  hold on;
+    else
+        plot(inds, all_waveforms{ii}./max(all_waveforms{ii}),'k');  hold on;
+    end
+end
+set(gca,'Tickdir','out','XTick',[],'Ylim',[-3 1.5]); axis square; hold off;
+subplot(325); plot(abs(peak_waveform(DOidx))./abs(trough_waveform(DOidx)),abs(timediff(DOidx)),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(abs(peak_waveform(LUMidx))./abs(trough_waveform(LUMidx)),abs(timediff(LUMidx)),'o','MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+plot(abs(peak_waveform(hardtoclassifyidx))./abs(trough_waveform(hardtoclassifyidx)),abs(timediff(hardtoclassifyidx)),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'TickDir','out'); xlabel('Peak/Trough'); ylabel('peak-trough time'); axis square; hold off; 
+subplot(326); plot(abs(peak_waveform(DOidx))./abs(trough_waveform(DOidx)),peak_hw(DOidx)+trough_hw(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(abs(peak_waveform(LUMidx))./abs(trough_waveform(LUMidx)),peak_hw(LUMidx)+trough_hw(LUMidx),'o','MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+plot(abs(peak_waveform(hardtoclassifyidx))./abs(trough_waveform(hardtoclassifyidx)),peak_hw(hardtoclassifyidx)+trough_hw(hardtoclassifyidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'TickDir','out'); xlabel('Peak/Trough'); ylabel('peak-hw+trough-hw'); axis square; hold off; 
+plot_counter = plot_counter + 1;
+
+

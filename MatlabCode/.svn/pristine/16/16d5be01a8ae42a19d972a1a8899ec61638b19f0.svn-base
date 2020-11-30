@@ -1,0 +1,77 @@
+% Visualising the anatomical and RF locations 
+R = [3 0.5 2.5 2.5 2.5 2.5 1 0 1 1]; % in mm
+Theta = [0 15 20 15 12 -15 0 0 0 0]; % in degrees
+X = [17 21 31 30 26 34 20 26 26 31]; % in tenths of visual degrees
+Y = [-28 -39 -40 -40 -43 -37 -38 -29 -38 -33]; % in tenths of visual degrees
+[U,V] = pol2cart(Theta*pi/180,R);
+figure(1), subplot(121), compass(U,V); title('Analtomical locations in chamber');
+subplot(122), compass(X,Y), title('RF locations');
+
+%% Adding some new code to plot the RFs corresponding to the injections and experiments 
+% DToneloc Files 
+load filenameoptoM.mat
+filename = filenameopto;
+RFloc = [];
+for ii = 1:numel(filename)
+    stro = nex2stro(findfile(char(filename(ii,:))));
+    RFloc = [RFloc; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+end
+
+% Plotting the injection and the DToneloc locations
+figure(2);
+plot(RFloc(:,1),RFloc(:,2),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(X,Y,'v','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-105 105],'Ylim',[-105 105]); xlabel('X'); ylabel('Y'); title('RF locations-Maui-Opto') ; axis square;
+legend('Injection','DToneloc');
+
+
+%% The code below might give me an idea about where the potential scotoma is based on the electrode penetrations 
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename1 = fetch(conn,'SELECT filename FROM WNthresh');
+filename2 = fetch(conn,'SELECT filename FROM WNSubunit');
+close(conn);
+filename = [filename1; filename2];
+Mauiidx = [];
+Panguidx = [];
+RFxy = [];
+for ii = 1:numel(filename)
+    fileofinterest = char(filename{ii,:});
+    stro = nex2stro(findfile(char(filename{ii,:})));
+    if strcmp(fileofinterest(1),'M')
+        Mauiidx = [Mauiidx; ii];
+    else
+        Panguidx = [Panguidx; ii];
+    end
+    RFxy = [RFxy; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+end
+figure(3), 
+subplot(121), plot(RFxy(Mauiidx,1),RFxy(Mauiidx,2),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); set(gca,'Xlim',[-60 60],'Ylim',[-60 60]); grid on; axis square; title('Maui RF locations');
+subplot(122), plot(RFxy(Panguidx,1),RFxy(Panguidx,2),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); set(gca,'Xlim',[-60 60],'Ylim',[-60 60]); grid on; axis square; title('Pangu RF locations');
+
+%% Plotting both Pulling out Maui's RF locations from Patrick's dataset: 
+figure(4);plot(RFxy(Mauiidx,1)/10,RFxy(Mauiidx,2)/10,'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 0 0]); set(gca,'Xlim',[-12 12],'Ylim',[-12 12]); grid on; title('Maui RF locations');
+
+load GLMSPopData_0to350.mat
+RFxyPat = [];
+for jj = 116:size(GLMSPopData,1)
+    RFxyPat = [RFxyPat; GLMSPopData{jj,8}.rfx GLMSPopData{jj,8}.rfy];
+end
+figure(4); hold on; plot(RFxyPat(:,1),RFxyPat(:,2),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 0 0]); hold off;
+
+
+%% PLotting the opto and ephys data together 
+figure(5); subplot(121); plot(RFloc(:,1),RFloc(:,2),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(X,Y,'v','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-105 105],'Ylim',[-105 105],'XTick',[-100:20:100],'YTick',[-100:20:100]); xlabel('X'); ylabel('Y'); title('RF locations-Opto') ; axis square;
+grid on; legend('DToneloc','Injection');
+subplot(122); plot(RFxy(Mauiidx,1),RFxy(Mauiidx,2),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(10*RFxyPat(:,1),10*RFxyPat(:,2),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-105 105],'Ylim',[-105 105],'XTick',[-100:20:100],'YTick',[-100:20:100]); grid on; axis square; title('RF locations-ephys');
+
+
+
+%% Putative expression visual coordinates in Pangu
+RF = [-50 -25; -37 -26; -42 -15; -56 -24];
+K = convhull(RF(:,1),RF(:,2));
+figure(6); plot(RF(K,1),RF(K,2),'g-','Linewidth',2); hold on; set(gca,'Xlim',[-60 0],'Ylim',[-60 0]); axis square; grid on; hold off;
+

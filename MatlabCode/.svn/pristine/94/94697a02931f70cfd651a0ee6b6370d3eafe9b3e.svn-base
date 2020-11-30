@@ -1,0 +1,472 @@
+% Population Analyses of relevant DToneloc files
+% Author - Abhishek De, 4/18
+clearvars; close all;
+% filename1 = {'M042518004.nex';'M042518005.nex';'M042518008.nex';'M042518006.nex';'M042518007.nex';}; % 4/25
+% RWmultiplier1 =[1.0;1.0;1.0;1.0;1.0];
+% filename2 = {'M042618003.nex';'M042618004.nex';'M042618005.nex';'M042618006.nex';'M042618007.nex'}; % 4/26, 200 stim, 300 laser
+% RWmultiplier2 =[1.0;1.0;1.0;1.0;1.0];
+% filename3 = {'M042718006.nex';'M042718007.nex';'M042718008.nex';'M042718009.nex';'M042718010.nex'}; % 4/27, 200 stim, 300 laser
+% RWmultiplier3 =[1.0;1.0;1.0;1.0;1.0];
+% filename4 = {'M042718012.nex';'M042718013.nex';'M042718014.nex'}; % 4/27, 100 stim, 150 laser
+% RWmultiplier4 =[1.0;1.0;1.0];
+% filename5 = {'M051318008.nex';'M051318009.nex';'M051318010.nex';'M051318011.nex'}; %5/13, 200 stim, 300 laser 
+% RWmultiplier5 =[1.0;0.70;0.60;1.0];
+% filename6 = {'M051418006.nex';'M051418008.nex';'M051418009.nex';'M051418010.nex';'M051418011.nex';'M051418013.nex';'M051418014.nex';'M051418015.nex';'M051418016.nex'}; %5/14, 200 stim, 300 laser 
+% RWmultiplier6 =[1.0;1.0;1.0;0.7;0.7;1.0;1.0;0.7;0.7];
+% filename7 = {'M051518003.nex';'M051518004.nex';'M051518005.nex';'M051518006.nex';'M051518007.nex';'M051518008.nex';'M051518009.nex';'M051518010.nex';'M051518011.nex';}; %5/15, 200 stim, 300 laser 
+% RWmultiplier7 =[1.0;0.7;0.5;0.5;0.3;0.6;1.0;0.4;0.7];
+% filename8 = {'M051618003.nex';'M051618004.nex';'M051618005.nex';'M051618006.nex';'M051618007.nex';'M051618008.nex';'M051618009.nex';'M051618010.nex';'M051618015.nex';'M051618016.nex'}; %5/16, 200 stim, 300 laser
+% RWmultiplier8 =[1.0;0.7;0.5;0.4;0.3;0.45;0.55;0.60;1.0;1.0];
+% filename9 = {'M051718014.nex';'M051718018.nex';'M051718019.nex'};
+% RWmultiplier9 = [1.0;1.0;1.0];
+% laserdial = [1.0;1.0;1.0];
+% filename = [filename1;filename2;filename3;filename4;filename5;filename6;filename7;filename8];
+% RWmultiplier = [RWmultiplier1;RWmultiplier2;RWmultiplier3;RWmultiplier4;RWmultiplier5;RWmultiplier6;RWmultiplier7;RWmultiplier8];
+% filename10 = {'P060418001.nex';'P060418002.nex';'P060418003.nex';'P060418004.nex';'P060518001.nex';'P060518002.nex';'P060518003.nex';'P060518004.nex';'P060518005.nex';'P060518006.nex';'P060518007.nex';'P060518008.nex';'P060518009.nex';'P060518010.nex';'P060518011.nex';'P060518012.nex';'P060518013.nex'};
+% RWmultiplier10 = [1.0;1.0;1.0;1.0;1.0;0.7;0.7;0.4;0.4;0.2;0.2;0.3;0.5;0.5;0.8;0.8;1.0];
+% filename11 = {'P060618001.nex';'P060618002.nex';'P060618003.nex';'P060618004.nex';'P060618005.nex';'P060618006.nex';'P060618007.nex';'P060618008.nex';'P060618009.nex';'P060618010.nex';'P060618011.nex';'P060618012.nex';'P060618013.nex'};
+% RWmultiplier11 = [1.0;0.5;0.5;0.0;0.25;0.25;0.25;0.60;0.60;0.35;0.35;0.10;0.10];
+% filename12 = {'P060718001.nex';'P060718002.nex';'P060718003.nex';'P060718004.nex';'P060718005.nex'};
+% RWmultiplier12 = [0.3;0.3;0.3;0.2;0.2];
+% filename13 = {'P060818001.nex';'P060818002.nex';'P060818003.nex';'P060818004.nex';'P060818005.nex';'P060818006.nex';'P060818007.nex';'P060818008.nex';'P060818009.nex';'P060818010.nex';'P060818011.nex';'P060818012.nex';'P060818013.nex'};
+% RWmultiplier13 = [1.0;0.6;0.4;0.2;0.8;0.1;0.0;0.5;0.3;0.7;0.9;1.0;1.0];
+filename14 = {'A011419007.nex';'A011419008.nex';'A011419009.nex';'A011419010.nex'};
+RWmultiplier14 = [0.7;0.7;0.5;0.5];
+filename = [filename14];
+RWmultiplier = [RWmultiplier14];
+laserdial = zeros(size(RWmultiplier));
+HitL = []; HitNL = [];
+MissL = []; MissNL = [];
+CRL = []; CRNL = [];
+FAL = []; FANL = [];
+stimdur = [];
+laserdur = [];
+h_hit = []; p_hit = [];
+h_FA = []; p_FA = [];
+TPRNL = []; TPRL = [];
+FPRNL = []; FPRL = [];
+alpha = 0.05;
+plot_counter = 1;
+plotindividualbarplots = 0;
+RF = [];
+stimabsentL = []; stimabsentNL = [];
+stimpresentL = []; stimpresentNL = [];
+weibullparamsNL = [];
+stimsizeinsigmas = [];
+RT = [];
+stimpresentallfiles = [];
+lasertrialsallfiles = [];
+correcttrialsallfiles = [];
+LMScontrastallfiles = [];
+for jj = 1:size(filename,1)
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    uniquediridxs = unique(diridxs);
+    lasertrials = logical(stro.trial(:,optstim));
+    N = numel(uniquediridxs);
+    RF = [RF; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+    stimsizeinsigmas = [stimsizeinsigmas; stro.sum.exptParams.sigma];
+    stimpresentallfiles = [stimpresentallfiles; stimpresent];
+    lasertrialsallfiles = [lasertrialsallfiles; lasertrials];
+    correcttrialsallfiles = [correcttrialsallfiles; correcttrials];
+    LMScontrastallfiles = [LMScontrastallfiles; sqrt(sum(LMStriplet.^2,2))];
+    for ii = 1:N
+        lasertrialidxs = logical(stro.trial(diridxs == ii-1,optstim));
+        colordirchoiceidxs = correcttrials(diridxs == ii-1);
+        colorstimpresent = logical(stimpresent(diridxs==ii-1));
+        percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+        percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+        
+        % Laser trials
+        Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+        Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+        CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+        
+        % Non-Laser trials
+        Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+        Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+        CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+    end
+    if plotindividualbarplots
+        figure(plot_counter);bar([Hitlasertrial Hitnonlasertrial; Misslasertrial Missnonlasertrial; CRlasertrial CRnonlasertrial; FAlasertrial FAnonlasertrial]); ylabel('Count');
+        set(gca,'XTick',[1 2 3 4],'XTickLabel',{'H','M','CR','FA'}); legend('L','NL'); drawnow; plot_counter = plot_counter + 1;
+    end
+    stimabsentL = [stimabsentL; sum(CRlasertrial) + sum(FAlasertrial)];
+    stimabsentNL = [stimabsentNL; sum(CRnonlasertrial) + sum(FAnonlasertrial)];
+    stimpresentL = [stimpresentL; sum(Hitlasertrial) + sum(Misslasertrial)];
+    stimpresentNL = [stimpresentNL; sum(Hitnonlasertrial) + sum(Missnonlasertrial)];
+    
+    % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+    HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+    MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+    CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+    FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+    TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+    FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+    TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+    FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial
+    
+    laserdur = [laserdur; mean(stro.trial(lasertrials,laseroff)-stro.trial(lasertrials,laseron))];
+    stimdur = [stimdur; mean(stro.trial(:,stimoffidx)-stro.trial(:,stimonidx))];
+    % Performing statistical test: equalproptest suggested by Greg
+    [h1,p1] = equalproptest([Hitlasertrial Hitnonlasertrial],[stimpresentL(jj) stimpresentNL(jj)],alpha);
+    [h2,p2] = equalproptest([FAlasertrial FAnonlasertrial],[stimabsentL(jj) stimabsentNL(jj)],alpha);
+    h_hit = [h_hit; h1]; p_hit = [p_hit; p1];
+    h_FA = [h_FA; h2]; p_FA = [p_FA; p2];
+    RT = [RT; stro.trial(:,saccstartidx)-stro.trial(:,fpoffidx)];
+    
+    trials = lasertrials;
+    for kk = 1:2
+        if kk == 2
+            trials = ~trials;
+        end
+        for ii = 1:N
+            LMScontrast = sqrt(sum(LMStriplet(stimpresent & trials & diridxs==ii-1,:).^2,2));
+            putativeoogcontrast = min(LMScontrast(logical(stro.trial(stimpresent & trials & diridxs==ii-1,oog))));
+            answers = correcttrials(stimpresent & trials & diridxs==ii-1);
+            if ~isempty(putativeoogcontrast)
+                LMScontrast(LMScontrast>putativeoogcontrast) = putativeoogcontrast;
+            end
+            contrast = unique(LMScontrast);
+            correctanswers = zeros(size(contrast));
+            wronganswers = zeros(size(contrast));
+            trialspercontrast = zeros(size(contrast));
+          
+            for jj = 1:numel(contrast)
+                trialspercontrast(jj) = numel(answers(LMScontrast==contrast(jj)));
+                correctanswers(jj) = sum(answers(LMScontrast==contrast(jj)));
+                wronganswers(jj) = trialspercontrast(jj) - correctanswers(jj);
+                percorrect(jj) = correctanswers(jj)/trialspercontrast(jj);
+            end
+            [a,b,g] = weibullFit(contrast,[correctanswers wronganswers],'mle');
+            if kk == 2
+                weibullparamsNL = [weibullparamsNL; a b g]; % laser trials
+            end   
+        end
+    end
+end
+[h1,p1] = equalproptest([sum(HitL) sum(HitNL)],[sum(stimpresentL) sum(stimpresentNL)],alpha);
+[h2,p2] = equalproptest([sum(FAL) sum(FANL)],[sum(stimabsentL) sum(stimabsentNL)],alpha);
+
+[r,p] = corr(CRNL./stimabsentNL,CRL./stimabsentNL);
+% Plotting cumulative bar graph
+figure(plot_counter); subplot(221); bar([sum(HitL) sum(HitNL); sum(MissL) sum(MissNL); sum(CRL) sum(CRNL); sum(FAL) sum(FANL)]); hold on; 
+text(4.5,200,strcat('p1=',num2str(p1,3))); text(4.5,100,strcat('p2=',num2str(p2,3))); 
+ylabel('Count'); set(gca,'XTick',[1 2 3 4],'XTickLabel',{'H','M','CR','FA'}); legend('L','NL'); axis square;
+% plotting the proportion of FAL and FANL trials
+subplot(222);plot(CRNL./stimabsentNL,CRL./stimabsentNL,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+text(0.5,0.4,strcat('r=',num2str(r,3))); text(0.5,0.3,strcat('p=',num2str(p,3))); 
+line([0 1],[0 1],'Linewidth',2); xlabel('CR Non-Laser'); ylabel('CR Laser'); axis square; set(gca,'Xlim',[0 1],'Ylim',[0 1]); hold off;
+[~,p] = ttest(CRNL./stimabsentNL,CRL./stimabsentNL);
+subplot(223),hist((CRNL./stimabsentNL) - (CRL./stimabsentNL),10); hold on; plot(mean((CRNL./stimabsentNL) - (CRL./stimabsentNL)),0,'gv','MarkerFaceColor',[0 1 0]); 
+text(0.1,4,strcat('p=',num2str(p,3))); set(gca,'Xlim',[-0.6 0.6]); xlabel('CR Non-Laser - CR Laser'); axis square; hold off;
+% Plotting the RF locations
+[RFlocations,ia,ib] = unique(RF,'rows');
+subplot(224); plot(0,0,'+','Markersize',15,'Linewidth',2); hold on;
+plot(RFlocations(:,1),RFlocations(:,2),'o','MarkerSize',7,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); 
+grid on; set(gca,'Xlim',[-80 80],'Ylim',[-80 80]); axis square; xlabel('X'); ylabel('Y'); title('RF locations');
+plot_counter = plot_counter + 1;
+
+% Based on Greg's and John Palmer's discussion, I am interested in looking
+% at the Hits from laser trials and FA from the non-laser trials.
+% Hypothesis is that they should match.
+[~,p] = equalproptest([sum(HitL) sum(FANL)],[sum(stimpresentL) sum(stimpresentNL)],alpha);
+figure(plot_counter); subplot(221);bar([sum(HitL) sum(FANL)]); hold on; text(1,350,strcat('p=',num2str(p,3)));ylabel('Count');
+set(gca,'XTick',[1 2],'XTickLabel',{'HitsL','FANL'}); axis square; hold off;
+[r,p] = corr(HitL,FANL);
+subplot(222), plot(HitL,FANL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+xlabel('HitsL'); ylabel('FANL'); lsline; text(10,4,strcat('r=',num2str(r,3))); text(10,2,strcat('p=',num2str(p,3)));axis square; hold off;
+[~,p] = ttest(TPRL,FPRNL);
+subplot(223); hist(TPRL-FPRNL,10); hold on; plot(mean(TPRL-FPRNL),0,'gv','MarkerFaceColor',[0 1 0]); text(0.1,10,strcat('p=',num2str(p,3)));
+xlabel('TPRL-FPRNL'); ylabel('files'); axis square; set(gca,'Xlim',[-0.5 0.5]); hold off; 
+[r,p] = corr(TPRL,FPRNL);
+subplot(224), plot(TPRL,FPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+xlabel('TPRL'); ylabel('FPRNL'); axis square; text(0.5,0.3,strcat('r=',num2str(r,3))); text(0.5,0.1,strcat('p=',num2str(p,3))); lsline; hold off;
+plot_counter = plot_counter + 1; 
+
+% plotting the TPR and FPR for laser and non-laser trials and maybe fit
+% them using an increasing exponential equation
+[r,p] = corr(TPRNL,FPRL-FPRNL);
+bins = 0:0.03:1.0;
+discretebins = 0:1:30;
+figure(plot_counter); subplot(221); plot(FPRL,TPRL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(FPRNL,TPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); set(gca,'Xlim',[0 1],'Ylim',[0 1]); 
+xlabel('prop FA over noise dist'); ylabel('prop hits over signal dist'); axis square; title('ROC curve');hold off;
+subplot(222); histogram(HitL,discretebins); hold on; histogram(HitNL,discretebins); plot(mean(HitNL),0,'v','MarkerFaceColor',[1 0 0]);
+plot(mean(HitL),0,'v','MarkerFaceColor',[0 0 1]); xlabel('prop hits over signal dist'); axis square;
+subplot(223); histogram(FAL,discretebins); hold on; histogram(FANL,discretebins); plot(mean(FANL),0,'v','MarkerFaceColor',[1 0 0]);
+plot(mean(FAL),0,'v','MarkerFaceColor',[0 0 1]); xlabel('prop FA over noise dist'); axis square;
+[~,p] = ttest(FPRL,TPRL);
+subplot(224),hist(FPRL-TPRL,10); hold on; plot(mean(FPRL-TPRL),0,'gv','MarkerFaceColor',[0 1 0]); 
+text(0.2,4,strcat('p=',num2str(p,3)));xlabel('FPRL-TPRL'); ylabel('files'); axis square; set(gca,'Xlim',[-0.7 0.7]);hold off;
+plot_counter = plot_counter + 1;
+% To measure the correlation between the proportion of hits in non-laser trials to proportion of FA in laser trials
+figure(plot_counter);subplot(121); plot(TPRNL-FPRNL,FPRL-FPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; lsline;
+text(0.2,-0.27,strcat('r=',num2str(r,3))); text(0.2,-0.36,strcat('p=',num2str(p,3)));
+xlabel('prop of TPRNL-FPRNL'); ylabel('prop of FAL-FANL'); axis square; set(gca,'Xlim',[0 1]);hold off;
+[r,p] = corr(weibullparamsNL(:,1),FPRL-FPRNL);
+subplot(122);plot(1./weibullparamsNL(:,1),FPRL-FPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; lsline;
+text(1.5,-0.25,strcat('r=',num2str(r,3))); text(1.5,-0.3,strcat('p=',num2str(p,3))); xlabel('Sensitivity'); ylabel('prop of FAL-FANL'); axis square; hold off;
+plot_counter = plot_counter + 1;
+
+% Maybe its worth looking at the pattern wrt to the RFs
+for ii = 1:numel(unique(ib))
+    ind = find(ib==ii);
+    figure(plot_counter); subplot(3,3,ii),plot(1./weibullparamsNL(ind,1),FPRL(ind)-FPRNL(ind),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); 
+    axis square; lsline; xlabel('Sensitivity'); ylabel('prop FAL-FANL'); title(num2str(RFlocations(ii,:)));
+    figure(plot_counter+1);subplot(3,3,ii),plot(TPRNL(ind),FPRL(ind)-FPRNL(ind),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); 
+    axis square; lsline; xlabel('prop TPRNL'); ylabel('prop FAL-FANL'); title(num2str(RFlocations(ii,:)));
+end
+plot_counter = plot_counter + 2;
+
+% Wanted to plot the dates of the files when the CRL-CRNL>0 and when they
+% were <0
+idx = (CRL-CRNL)>0;
+figure(plot_counter); set(gca,'Xlim',[0.5 2.75],'Ylim',[0 20]);
+count1 = 1; count2 = 1;
+for ii = 1:numel(filename)
+    if idx(ii)
+        text(0.75,count1,filename{ii}); hold on;
+        count1 = count1+1;
+    else
+        text(1.75,count2,filename{ii}); hold on;
+        count2 = count2+1;
+    end
+end
+ylabel('filenames'); set(gca,'Ylim',[0 max(count1,count2)+2]); xticks([1 2]); xticklabels({'CRL-CRNL>0','CRL-CRNL<0'}); title('Effect correlated with dates?'); hold off;
+plot_counter = plot_counter + 1;
+
+% Next thing would be to plot the data as a function of reward
+% multiplier
+figure(plot_counter); subplot(221); hist(RWmultiplier,10);xlabel('RW multiplier'); ylabel('files'); axis square;
+subplot(222); plot(RWmultiplier,FAL-FANL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); xlabel('RWmultiplier'); ylabel('FAL-FANL'); 
+set(gca,'Xlim',[0 1]); lsline; axis square;
+for ii = 1:numel(filename)
+    subplot(223),plot(FPRL(ii),TPRL(ii),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1-RWmultiplier(ii) RWmultiplier(ii) 0],'MarkerEdgeColor',[1 1 1]); hold on;
+    subplot(224),plot(FPRNL(ii),TPRNL(ii),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1-RWmultiplier(ii) RWmultiplier(ii) 0],'MarkerEdgeColor',[1 1 1]); hold on;
+end
+subplot(223); xlabel('FPRL'); ylabel('TPRL'); title('ROC-Laser'); set(gca,'Xlim',[0 1],'Ylim',[0 1]); axis square; hold off;
+subplot(224); xlabel('FPRNL'); ylabel('TPRNL'); title('ROC-Non-laser'); set(gca,'Xlim',[0 1],'Ylim',[0 1]); axis square; hold off;
+plot_counter = plot_counter + 1;
+
+% I want to see if there is any effect of laser dial on Hits and FA for laser and non-laser trials
+figure(plot_counter); set(gcf,'Name','Effect of laser & RW multiplier');
+subplot(221); plot(laserdial,TPRL-TPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); lsline; 
+xlabel('Laser dial'); ylabel('TPRL-TPRNL'); set(gca,'Xlim',[0 5]); title('Hits'); axis square;
+subplot(222); plot(laserdial,FPRL-FPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); lsline; 
+xlabel('Laser dial'); ylabel('FPRL-FPRNL'); set(gca,'Xlim',[0 5]); title('FA'); axis square;
+% Maybe looks at the effects of reward multiplier
+subplot(223); plot(RWmultiplier,TPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); lsline; hold on;
+plot(RWmultiplier,TPRL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); lsline; 
+xlabel('RW multiplier'); ylabel('Prop of Hits'); axis square; set(gca,'Xlim',[0 1]);
+subplot(224); plot(RWmultiplier,FPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); lsline; hold on;
+plot(RWmultiplier,FPRL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); lsline; 
+xlabel('RW multiplier'); ylabel('Prop of Miss'); axis square; set(gca,'Xlim',[0 1]);
+plot_counter = plot_counter+1;
+
+% Now I want to look at the reaction times (RT) of the the saccdes. In
+% principle there could be a correlation with the contrast of the stimulus
+% in the stimulus-present trials
+lasertrialsallfiles = logical(lasertrialsallfiles);
+correcttrialsallfiles = logical(correcttrialsallfiles);
+stimpresentallfiles = logical(stimpresentallfiles);
+timebins = 0:0.005:0.3;
+figure(plot_counter); subplot(231),histogram(RT(lasertrialsallfiles),timebins);hold on; histogram(RT(~lasertrialsallfiles),timebins);
+plot(mean(RT(lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Effect of laser'); legend('L','NL'); axis square;
+subplot(232),histogram(RT(correcttrialsallfiles),timebins); hold on; histogram(RT(~correcttrialsallfiles),timebins); 
+plot(mean(RT(correcttrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~correcttrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Correct-incorrect'); legend('C','I');axis square;
+subplot(233),histogram(RT(stimpresentallfiles),timebins); hold on; histogram(RT(~stimpresentallfiles),timebins);
+plot(mean(RT(stimpresentallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~stimpresentallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Effect of stimulus'); legend('P','A');axis square;
+subplot(234),histogram(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles),timebins); hold on; histogram(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles),timebins);
+plot(mean(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Hits L & FA NL'); legend('HitsL','FANL');axis square;
+subplot(235),histogram(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles),timebins); hold on; histogram(RT(stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles),timebins);
+plot(mean(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Hits L & Hits NL'); legend('HitsL','HitsNL');axis square;
+subplot(236),histogram(RT(~stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles),timebins); hold on; histogram(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles),timebins);
+plot(mean(RT(~stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('FA L & FA NL'); legend('FAL','FANL');axis square;
+plot_counter = plot_counter + 1;
+
+figure(plot_counter); subplot(221);histogram(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles),timebins);hold on; histogram(RT(stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles),timebins);
+plot(mean(RT(stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Laser'); legend('Hits','Miss'); axis square;
+subplot(222);histogram(RT(stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles),timebins);hold on; histogram(RT(stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles),timebins);
+plot(mean(RT(stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Non-Laser'); legend('Hits','Miss'); axis square;
+subplot(223);histogram(RT(~stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles),timebins);hold on; histogram(RT(~stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles),timebins);
+plot(mean(RT(~stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Laser'); legend('CR','FA'); axis square;
+subplot(224);histogram(RT(~stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles),timebins);hold on; histogram(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles),timebins);
+plot(mean(RT(~stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','b'); plot(mean(RT(~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Non-Laser'); legend('CR','FA'); axis square;
+plot_counter = plot_counter + 1;
+
+LeftsaccadeL = (~stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles) |  (stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles);
+LeftsaccadeNL = (~stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles) |  (stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles);
+RightsaccadeL = (stimpresentallfiles & correcttrialsallfiles & lasertrialsallfiles) |  (~stimpresentallfiles & ~correcttrialsallfiles & lasertrialsallfiles);
+RightsaccadeNL = (stimpresentallfiles & correcttrialsallfiles & ~lasertrialsallfiles) |  (~stimpresentallfiles & ~correcttrialsallfiles & ~lasertrialsallfiles);
+figure(plot_counter); subplot(121); histogram(RT(LeftsaccadeL),timebins);hold on; histogram(RT(RightsaccadeL),timebins)
+plot(mean(RT(LeftsaccadeL)),0,'v','MarkerFaceColor','b'); plot(mean(RT(RightsaccadeL)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Saccade directions: Laser'); legend('Left','Right'); axis square;
+subplot(122); histogram(RT(LeftsaccadeNL),timebins);hold on; histogram(RT(RightsaccadeNL),timebins)
+plot(mean(RT(LeftsaccadeNL)),0,'v','MarkerFaceColor','b'); plot(mean(RT(RightsaccadeNL)),0,'v','MarkerFaceColor','r');
+set(gca,'Xlim',[0 0.3]); xlabel('RT'); title('Saccade directions: Non-Laser'); legend('Left','Right'); axis square;
+plot_counter = plot_counter + 1;
+
+figure(plot_counter); plot(LMScontrastallfiles(stimpresentallfiles),RT(stimpresentallfiles),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); 
+hold on; lsline; xlabel('contrast'), ylabel('RT'); axis square;
+plot_counter = plot_counter + 1;
+
+
+%% 
+% Analyzing the effects of the reward multiplier (as of now all are training data)
+filename1 = {'M050418002.nex';'M050418003.nex';'M050418004.nex';'M050418005.nex';'M050418006.nex';'M050418007.nex'}; % 5/4
+RWmultiplier1 = [0.55;0.4;0.4;0.55;0.65;0.65];
+filename2 = {'M050518001.nex';'M050518002.nex';'M050518003.nex';'M050518004.nex';'M050518005.nex';'M050518006.nex';'M050518007.nex';'M050518008.nex';'M050518009.nex';}; % 5/5
+RWmultiplier2 = [0.85;0.7;0.65;0.65;0.5;0.5;0.4;0.4;0.55];
+filename3 = {'M050618001.nex';'M050618002.nex';'M050618003.nex';'M050618004.nex';'M050618005.nex';'M050618006.nex'}; % 5/6
+RWmultiplier3 = [0.55;0.4;0.4;0.3;0.3;0.3];
+filename4 = {'M050718001.nex';'M050718002.nex';'M050718003.nex';'M050718004.nex'}; % 5/7
+RWmultiplier4 = [0.85;0.5;0.2;0.35];
+filename5 = {'M050818001.nex';'M050818002.nex';'M050818003.nex';'M050818004.nex';'M050818006.nex';'M050818007.nex';'M050818008.nex';'M050818009.nex'}; % 5/8
+RWmultiplier5 = [1.0;0.8;0.6;0.4;0.5;0.2;0.6;1.0];
+filename6 = {'M050918001.nex';'M050918002.nex';'M050918003.nex';'M050918004.nex';'M050918005.nex';'M050918006.nex';'M050918007.nex';'M050918008.nex';'M050918009.nex';'M050918010.nex'}; % 5/9
+RWmultiplier6 = [1.0;0.75;0.50;0.25;0.50;0.30;0.40;0.40;1.0;1.0];
+filename7 = {'M051018006.nex';'M051018007.nex';'M051018008.nex';'M051018009.nex';'M051018010.nex';'M051018011.nex';'M051018012.nex'}; % 5/10, laser control trials
+RWmultiplier7 =[1.0;0.75;0.50;0.25;0.40;0.60;0.80];
+filename8 = {'M051118005.nex';'M051118006.nex';'M051118007.nex';'M051118008.nex';'M051118009.nex';'M051118010.nex';'M051118011.nex';'M051118012.nex';'M051118013.nex';}; % 5/11, laser control trials
+RWmultiplier8 =[1.0;0.70;0.40;0.60;0.50;0.30;0.65;0.80;0.45];
+filename = [filename7; filename8];
+RWmultiplier = [RWmultiplier7; RWmultiplier8]; 
+% filename = [filename1;filename2;filename3;filename4;filename5;filename6];
+% RWmultiplier = [RWmultiplier1;RWmultiplier2;RWmultiplier3;RWmultiplier4;RWmultiplier5;RWmultiplier6];
+filename9 = {'P060418001.nex';'P060418002.nex';'P060418003.nex';'P060418004.nex';'P060518001.nex';'P060518002.nex';'P060518003.nex';'P060518004.nex';'P060518005.nex';'P060518006.nex';'P060518007.nex';'P060518008.nex';'P060518009.nex';'P060518010.nex';'P060518011.nex';'P060518012.nex';'P060518013.nex'};
+RWmultiplier9 = [1.0;1.0;1.0;1.0;1.0;0.7;0.7;0.4;0.4;0.2;0.2;0.3;0.5;0.5;0.8;0.8;1.0];
+filename10 = {'P060618001.nex';'P060618002.nex';'P060618003.nex';'P060618004.nex';'P060618005.nex';'P060618006.nex';'P060618007.nex';'P060618008.nex';'P060618009.nex';'P060618010.nex';'P060618011.nex';'P060618012.nex';'P060618013.nex'};
+RWmultiplier10 = [1.0;0.5;0.5;0.0;0.25;0.25;0.25;0.60;0.60;0.35;0.35;0.10;0.10];
+filename = [filename9;filename10];
+RWmultiplier = [RWmultiplier9;RWmultiplier10];
+HitL = []; HitNL = [];
+MissL = []; MissNL = [];
+CRL = []; CRNL = [];
+FAL = []; FANL = [];
+RF = [];
+TPRNL = []; TPRL = [];
+FPRNL = []; FPRL = [];
+for jj = 1:size(filename,1)
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    uniquediridxs = unique(diridxs);
+    lasertrials = logical(stro.trial(:,optstim));
+    N = numel(uniquediridxs);
+    RF = [RF; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+    for ii = 1:N
+        lasertrialidxs = logical(stro.trial(diridxs == ii-1,optstim));
+        colordirchoiceidxs = correcttrials(diridxs == ii-1);
+        colorstimpresent = logical(stimpresent(diridxs==ii-1));
+        percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+        percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+        
+        % Laser trials
+        Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+        Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+        CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+        
+        % Non-Laser trials
+        Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+        Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+        CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+    end
+    % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+    HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+    MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+    CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+    FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+    TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+    FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+    TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+    FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial
+end
+
+figure(plot_counter); subplot(121); plot(RWmultiplier,HitL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on;
+plot(RWmultiplier,HitNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 0 0]); lsline;
+xlabel('Reward multiplier'); ylabel('Hits'); title('Perf stim present'); set(gca,'Ylim',[0 30]); axis square;
+subplot(122); plot(RWmultiplier,FAL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on;
+plot(RWmultiplier,FANL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 0 0]); lsline;
+xlabel('Reward multiplier'); ylabel('FA'); title('Perf stim absent'); set(gca,'Ylim',[0 30]); axis square;
+plot_counter = plot_counter + 1;
+
+figure(plot_counter), subplot(121);plot(FPRL,TPRL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on;
+plot(FPRNL,TPRNL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 0 0]); set(gca,'Xlim',[0 1],'Ylim',[0 1]); 
+ylabel('prop hits over signal dist'); xlabel('prop FA over noise dist'); axis square; title('ROC curve');hold off;
+
+% Perhaps color code the points with RW multiplier
+for ii = 1:numel(RWmultiplier)
+    subplot(122);plot(FPRL(ii),TPRL(ii),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[RWmultiplier(ii) 1-RWmultiplier(ii) 0],'MarkerEdgeColor',[RWmultiplier(ii) 1-RWmultiplier(ii) 0]); hold on;
+    plot(FPRNL(ii),TPRNL(ii),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[RWmultiplier(ii) 1-RWmultiplier(ii) 0],'MarkerEdgeColor',[RWmultiplier(ii) 1-RWmultiplier(ii) 0]); set(gca,'Xlim',[0 1],'Ylim',[0 1]);
+end
+f=fit([FPRNL; FPRL],[TPRNL; TPRL], @(a,b,x)(1-a*exp(-b*x)),'StartPoint',[0.5 2]);
+plot(linspace(0,1,101),feval(f,linspace(0,1,101)),'Linewidth',2); ylabel('prop hits over signal dist'); xlabel('prop FA over noise dist'); axis square; title('ROC curve');hold off;
+
+AUCROC = trapz(linspace(0,1,101),feval(f,linspace(0,1,101)));
+plot_counter = plot_counter + 1;
+figure(plot_counter), hist(RWmultiplier,10); xlabel('CR reward multiplier'); ylabel('Files'); axis square;
+plot_counter = plot_counter + 1;
+
+
+
+

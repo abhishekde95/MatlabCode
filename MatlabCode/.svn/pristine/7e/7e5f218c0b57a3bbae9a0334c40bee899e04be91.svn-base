@@ -1,0 +1,31 @@
+% Waveform analysis for all the cells 
+% Author - Abhishek De, 3/19
+close all; clearvars;
+load filename_c.mat
+load filename_l.mat
+filename = [filename_c; filename_l];
+plot_counter = 1;
+numsubplots = ceil(sqrt(numel(filename)));
+figure(plot_counter); set(gcf,'Name','Waveforms');
+peak = []; trough = []; timediff = [];
+color = [0 0 0];
+for ii = 1:numel(filename)
+    stro = nex2stro(findfile(char(filename(ii))));
+    samplingrate = stro.sum.waves.storeRates{1};
+    leastcount = 10^6/samplingrate; % in us
+    waveform = mean(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001a_wf')))',2);
+    noise_waveform = mean(cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'sig001U_wf')))',2);
+    time1 = 0:25:25*(numel(waveform)-1);
+    time = 0:2.5:25*(numel(waveform)-1);
+    waveform = spline(time1,waveform,time);
+    noise_waveform = spline(time1,noise_waveform,time);
+    [val1,t1] = max(waveform);
+    [val2,t2] = min(waveform);
+    peak = [peak; val1]; 
+    trough = [trough; val2];
+    timediff = [timediff; abs(time(t2)-time(t1))];
+    subplot(numsubplots,numsubplots,ii); plot(time,waveform,'-','color',color,'Linewidth',2); hold on; plot(time,noise_waveform,'-','color',[0.5 0.5 0.5],'Linewidth',2);
+    plot(time,waveform-std(cell2mat(stro.ras(:,3))',0,2),'-','color',color,'Linewidth',1); plot(time,waveform+std(cell2mat(stro.ras(:,3))',0,2),'-','color',color,'Linewidth',1);
+    plot(time,noise_waveform-std(cell2mat(stro.ras(:,4))',0,2),'-','color',[0.5 0.5 0.5],'Linewidth',1); plot(time,noise_waveform+std(cell2mat(stro.ras(:,4))',0,2),'-','color',[0.5 0.5 0.5],'Linewidth',1);
+    line([0 max(time)],[0 0]); set(gca,'Xlim',[min(time) max(time)],'XTick',0:800:800); drawnow; hold off;
+end

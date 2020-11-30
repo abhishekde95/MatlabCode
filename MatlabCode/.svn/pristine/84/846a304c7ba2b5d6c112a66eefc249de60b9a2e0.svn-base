@@ -1,0 +1,284 @@
+% This is a variant of the code I wrote before and am trying it out for Greg's old WN data
+% Comparing the Gabor and DOG fits for the WN data
+% Author - Abhishek De, 1/19
+close all; clearvars;
+load fundamentals.mat 
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+resize_fact = 1;
+% Include Gun noise data for statistical tests in order to estimate the RF size
+channels = 3;
+Gaborerror = [];
+DOGerror = [];
+kk = 1;
+num_rows = 10; % Number of cells in a figure
+C = 4;
+resize_fact2 = 1;
+spikename_options = ['sig001a'; 'sig001b'];
+[filename_Lum, spikeIdx_Lum] = fnamesFromTxt2('Lum.txt');
+[filename_LvsM, spikeIdx_LvsM] = fnamesFromTxt2('LvsM.txt');
+[filename_ColorOpponent, spikeIdx_ColorOpponent] = fnamesFromTxt2('ColorOpponent.txt');
+[filename_BY, spikeIdx_BY] = fnamesFromTxt2('BYcandidates.txt');
+Input_List = [filename_Lum; filename_LvsM; filename_ColorOpponent; filename_BY];
+spikeIdx = [spikeIdx_Lum; spikeIdx_LvsM; spikeIdx_ColorOpponent; spikeIdx_BY];
+cellIds = [repmat({'Lum'},size(filename_Lum)); repmat({'LvsM'},size(filename_LvsM)); repmat({'ColorOpponent'},size(filename_ColorOpponent)); repmat({'BY'},size(filename_BY))];
+LumIds = strcmp(cellIds,'Lum');
+LvsMIds = strcmp(cellIds,'LvsM');
+ColorOpponentIds = strcmp(cellIds,'ColorOpponent');
+BYIds = strcmp(cellIds,'BY');
+Gaborphase = zeros(numel(Input_List),1);
+
+for ii = 1:numel(Input_List)
+    filename = char(Input_List{ii}{1}); % acquiring the filename (1st column) from the List
+    Output_List{ii,1} = filename;
+    WN = {};
+    for jj = 1:size(Input_List{ii},2)
+        tmpstro = nex2stro(findfile(char(Input_List{ii}(jj))));
+        if (isempty(WN))
+            WN = tmpstro;
+        else
+            WN = strocat(WN, tmpstro);
+        end
+    end
+    framerate = WN.sum.exptParams.framerate;
+    nstixperside = WN.sum.exptParams.nstixperside;
+    ntrials = length(WN.sum.absTrialNum);
+    stimonidx = find(strcmp(WN.sum.trialFields(1,:),'stim_on'));
+    stimoffidx = find(strcmp(WN.sum.trialFields(1,:),'all_off'));
+    nframesidx = find(strcmp(WN.sum.trialFields(1,:),'num_frames'));
+    noisetypeidx = find(strcmp(WN.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',WN.sum.trialFields(1,:));
+    hepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD11'));
+    vepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD12'));
+    maskidx = strcmp(WN.sum.rasterCells(1,:), 'subunit_mask');
+    anlgStartTimeidx = find(strcmp(WN.sum.rasterCells(1,:),'anlgStartTime'));
+    gammaTable = WN.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    gammaTable1 = interp1(linspace(0,255,256),gammaTable,linspace(0,255,65536), 'spline');
+    invgamma = InvertGamma(gammaTable, 0);
+    
+    % Getting the background rgb/lms
+    ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+   
+    mask_changes = [2 size(WN.trial,1)];
+    spikeidx = spikeIdx(ii);
+    spikename = spikename_options(spikeidx,:); 
+    maxT = 15;
+    out_gun = getWhtnsStats(WN,maxT,'STCOVmex',{nstixperside^2,3,maxT},spikename);
+    STAs_gun = out_gun{1}; STCs_gun = out_gun{2}; nspikes_gun = out_gun{3};
+     
+    % Code for Statistical testing begins here 
+    CHI2CRIT = .95; % For flaging a stixel as significant (adding gun and cone noise z-scores, squared)
+    s_gun = std(STAs_gun(:,1));
+    STAs_gun_z = STAs_gun./s_gun;
+    
+    % Spatial map
+    grandz = zeros([nstixperside nstixperside]);
+    maxzs = [];
+    for i = 1:maxT
+        tmp_gun = reshape(STAs_gun_z(:,i),[nstixperside nstixperside 3]); % This is the only place in the code where I use data from gun noise
+        grandz = grandz+sum(tmp_gun.^2,3);
+        maxzs = [maxzs; sum(sum(tmp_gun(:,:,1).^2)) sum(sum(tmp_gun(:,:,2).^2)) sum(sum(tmp_gun(:,:,3).^2))];
+    end
+    peakframe1 = max(maxzs(:,1)) == maxzs(:,1);
+    peakframe2 = max(maxzs(:,2)) == maxzs(:,2);
+    peakframe3 = max(maxzs(:,3)) == maxzs(:,3);
+    peakframe = max(sum(maxzs,2)) == sum(maxzs,2);
+    id = find(peakframe==1);
+    latency = find(peakframe)*1000/WN.sum.exptParams.framerate;
+    
+    if id~=1
+        peakframe(id-1)= 1;
+    end
+    if id <=maxT-1
+        peakframe(id+1)=1;
+    end
+    crit = chi2inv(CHI2CRIT,channels*maxT); % 3 color channels 
+    L = grandz > crit;
+    
+    % Now get largest contiguous block
+    [i,j] = ind2sub(size(L),find(L));
+    ij = [i,j];
+    T = clusterdata(ij,'linkage','single','distance','euclidean','criterion','distance','cutoff',sqrt(2));
+    clusternmembers = [];
+    for k =1:max(T)
+        clusternmembers(k) = sum(T == k);
+    end
+    dominantcluster = find(clusternmembers == max(clusternmembers));
+    clustermat = zeros(nstixperside, nstixperside);
+    clustermat(sub2ind(size(clustermat),ij(T==dominantcluster(1),1),ij(T==dominantcluster(1),2))) = 1;
+    % Then get convex hull
+    dominantclusteridxs = ij(T==dominantcluster(1),:);
+    tmpSTA = reshape(STAs_gun, [nstixperside^2 3 maxT]);
+    Output_List{ii,2} = squeeze(sum(tmpSTA(:,:,peakframe),3));
+    tmpSTA = permute(tmpSTA, [2 1 3]);
+    try
+        K=convhull(dominantclusteridxs(:,1), dominantclusteridxs(:,2));
+        tmp = dominantclusteridxs(K,:);
+        [x,y] = meshgrid(1:nstixperside,1:nstixperside);
+        inRF = reshape(inpolygon(x(:),y(:),dominantclusteridxs(K,2),dominantclusteridxs(K,1)),[nstixperside, nstixperside]);
+        Output_List{ii,3} = inRF;
+    catch
+        Output_List{ii,3} = zeros(nstixperside,nstixperside);
+    end
+    STAgunmat_pf = Output_List{ii,2};
+    [u1,~,v1] = svd(STAgunmat_pf');
+    m = reshape(v1(:,1),[nstixperside nstixperside]);
+    
+    Output_List{ii,4} = sign(m).*(abs(m).^(1.0));
+    [out1,Output_List{ii,5}] = gaborfit_AD(imresize(Output_List{ii,4},resize_fact)); % fitting gabor
+    Gaborerror = [Gaborerror; out1.fval];
+    Gaborphase(ii) = out1.phi;
+    [out2,Output_List{ii,6}] = DOGfit(imresize(Output_List{ii,4},resize_fact)); % fitting DOG
+    DOGerror = [DOGerror; out2.fval];
+    basisvec_size = nstixperside*nstixperside*3;
+    Output_List{ii,7} = u1(:,1);
+    
+    % storing latency
+    Output_List{ii,8} = latency;
+    
+    figure(kk)
+    % gunnoise based STA
+    tmp_vec_gun = Output_List{ii,2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*Output_List{ii,2} + 0.5;
+    im = reshape(im,[nstixperside nstixperside 3]);
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+1); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gun');
+    end
+    
+    % Peak Frame
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+2); imagesc(imresize(Output_List{ii,4},resize_fact2)); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('RF');
+    end
+   
+    % Gabor Fit R 
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+3); imagesc(Output_List{ii,5}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gabor');
+    end
+    
+    % DOG fit 
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+4); imagesc(Output_List{ii,6}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('DOG');
+    end
+      
+    if mod(ii,num_rows) == 0
+        kk = kk + 1;
+    end
+       
+end
+
+%% Need to come up with a summary statistics for which is a better fit, This statistic probably won't work since the models are not nested.
+% Lets test if AIC or BIC works or not.
+N = nstixperside.^2;
+numgaborparams = 8;
+numDOGparams = 6;
+bins = -100:10:300;
+GaborBIC = N*log(Gaborerror/N) + numgaborparams*log(N);
+DOGBIC = N*log(DOGerror/N) + numDOGparams*log(N);
+deltaBIC = DOGBIC-GaborBIC;
+GaborAIC = 2*numgaborparams + N*log(Gaborerror/N);
+DOGAIC = 2*numDOGparams + N*log(DOGerror/N);
+deltaAIC = DOGAIC-GaborAIC;
+plot_counter = kk+1;
+figure(plot_counter); set(gcf,'Name','model comparison');
+subplot(341); plot(Gaborerror(LumIds),DOGerror(LumIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('Lum'); hold off;
+subplot(342); plot(Gaborerror(LvsMIds),DOGerror(LvsMIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('LvsM'); hold off;
+subplot(343); plot(Gaborerror(ColorOpponentIds),DOGerror(ColorOpponentIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('ColorOpponent'); hold off;
+subplot(344); plot(Gaborerror(BYIds),DOGerror(BYIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('BY'); hold off;
+subplot(345); plot(GaborBIC(LumIds),DOGBIC(LumIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('Lum'); hold off;
+subplot(346); plot(GaborBIC(LvsMIds),DOGBIC(LvsMIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('LvsM'); hold off;
+subplot(347); plot(GaborBIC(ColorOpponentIds),DOGBIC(ColorOpponentIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('Color Opponent'); hold off;
+subplot(348); plot(GaborBIC(BYIds),DOGBIC(BYIds),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('BY'); hold off;
+subplot(349); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LumIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LumIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('Lum'); set(gca,'TickDir','out');hold off;
+subplot(3,4,10); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LvsMIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LvsMIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('LvsM'); set(gca,'TickDir','out');hold off;
+subplot(3,4,11); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(ColorOpponentIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(ColorOpponentIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('ColorOpponent'); set(gca,'TickDir','out');hold off;
+subplot(3,4,12); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(BYIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(BYIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('BY'); set(gca,'TickDir','out');hold off;
+plot_counter = plot_counter+1;
+
+x = [ones(numel(filename_Lum),1); 2*ones(numel(filename_LvsM),1); 3*ones(numel(filename_ColorOpponent),1); 4*ones(numel(filename_BY),1)];
+p = anova1(deltaBIC,x,'off');
+figure(plot_counter); set(gcf,'Name','Boxplots for Lum, LvsM, ColorOpponent: ANOVA 1 way');
+subplot(121); boxplot(deltaBIC,x,'Notch','on','Labels',{'Lum','LvsM','Color Opp','BY'}); title(strcat('deltaBIC',{' '},num2str(p,3))); ylabel('delta BIC'); axis square;
+subplot(122);bar([sum(deltaBIC<0 & LumIds) sum(deltaBIC<0 & LvsMIds) sum(deltaBIC<0 & ColorOpponentIds) sum(deltaBIC<0 & BYIds); sum(deltaBIC>0 & LumIds) sum(deltaBIC>0 & LvsMIds) sum(deltaBIC>0 & ColorOpponentIds) sum(deltaBIC>0 & BYIds)]); 
+legend('Lum','LvsM','Color Opp','BY');set(gca,'xticklabel',{'DOG','Gabor'}); ylabel('no. of cells');
+plot_counter = plot_counter + 1;
+
+% Now I will select 36 most negative and 36 most positive deltaBIC cells and see what the STA looks like: just to visually confirm if the fitting is working 
+% Only considering Luminance and Color-Opponent cells
+numsubplots = 6;
+newind = find(LumIds | ColorOpponentIds);
+[~,id] = sort(deltaBIC(newind));
+mostneg = newind(id(1:numsubplots^2));
+mostpos = newind(id(numel(newind):-1:numel(newind)-numsubplots^2+1)); 
+N = [mostneg; mostpos];
+count = 1;
+for ii = 1:numel(N)
+    tmp_vec_gun = Output_List{N(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[nstixperside nstixperside 3]);
+     
+    figure(plot_counter),subplot(numsubplots,numsubplots,count); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    count = count + 1;
+    if count > numsubplots^2
+        plot_counter = plot_counter + 1;
+        count  = 1;
+    end
+end
+plot_counter = plot_counter + 1;   
+
+figure(plot_counter);bar([sum(LumIds(mostneg)) sum(ColorOpponentIds(mostneg)); sum(LumIds(mostpos)) sum(ColorOpponentIds(mostpos))]);
+legend('Lum','Color Opp');set(gca,'xticklabel',{'best DOG','best Gabor'}); ylabel('no. of cells');
+plot_counter = plot_counter + 1;
+    
+% Selecting all phases from Gabor fits where deltaBIC is positive
+bins = 0:10:500;
+Lumgaborphases = abs(Gaborphase(deltaBIC>0 & LumIds)*180/pi);
+LvsMgaborphases = abs(Gaborphase(deltaBIC>0 & LvsMIds)*180/pi);
+ColorOpponentgaborphases = abs(Gaborphase(deltaBIC>0 & ColorOpponentIds)*180/pi);
+BYgaborphases = abs(Gaborphase(deltaBIC>0 & BYIds)*180/pi);
+x = [ones(numel(Lumgaborphases),1); 2*ones(numel(LvsMgaborphases),1); 3*ones(numel(ColorOpponentgaborphases),1); 4*ones(numel(BYgaborphases),1)];
+p = anova1([Lumgaborphases;LvsMgaborphases;ColorOpponentgaborphases;BYgaborphases],x,'off');
+figure(plot_counter); set(gcf,'Name','Phases of Gabor fits');
+subplot(231); histogram(Lumgaborphases,bins); xlabel('phase'); title('Lum');
+subplot(232); histogram(LvsMgaborphases,bins); xlabel('phase'); title('LvsM');
+subplot(233); histogram(ColorOpponentgaborphases,bins); xlabel('phase'); title('ColorOpponent');
+subplot(234); histogram(BYgaborphases,bins); xlabel('phase'); title('BY');
+subplot(235); boxplot([Lumgaborphases;LvsMgaborphases;ColorOpponentgaborphases;BYgaborphases],x,'Notch','on','Labels',{'Lum','LvsM','Color Opp','BY'}); title(strcat('phase',{' '},num2str(p,3)));axis square;
+plot_counter = plot_counter + 1;
+
+savevariables = 1;
+if savevariables == 1
+    save GaborBICWN GaborBIC
+    save DOGBICWN DOGBIC
+    save GaborAICWN GaborAIC
+    save DOGAICWN DOGAIC
+    save GaborerrorWN Gaborerror
+    save DOGerrorWN DOGerror
+    save Output_ListWN Output_List
+    save Gaborphase Gaborphase
+end
+    
+
+

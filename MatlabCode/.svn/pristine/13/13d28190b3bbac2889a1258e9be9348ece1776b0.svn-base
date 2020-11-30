@@ -1,0 +1,698 @@
+%analysis of data from SC_stimcue paradigm
+%adapted from "FixStimAnalyses.m"
+
+%%
+% Plotting eye trajectories from fpoff to fpoff+300 ms
+% This only plots the short latency saccades
+
+stro = nex2stro;
+targ_x = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targ_x'));
+targ_y = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targ_y'));
+uniquetargxy = unique([targ_x targ_y],'rows');
+ntrials = size(stro.trial,1);
+Lcatchtrials = targ_x == 0 & targ_y == 0;
+laseron_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+laseroff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+fix_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpacq_t'));
+targon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targon_t'));
+targoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targoff_t'));
+sacinit_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccinit_t'));
+sacmade_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccmade_t'));
+
+Llaser = ~isnan(laseron_t);
+samplerate = stro.sum.analog.storeRates{1};
+figure; axes; hold on;
+for i = 1:size(stro.trial,1)
+    x = stro.ras{i,2}*4096/400;
+    y = stro.ras{i,3}*4096/400;
+    t = stro.ras{i,5}+[0:1:length(x)-1]/samplerate;
+    %Lt = t>fpoff_t(i) & t < sacmade_t(i)+.1;
+    Lt = t>fpoff_t(i) & t < fpoff_t(i) +.3;
+
+    h = plot(x(Lt),y(Lt),'k');
+    if Lcatchtrials(i)
+        set(h,'LineStyle','--','color',[0 .5 0]);
+    end
+    if Llaser(i)
+        set(h,'color',[1 0 0]);
+    end
+end
+axis square
+set(gca,'Xlim',[-12 12],'Ylim',[-12 12]);
+
+
+%%
+% Looking at consistency of events across trials
+% First, catch trials
+Lcatchtrial = targ_x == 0 & targ_y == 0;
+figure; subplot(2,1,1); hold on;
+plotcounter = 0;
+for i = find(Lcatchtrial')
+   plot(laseron_t(i)-fpoff_t(i),plotcounter,'m*')
+   plotcounter = plotcounter + 1; 
+end
+
+% Now saccade trials
+% green line is target on to target off
+% red star is saccade initiation
+% magenta star is laser on, magenta triangle is laser off
+
+subplot(2,1,2); hold on;
+plotcounter = 0;
+for i = find(~Lcatchtrial')
+   plot(laseron_t(i)-fpoff_t(i),plotcounter,'m*');
+   plot(laseroff_t(i)-fpoff_t(i),plotcounter,'m^');
+   plot([targon_t(i) targoff_t(i)]-fpoff_t(i),[1 1]*plotcounter,'g-');
+   plot(sacinit_t(i)-fpoff_t(i),plotcounter,'r*');
+   plotcounter = plotcounter + 1; 
+end
+%%
+% Plotting X,Y eye position plots on a per condition basis
+H = stro.ras(:,strcmp(stro.sum.rasterCells,'AD11'));
+V = stro.ras(:,strcmp(stro.sum.rasterCells,'AD12'));
+ep_t = stro.ras(:,strcmp(stro.sum.rasterCells,'anlgStartTime'));
+ADfreq = stro.sum.analog.storeRates{1};
+
+for i = 1:size(uniquetargxy,1)
+    Ltarg = targ_x == uniquetargxy(i,1) & targ_y == uniquetargxy(i,2);
+    trialsid = find(Ltarg);
+    figure; axes; hold on;
+    
+    for counter = 1:sum(Ltarg)
+        trialid = trialsid(counter);
+        h = H{trialid}*4096/400;
+        v = V{trialid}*4096/400;
+        t = [0:length(h)-1]./ADfreq+ep_t{trialid};
+        t = t-targon_t(trialid);
+        Lt = t>0.05 & t<.3;
+        if Llaser(trialid)
+            plot(t(Lt),h(Lt),'g-','Color',[0 1 0]);
+            plot(t(Lt),v(Lt),'r-','Color',[1 0 0]);
+        else
+            plot(t(Lt),h(Lt),'g--','Color',[.5 1 .5]);
+            plot(t(Lt),v(Lt),'r--','Color',[1 .5 .5]);
+        end
+    end
+    title(num2str(uniquetargxy(i,:)/10));
+end
+
+%% 
+% Looking at potential effects of laser on latency
+
+data = [];
+uniquetargxy = unique([targ_x targ_y],'rows');
+for i = 1:size(uniquetargxy,1)
+   Ltarg = targ_x == uniquetargxy(i,1) & targ_y == uniquetargxy(i,2);
+   lat_laser = sacinit_t(Ltarg&Llaser);
+   lat_nolaser = sacinit_t(Ltarg&~Llaser);
+   
+   data(i,:) = [nanmean(lat_laser) sum(~isnan(lat_laser)) nanmean(lat_nolaser) sum(~isnan(lat_nolaser)) ];
+end
+
+figure; axes; hold on;
+for i = 1:size(uniquetargxy,1)
+    tmp = data(i,1)-data(i,3);
+    if data(i,2) > 1 & data(i,4) > 1
+        if tmp == 0 | isnan(tmp)
+            h = plot(uniquetargxy(i,1),uniquetargxy(i,2),'k.','MarkerSize',1);
+        else
+            h = plot(uniquetargxy(i,1),uniquetargxy(i,2),'ko','MarkerSize',abs(tmp),'Linewidth',2);
+            if tmp < 0
+                set(h,'Color','red');
+            end
+        end
+    end
+end
+axis square;
+%%
+% Quickly hacking up a bit of analysis for DToneloc
+stro = nex2stro;
+stimpresent = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimpresent'));
+stim_idx = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_idx'));
+correct = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'correct'));
+Llaser = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'optstim')));
+Lseenresp = (correct&stimpresent) |(~correct&~stimpresent);
+
+lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'lcc'));
+mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'mcc'));
+scc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'scc'));
+oog = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'oog'));
+
+% numbers of different types of corrects/incorrects
+nhit_laser = sum(correct(stimpresent&Llaser));
+nhit_nolaser = sum(correct(stimpresent&~Llaser));
+nFA_laser = sum(~correct(~stimpresent&Llaser));
+nFA_nolaser = sum(~correct(~stimpresent&~Llaser));
+nmiss_laser = sum(~correct(stimpresent&Llaser));
+nmiss_nolaser = sum(~correct(stimpresent&~Llaser));
+nCR_laser = sum(correct(~stimpresent&Llaser));
+nCR_nolaser = sum(correct(~stimpresent&~Llaser));
+
+figure;
+bar([nhit_laser nhit_nolaser; nmiss_laser nmiss_nolaser; nCR_laser nCR_nolaser; nFA_laser nFA_nolaser]);
+set(gca,'Xticklabel',{'Hits','Misses','CRs','FAs'});
+ylabel('trial count');
+
+% Analysing choices on a color-direction basis
+% Firt sanity checking
+colordirs = unique(stim_idx)';
+
+figure;
+for j = colordirs
+    for i = 0:1
+        subplot(3,2,2*j+(i+1)); hold on;
+        plot(lcc(stim_idx == j & Llaser == i & stimpresent),'ro-');
+        plot(mcc(stim_idx == j & Llaser == i & stimpresent),'go-');
+        plot(scc(stim_idx == j & Llaser == i & stimpresent),'bo-');
+%        plot(lcc(stim_idx == j & Llaser == i & stimpresent & ~oog),'r*');
+%        plot(mcc(stim_idx == j & Llaser == i & stimpresent & ~oog),'g*');
+%        plot(scc(stim_idx == j & Llaser == i & stimpresent & ~oog),'b*');
+    end
+end
+% Equating axes
+for j = colordirs
+    axeshandles = [];
+    ylims = [];
+    for i = 1:2
+        subplot(3,2,2*j+i); hold on;
+        axeshandles(i) = gca;
+        ylims(i,:) = get(gca,'Ylim');
+    end
+    for i = 1:2
+       set(axeshandles(i),'Ylim',max(ylims));
+    end
+end
+
+%%
+% Looking at microsaccades from DToneloc experiments
+
+conn = database('Abhishek','','','Vendor','MySql','Server','128.95.153.12');
+location_query = 'SELECT filename FROM DToneloc WHERE (training = ''no'')';
+filenames = fetch(conn, location_query);
+close(conn);
+nfp = [nexfilepath,filesep,'Abhishek',filesep,'DToneloc_trainingfiles'];
+nfp = [nexfilepath,filesep,'Abhishek'];
+
+data = [];
+for fileidx = 1:length(filenames)
+    disp([fileidx length(filenames)]);
+    stro = nex2stro(findfile(filenames{fileidx}, nfp));
+    sacstats = getSacData(stro); close;
+    samplerate = stro.sum.analog.storeRates{1};
+    ntrials = size(stro.trial,1);
+    fix_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpacq_t'));
+    fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+    laseron_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'laseron'));
+    laseroff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'laseroff'));
+    targon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targon_t'));
+    stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+    stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+    saccstart_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccstart_t'));
+    saccend_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccend_t'));
+    Llaser = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'optstim')));
+    Lcorrect = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'correct')));
+    Lstimpresent = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimpresent')));
+    Heye_col = find(strcmp(stro.sum.rasterCells,'AD11'));
+    Veye_col = find(strcmp(stro.sum.rasterCells,'AD12'));
+    Teye_col = find(strcmp(stro.sum.rasterCells,'anlgStartTime'));
+
+    % Creating the "data" matrix which will be used in subsequent analyses
+ 
+    tmpdata = [];
+    PLOT = false;
+    if PLOT
+        figure; axes; hold on;
+    end
+    for i = 1:ntrials
+        x = stro.ras{i,Heye_col}*4096/400;
+        y = stro.ras{i,Veye_col}*4096/400;
+        t = stro.ras{i,Teye_col}+[0:1:length(x)-1]/samplerate;
+        Lt = t > fix_t(i) & t < saccstart_t(i)+.1;
+        offsets = [0 0]; % when to start looking for fixational saccades. 0.2 skips the initial corrective
+        L = sacstats.starttimes{i}>fix_t(i)+offsets(1) & sacstats.endtimes{i}<saccend_t(i)+offsets(2); % saccend_t is before the operant saccade ends, so we don't pick it up here
+        if PLOT
+            plot([sacstats.starttimes{i}(L),sacstats.endtimes{i}(L)]'-fix_t(i),zeros(2,sum(L)),'k-','Linewidth',2);
+            plot(t(Lt)-fix_t(i),x(Lt),'g-');
+            plot(t(Lt)-fix_t(i),y(Lt),'r-');
+            drawnow;
+            pause;
+            cla;
+        end
+        for j = find(L)'
+            tmpdata = [tmpdata; i sacstats.amplitudes{i}(j) sacstats.directions{i}(j) sacstats.starttimes{i}(j)-fix_t(i) Lcorrect(i) Llaser(i) Lstimpresent(i)];
+        end
+    end
+    if ~isempty(data)
+        tmpdata(:,1) = tmpdata(:,1) + data(end,1);
+    end
+    data = [data; tmpdata];
+end
+
+% Each row in data is a fixational saccade
+% order of columns in data:
+TRIALIDX = 1;
+AMPIDX = 2;
+DIRIDX = 3;
+TIMEIDX = 4;
+CORRECTIDX = 5;
+LASERIDX = 6;
+STIMPRESENTIDX = 7;
+
+% Doing the analysis for no laser trials first.
+% this is an important baseline to understand before we
+% start analyzing the effect of the laser.
+% Time zero is fix_t.
+ANALYZELASERTRIALS = 1;
+titles = {'FA','CR','Miss','Hit'};
+binary_conditions = fullfact([2 2])-1;
+% amplitudes
+figure;
+for i = 1:4
+    L = data(:,CORRECTIDX) == binary_conditions(i,1) & data(:,STIMPRESENTIDX) == binary_conditions(i,2) & data(:,LASERIDX) == ANALYZELASERTRIALS;
+    subplot(2,2,i);
+    hist(data(L,AMPIDX),linspace(0,1,30))
+    set(gca,'Xlim',[0 1]);
+    title(titles{i});
+    xlabel('amplitude (deg)');
+    ylabel('count');
+end
+equatesubplotaxeslims;
+if ANALYZELASERTRIALS
+    set(gcf,'name','Laser trials');
+else
+    set(gcf,'name','Non-laser trials');
+end
+
+% directions
+figure;
+for i = 1:4
+    L = data(:,CORRECTIDX) == binary_conditions(i,1) & data(:,STIMPRESENTIDX) == binary_conditions(i,2) & data(:,LASERIDX) == ANALYZELASERTRIALS; 
+    subplot(2,2,i)
+    rose(data(L,DIRIDX))
+    title(titles{i});
+end
+if ANALYZELASERTRIALS
+    set(gcf,'name','Laser trials');
+else
+    set(gcf,'name','Non-laser trials');
+end
+
+% Frequencies
+nbins = 20;
+binedges = linspace(0,min(fpoff_t-fix_t),nbins+1);
+binwidth = binedges(2)-binedges(1);
+PSTHs = zeros(4, nbins);
+nsacs_per_cond = zeros(4,1);
+for i = 1:size(data,1)
+    if data(i,LASERIDX) == ANALYZELASERTRIALS
+        sacstart_times = data(i,TIMEIDX); % microsaccade time relative to fix_t
+        sacstart_times(sacstart_times < 0) = [];
+        tmpidx = data(i,STIMPRESENTIDX)*2+data(i,CORRECTIDX)+1;
+        PSTHs(tmpidx,:) = PSTHs(tmpidx,:) + histcounts(sacstart_times,binedges);
+        nsacs_per_cond(tmpidx) = nsacs_per_cond(tmpidx)+1;
+    end
+end 
+figure;
+for i = 1:4
+   subplot(2,2,i); hold on;
+   bar(binedges(1:end-1)+binwidth/2, PSTHs(i,:)./nsacs_per_cond(i)/binwidth);
+   title(titles{i});
+   set(gca,'Xlim',[0 binedges(end)])
+   plot([mean(stimoff_t-fix_t),mean(stimon_t-fix_t)],[0 0],'g-','linewidth',2);
+   ylabel('sac/sec');
+   xlabel('time(s)');
+   set(gca,'Ylim',[0 1]);
+end
+if ANALYZELASERTRIALS
+    set(gcf,'name','Laser trials');
+else
+    set(gcf,'name','Non-laser trials');
+end
+% Looks like there's a signature of hits vs FAs in microsaccade rate at the
+% end of trials. More microsaccades in FAs than hit trials. Weird.
+
+% Microsaccade directions corrects vs errors (for the same direction saccades)
+labels = {'CR vs misses','hits vs FAs'};
+for i = 0:1 % 0 = CR vs misses. 1 = hits vs FAs.
+    L_cor = data(:,LASERIDX) == ANALYZELASERTRIALS & data(:,STIMPRESENTIDX) == i & data(:,CORRECTIDX) == 1;
+    L_incor = data(:,LASERIDX) == ANALYZELASERTRIALS & data(:,STIMPRESENTIDX) == ~i & data(:,CORRECTIDX) == 0;
+    [~,p_amp] = ttest2(data(L_cor,AMPIDX),data(L_incor,AMPIDX));
+    p_dir = circ_kuipertest(data(L_cor,DIRIDX),data(L_incor,DIRIDX));
+    if ANALYZELASERTRIALS
+        laserstr = 'Laser trials';
+    else
+        laserstr = 'No laser trials';
+    end
+    sprintf('%s. %s: amp: p = %0.2f dir: p = %0.2f', laserstr,labels{i+1},p_amp,p_dir)
+end
+
+% Now comparing microsaccades on identical outcomes (hit, miss, CR, FA)
+% between laser and no laser trials
+titles = {'FA','CR','Miss','Hit'};
+binary_conditions = fullfact([2 2])-1;
+for i = 1:4
+    L_nolaser = data(:,CORRECTIDX) == binary_conditions(i,1) & data(:,STIMPRESENTIDX) == binary_conditions(i,2) & data(:,LASERIDX) == 0;
+    L_laser = data(:,CORRECTIDX) == binary_conditions(i,1) & data(:,STIMPRESENTIDX) == binary_conditions(i,2) & data(:,LASERIDX) == 1;
+    [~,p_amp] = ttest2(data(L_laser,AMPIDX),data(L_nolaser,AMPIDX));
+    p_dir = circ_kuipertest(data(L_laser,DIRIDX),data(L_nolaser,DIRIDX));
+    sprintf('Laser vs non-laser %s: amp: p = %0.3f dir: p = %0.3f', titles{i},p_amp,p_dir)
+end
+% Distribution of microsaccade directions is different on laser miss and no
+% laser miss trials. How about laser miss trials and no laser CR trials
+L_nolaser_CR = data(:,CORRECTIDX) == 1 & data(:,STIMPRESENTIDX) == 0 & data(:,LASERIDX) == 0; % no laser CR
+L_laser_miss = data(:,CORRECTIDX) == 0 & data(:,STIMPRESENTIDX) == 1 & data(:,LASERIDX) == 1; % laser miss
+[~,p_amp] = ttest2(data(L_laser_miss,AMPIDX),data(L_nolaser_CR,AMPIDX));
+p_dir = circ_kuipertest(data(L_laser_miss,DIRIDX),data(L_nolaser_CR,DIRIDX));
+sprintf('No laser CR vs laser miss: amp: p = %0.3f dir: p = %0.3f',p_amp,p_dir)
+
+%%
+% Population analysis of laser effect on stimulus-absent trials 
+% DToneloc
+conn = database('Abhishek','','','Vendor','MySql','Server','128.95.153.12');
+location_query = 'SELECT filename FROM DToneloc WHERE training = ''no''';
+filenames = fetch(conn, location_query);
+close(conn);
+nfp = [nexfilepath,filesep,'Abhishek'];
+
+choice_data = [];
+rt_data = [];
+
+for fileidx = 1:length(filenames)
+    disp([fileidx length(filenames)]);
+    stro = nex2stro(findfile(filenames{fileidx}, nfp));
+    stimpresent = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimpresent'));
+    correct = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'correct'));
+    Llaser = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'optstim')));
+    sacstart_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccstart_t'));
+    fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+    rt = sacstart_t-fpoff_t;
+    
+    lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'lcc'));
+    mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'mcc'));
+    scc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'scc'));
+    oog = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'oog'));
+    
+    % numbers of different types of corrects/incorrects
+    nhit_laser = sum(correct&stimpresent&Llaser);
+    nhit_nolaser = sum(correct&stimpresent&~Llaser);
+    nFA_laser = sum(~correct&~stimpresent&Llaser);
+    nFA_nolaser = sum(~correct&~stimpresent&~Llaser);
+    nmiss_laser = sum(~correct&stimpresent&Llaser);
+    nmiss_nolaser = sum(~correct&stimpresent&~Llaser);
+    nCR_laser = sum(correct&~stimpresent&Llaser);
+    nCR_nolaser = sum(correct&~stimpresent&~Llaser);
+    
+    % Reaction times. Nan means "didn't happen"?
+    rt_hit_laser = mean(rt(correct&stimpresent&Llaser));
+    rt_hit_nolaser = mean(rt(correct&stimpresent&~Llaser));
+    rt_FA_laser = mean(rt(~correct&~stimpresent&Llaser));
+    rt_FA_nolaser = mean(rt(~correct&~stimpresent&~Llaser));
+    rt_miss_laser = mean(rt(~correct&stimpresent&Llaser));
+    rt_miss_nolaser = mean(rt(~correct&stimpresent&~Llaser));
+    rt_CR_laser = mean(rt(correct&~stimpresent&Llaser));
+    rt_CR_nolaser = mean(rt(correct&~stimpresent&~Llaser));
+    
+    choice_data = [choice_data; nhit_laser nhit_nolaser nFA_laser nFA_nolaser nmiss_laser nmiss_nolaser nCR_laser nCR_nolaser];
+    rt_data = [rt_data; rt_hit_laser rt_hit_nolaser rt_FA_laser rt_FA_nolaser rt_miss_laser rt_miss_nolaser rt_CR_laser rt_CR_nolaser];
+end
+data = choice_data;
+
+alpha = 0.01;
+Lstimpresent_effect1 = logical(equalproptest([data(:,1) data(:,2)], [data(:,1)+data(:,5) data(:,2)+data(:,6)],alpha)); % hits laser vs hits no laser
+Lstimpresent_effect2 = ~logical(equalproptest([data(:,1) data(:,4)], [data(:,1)+data(:,5) data(:,4)+data(:,8)],alpha)); % hits laser vs fa no laser
+Lstimpresent_effect = Lstimpresent_effect1;
+
+figure;
+subplot(2,2,1); hold on;
+plot(data(:,2),data(:,1),'ko');
+plot(data(Lstimpresent_effect,2),data(Lstimpresent_effect,1),'ko','MarkerFaceColor','red');
+plot([0 max(data(:,2))],[0 max(data(:,2))],'k-');
+axis square;
+xlabel('hits no laser'); ylabel('hits laser');
+
+subplot(2,2,2); hold on;
+plot(data(:,8),data(:,7),'ko'); xlabel('CRs no laser'); ylabel('CRs laser');
+plot(data(Lstimpresent_effect,8),data(Lstimpresent_effect,7),'ko','MarkerFaceColor','red');
+%plot(data(:,4),data(:,1),'ko'); xlabel('FAs no laser'); ylabel('Hits laser');
+%plot(data(Lstimpresent_effect,4),data(Lstimpresent_effect,1),'ko','MarkerFaceColor','red');
+plot([0 max(data(:,2))],[0 max(data(:,2))],'k-');
+axis square;
+
+subplot(2,2,3); hold on;
+plot(data(:,2)-data(:,1),data(:,7)-data(:,8),'ko');
+lsline;
+plot([min(data(:,2)-data(:,1)) max(data(:,2)-data(:,1))],[0 0],'k-');
+plot(data(Lstimpresent_effect,2)-data(Lstimpresent_effect,1),data(Lstimpresent_effect,7)-data(Lstimpresent_effect,8),'ko','MarkerFaceColor','red');
+xlabel('hits (no laser-laser)');
+ylabel('CR (laser-no laser)');
+axis square;
+
+% At sites where the laser reduces the number of hits, it also increases 
+% the number of correct rejections.
+
+% Does the size of the effect correlate with some measure of general
+% performance on no laser trials (ignoring staircasing for the moment)?
+subplot(2,2,4); hold on;
+plot(data(:,2)-data(:,6),data(:,7)-data(:,8),'ko');
+lsline;
+plot([min(data(:,2)-data(:,6)) max(data(:,2)-data(:,6))],[0 0],'k-');
+plot(data(Lstimpresent_effect,2)-data(Lstimpresent_effect,6),data(Lstimpresent_effect,7)-data(Lstimpresent_effect,8),'ko','MarkerFaceColor','red');
+xlabel('hits-miss (no laser)');
+ylabel('CR (laser-no laser)');
+axis square;
+% In sessions in which the monkey is performing well (= lots of hits in no
+% laser trials) the hoped-for effect appears to be bigger
+
+prettycorr([data(:,7)-data(:,8), data(:,2), data(:,2)-data(:,1)],{'CR (laser-no laser)','hits (no laser)','hits (laser-no laser)'})
+
+% getting rid of nans. Not graceful.
+tmp = [choice_data(:,2)-choice_data(:,6) choice_data(:,2)-choice_data(:,1), choice_data(:,7)-choice_data(:,8), rt_data(:,8)-rt_data(:,2),  rt_data(:,7)-rt_data(:,1)];
+for i = 1:size(tmp,2)
+    tmp(isnan(tmp(:,i)),:) = [];
+end
+prettycorr(tmp,{'hits-misses (no laser)','hits (laser-no laser)','CR (laser-no laser)','RT (CR-hit) no laser', 'RT (CR-hit) laser'})
+% The RT difference between hits and CRs (in no laser trials) is large when
+% the monkey is performing the task well (many hits and few misses on no laser trials).
+% when "RT (CR-hit) laser" is large, the monkey is performing the task
+% similarly on laser and non-laser trials
+
+% --------------------------------------------
+% Binning CRs to make an "ROC" type function.
+USEALLBLOCKS = 1;
+figure; axes; hold on;
+nblocks_stimabsent_laser = data(:,7)+data(:,3); % number of blocks
+nblocks_stimabsent_nolaser = data(:,8)+data(:,4);
+p_cr_laser = data(:,7)./nblocks_stimabsent_laser;
+p_cr_nolaser = data(:,8)./nblocks_stimabsent_nolaser;
+binedges = [0:.15:1]; % binning on x (no laser)
+for i = 1:length(binedges)-1
+    L = p_cr_nolaser > binedges(i) & p_cr_nolaser < binedges(i+1);
+    if ~USEALLBLOCKS
+        L = L & Lstimpresent_effect;
+    end
+    if any(L)
+        mn_cr_nolaser = mean(p_cr_nolaser(L));
+        mn_cr_laser = mean(p_cr_laser(L));
+        % Variance of mean across blocks is the sum of variances across blocks
+        % divided by number of blocks (squared). Variance within each block is
+        % computed under binomial assumptions: (p*(1-p))/n.
+        % So I'm computing the SE of the mean assuming that the things that
+        % went into the mean are binomial proportions.
+        var_cr_nolaser = sum((p_cr_nolaser(L).*(1-p_cr_nolaser(L)))./nblocks_stimabsent_nolaser(L))/sum(L)^2;
+        var_cr_laser = sum((p_cr_laser(L).*(1-p_cr_laser(L)))./nblocks_stimabsent_laser(L))/sum(L)^2;
+        plot(mn_cr_nolaser,mn_cr_laser,'ko','MarkerFaceColor','black');
+        plot(mn_cr_nolaser+(sqrt(var_cr_nolaser).*[-1 1]),mn_cr_laser.*[1 1],'k-');
+        plot(mn_cr_nolaser.*[1 1],mn_cr_laser+(sqrt(var_cr_laser).*[-1 1]),'k-');
+    end
+end
+
+plot(p_cr_nolaser, p_cr_laser,'k.','MarkerEdgeColor',[.75 .75 .75])
+axis square;
+xlabel('CR no laser');
+ylabel('CR laser');
+plot([0 1],[0 1],'k-');
+
+% Fitting ROCs. 
+% ROC data = [nFAs(laser) nFAs(no laser) nstimabsent(laser) nstimabsent(nolaser)]
+% substitute FA(no laser) for hits on the y-axis
+% substitute FA(laser) for FA on the x-axis
+if USEALLBLOCKS
+    ROC_data = [choice_data(:,3) choice_data(:,4) choice_data(:,3)+choice_data(:,7) choice_data(:,4)+choice_data(:,8)];
+else
+    ROC_data = [choice_data(Lstimpresent_effect,3) choice_data(Lstimpresent_effect,4) choice_data(Lstimpresent_effect,3)+choice_data(Lstimpresent_effect,7) choice_data(Lstimpresent_effect,4)+choice_data(Lstimpresent_effect,8)];
+end
+
+figure; subplot(2,1,1); hold on;
+plot(ROC_data(:,1)./ROC_data(:,3), ROC_data(:,2)./ROC_data(:,4),'ko')
+set(gca,'Xlim',[0 1],'Ylim',[0 1]);
+axis square;
+xlabel('Prop. FA laser');
+ylabel('Prop. FA no laser');
+[muhat, sigmahat, initialguesses,stats] = FitROC(ROC_data); % here's the call to the fitting routine
+% Switching the roles of the two distributions so that the (no laser) noise
+% distribution is N(0,1) and the (laser) noise is N(mu, sigma)
+muhat = -muhat/sigmahat;
+sigmahat = 1/sigmahat;
+stats.muCI = -stats.muCI./sigmahat;
+tmp = linspace(-4,4,100);
+plot(1-normcdf(tmp,muhat,sigmahat),1-normcdf(tmp,0,1),'b-');
+plot([0 1],[0 1],'k--');
+
+subplot(2,1,2); hold on;
+plot(tmp, normpdf(tmp,0,1),'k-','Linewidth',2);
+plot(tmp, normpdf(tmp,muhat,sigmahat),'b-','Linewidth',2);
+title(['mu = ',num2str(muhat,'%.2f'),' (',num2str(stats.muCI,'%.2f '),') sigma = ',num2str(sigmahat,'%.2f'),', p(sigma) = ',num2str(stats.p,'%.2f')])
+
+
+%%
+%  Is there an effect of saccade latency on stim present vs stim absent
+%  trials? Is this affected by the laser? By the time of the last
+%  microsaccade preceding the operant saccade?
+
+conn = database('Abhishek','','','Vendor','MySql','Server','128.95.153.12');
+location_query = 'SELECT filename FROM DToneloc WHERE training = ''no''';
+filenames = fetch(conn, location_query);
+close(conn);
+nfp = [nexfilepath,filesep,'Abhishek'];
+
+data = [];
+for fileidx = 1:length(filenames)
+    disp([fileidx length(filenames)]);
+    stro = nex2stro(findfile(filenames{fileidx}, nfp));
+    ntrials = size(stro.trial,1);
+    stimpresent = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimpresent'));
+    correct = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'correct'));
+    Llaser = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'optstim')));
+    saccstart_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'saccstart_t'));
+    fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+    msacstats = getSacData(stro,1);
+    msaclatencies = nan(size(stro.trial,1),1);
+    for trialcounter = 1:size(stro.trial,1)
+        lastmsacidx = find(msacstats.endtimes{trialcounter}<saccstart_t(trialcounter),1,'last');
+        if ~isempty(lastmsacidx)
+            msaclatencies(trialcounter) = msacstats.starttimes{trialcounter}(lastmsacidx)-fpoff_t(trialcounter);
+        end
+    end
+    data = [data; repmat(fileidx,ntrials,1) stimpresent correct Llaser msaclatencies saccstart_t-fpoff_t];
+end
+Lstimpresent = data(:,2) == 1;
+Lcorrect = data(:,3) == 1;
+Lchooserighttarg = (Lstimpresent & Lcorrect) | (~Lstimpresent & ~Lcorrect);
+Llaser = data(:,4) == 1;
+lastmsaclat = data(:,5);
+lat = data(:,6);
+fileidxs = unique(data(:,1));
+
+% Panels 1 and 2: effect of stimulus presence on latency
+figure;
+for j = 0:1
+    subplot(2,2,j+1); hold on;
+    for i = fileidxs'
+        x = lat(Lstimpresent & data(:,1) == i & Llaser == j);
+        y = lat(~Lstimpresent & data(:,1) == i & Llaser == j);
+        [h,p] = ttest2(x,y);
+        if(h)
+            plot(mean(x), mean(y),'ko','MarkerFaceColor','black');
+        else
+            plot(mean(x), mean(y),'ko','MarkerFaceColor','none');
+        end
+    end
+    plot([.1 .2],[.1 .2],'k-');
+    xlabel('latency stim present')
+    ylabel('latency stim not present')
+    axis square;
+    if j== 0
+        title('No laser');
+    else
+        title('laser');
+    end
+end
+
+% Panel 2: Does the laser affect the speed of choosing a particular target?
+for j = 0:1
+    subplot(2,2,j+3); hold on;
+    for i = fileidxs'
+        x = lat(Lchooserighttarg == j & data(:,1) == i & Llaser == 0);
+        y = lat(Lchooserighttarg == j & data(:,1) == i & Llaser == 1);
+        [h,p] = ttest2(x,y);
+        if(h)
+            plot(mean(x), mean(y),'ko','MarkerFaceColor','black');
+        else
+            plot(mean(x), mean(y),'ko','MarkerFaceColor','none');
+        end
+    end
+    plot([.1 .2],[.1 .2],'k-');
+    xlabel('latency no laser')
+    ylabel('latency laser')
+    axis square;
+    if j== 0
+        title('Left choices');
+    else
+        title('Right choices');
+    end
+end
+
+% How do I know this isn't because he's just a little slower to saccade to
+% the left than the right, mechanically?
+
+%%
+% Looking at eye movement traces around the time that the stimulus appears
+% (which is around the time that the laser turns on).
+% Remember, different files have different stimulus/laser durations.
+
+conn = database('Abhishek','','','Vendor','MySql','Server','128.95.153.12');
+location_query = 'SELECT filename FROM DToneloc WHERE training = ''no''';
+filenames = fetch(conn, location_query);
+close(conn);
+nfp = [nexfilepath,filesep,'Abhishek'];
+
+% CORRECT x LASER x STIMPRESENT
+h_data = cell(2,2,2);
+v_data = cell(2,2,2);
+t_offsets = [-.5, .5];
+for fileidx = 1:length(filenames)
+    disp([fileidx length(filenames)]);
+    stro = nex2stro(findfile(filenames{fileidx}, nfp));
+    stimpresent = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimpresent'));
+    correct = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'correct'));
+    Llaser = logical(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'optstim')));
+    stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+    stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+    laseron_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'laseron'));
+    samplerate = stro.sum.analog.storeRates{strcmp(stro.sum.analog.sigid,'AD11')};
+    ntrials = size(stro.trial,1);
+    h_ep = cellfun(@(x)x*4096/400,stro.ras(:,strcmp(stro.sum.rasterCells,'AD11')),'UniformOutput',0);
+    v_ep = cellfun(@(x)x*4096/400,stro.ras(:,strcmp(stro.sum.rasterCells,'AD12')),'UniformOutput',0);
+    t_analogstart = cell2mat(stro.ras(:,strcmp(stro.sum.rasterCells,'anlgStartTime')));
+    if mean(stimoff_t-stimon_t) > .18 & mean(stimoff_t-stimon_t) < .23
+        for j = 1:ntrials
+            t = (t_analogstart(j)-stimon_t(j))+(1./samplerate)*[0:length(h_ep{j})-1];
+            L = t >= t_offsets(1) & t < t_offsets(2);
+            if sum(L) < (t_offsets(2)-t_offsets(1))*samplerate % avoiding round off errors
+                L(find(L,1,'last')+1) = 1;
+            end
+            h_data{correct(j)+1,Llaser(j)+1,stimpresent(j)+1} = [h_data{correct(j)+1,Llaser(j)+1,stimpresent(j)+1}; h_ep{j}(L)'];
+            v_data{correct(j)+1,Llaser(j)+1,stimpresent(j)+1} = [v_data{correct(j)+1,Llaser(j)+1,stimpresent(j)+1}; v_ep{j}(L)'];
+        end
+    end
+end
+
+titlestrs = {{'Correct'; 'Incorrect'},{'Laser','No laser'},{'Stim Present','Stim Absent'}};
+for correct_idx = 1:2
+    for laser_idx = 1:2
+        for stimpresent_idx = 1:2
+            figure; axes; hold on;
+            t_plot = linspace(t_offsets(1),t_offsets(2),size(h_data{1,1,1},2));
+            h = h_data{correct_idx,laser_idx,stimpresent_idx}';
+            v = v_data{correct_idx,laser_idx,stimpresent_idx}';
+            plot(t_plot, h-repmat(h(1,:),size(h,1),1),'r-','Color',[1 .5 .5]);
+            plot(t_plot, v-repmat(v(1,:),size(v,1),1),'b-','Color',[.5 .5 1]);
+            plot(t_plot, mean([h-repmat(h(1,:),size(h,1),1)]'),'r-','LineWidth',2);
+            plot(t_plot, mean([v-repmat(v(1,:),size(v,1),1)]'),'b-','LineWidth',2);
+            titlestr = [titlestrs{1}{correct_idx},', ',titlestrs{2}{laser_idx},', ',titlestrs{3}{stimpresent_idx}];
+            title(titlestr);
+            ylabel('deg');
+        end
+    end
+end

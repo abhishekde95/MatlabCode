@@ -1,0 +1,25 @@
+function hfig = figprefs(a)
+% function hfig = figprefs(a)
+%
+% Makes a figure with defaults appropriate for slide or paper figure
+% INPUTS
+%     a: 1 = Slide, 0 = paper figure (default)
+%
+% OUTPUT
+%     hfig = figure handle
+
+if nargin == 0
+    a = 0;
+end
+if a == 1 % slide 16:9
+    hfig = figure('Units','inches','Position',[1 1 16 9],'Color',[0 0 0]);
+    set(hfig,'DefaultAxesColor',[0 0 0],'DefaultAxesTickDirMode','manual','DefaultAxesTickDir','out','DefaultAxesYColor',[1 1 1],'DefaultAxesXColor',[1 1 1]);
+else % paper figure. Cant set figure to 8.5x11" since Matlab automaticaly scales large figures to screen size. Yuck.
+    hfig = figure('Units','inches','Position',[0 0 8.5 10],'DefaultAxesTickDirMode','manual','DefaultAxesTickdir','out');
+    set(hfig,'DefaultAxesYcolor','black','DefaultAxesXcolor','black');
+    set(hfig,'DefaultAxesFontName','Helvetica','DefaultTextFontName','Helvetica','DefaultAxesFontSize',12,'DefaultAxesFontAngle','italic','DefaultAxesUnits','centimeters');
+    set(hfig,'DefaultAxesPosition',[3 3 7 7],'DefaultAxesNextPlot','add'); % single column
+    %set(0,'DefaultLabelFontSizeMultiplier',1);
+end
+set(hfig,'Renderer','painters','InvertHardCopy','off');
+end

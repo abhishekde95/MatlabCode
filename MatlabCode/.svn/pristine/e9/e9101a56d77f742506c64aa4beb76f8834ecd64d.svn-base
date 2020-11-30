@@ -1,0 +1,320 @@
+% A revised script for the paper figures geared towards addressing the rebuttals 
+% Author - Abhishek De, 4/20
+close all; clearvars;
+plot_counter = 1;
+
+%% Figure 2: Plot of cone weights of all the screened cells
+% Calculating conewts of the cells of interest: SVD 
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+% load Output_ListWN.mat
+load Output_ListWN2.mat
+load Singleopponent.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+
+% calculating the M matrix
+conewts_svd = cell2mat(Output_List(~Singleopponent & simplecells,23)');
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); 
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+figure(plot_counter); set(gcf,'Name','Cone wts') 
+subplot(211);plot(conewts_svd(1,LumIds_conewts),conewts_svd(2,LumIds_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(conewts_svd(1,ColorOpponentIds_conewts),conewts_svd(2,ColorOpponentIds_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(conewts_svd(1,Sconedominated_conewts),conewts_svd(2,Sconedominated_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]);
+plot(conewts_svd(1,Other_conewts),conewts_svd(2,Other_conewts),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); 
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out'); plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');  xlabel('L'), ylabel('M');
+subplot(212); plot(conewts_svd(3,LumIds_conewts),conewts_svd(2,LumIds_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(conewts_svd(3,ColorOpponentIds_conewts),conewts_svd(2,ColorOpponentIds_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(conewts_svd(3,Sconedominated_conewts),conewts_svd(2,Sconedominated_conewts),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]);
+plot(conewts_svd(3,Other_conewts),conewts_svd(2,Other_conewts),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); 
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out'); plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');  xlabel('S'), ylabel('M');
+plot_counter = plot_counter + 1;
+
+% Further classification of S-cone sensitive cells
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+SvsLM = Sconesensitive(:,sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==-1);
+SMvsL = Sconesensitive(:,sign(Sconesensitive(1,:))==-1 & sign(Sconesensitive(3,:))==1);
+SLvsM = Sconesensitive(:,sign(Sconesensitive(1,:))==-1 & sign(Sconesensitive(3,:))==-1);
+
+figure(plot_counter); set(gcf,'Name','Cone wts for S cells') 
+plot(SvsLM(1,:),SvsLM(2,:),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0.5 0.5 0.1],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(SMvsL(1,:),SMvsL(2,:),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0.7 0.3 0.1],'MarkerEdgeColor',[1 1 1]);
+plot(SLvsM(1,:),SLvsM(2,:),'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0.3 0.7 0.1],'MarkerEdgeColor',[1 1 1]); 
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out'); plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');  xlabel('L'), ylabel('M');
+plot_counter = plot_counter + 1;
+
+%% Figure 3: Model fits for each cell type
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+% load Output_ListWN.mat
+load Output_ListWN2.mat
+load Singleopponent.mat
+load modelfits.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+ind = find(~Singleopponent & simplecells);
+
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+% calculating the cone weights
+conewts_svd = cell2mat(Output_List(~Singleopponent & simplecells,23)');
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+Lumind = ind(LumIds_conewts); 
+COind = ind(ColorOpponentIds_conewts); 
+Sconeind = ind(Sconedominated_conewts);
+
+% idx = [Lumind(8); COind(30); Sconeind(20)];
+idx = [Lumind(20); Lumind(2); COind(32); COind(27); Sconeind(15); Sconeind(8)];
+figure(plot_counter);
+L = numel(idx);
+swt_tmp = [-1 -1 1 1 -1 1];
+gf_tmp = [-1 1 1 1 -1 -1];
+dogf_tmp = [-1 1 1 1 -1 -1];
+lambda = 12;
+for ii = 1:numel(idx)
+    jj = idx(ii);
+    %STA
+    im = Output_List{jj,2};
+    normfactor = 0.5/(max(abs(im(:)))+0.01);
+    im = normfactor*im + 0.5;
+    im = reshape(im,[10 10 3]);
+    subplot(8,L,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    
+    % Calculation of significance maps
+    im = reshape(Output_List{jj,2},[10 10 3]);
+    mumat = reshape(Output_List{jj,26},[10 10 3]);
+    sigmamat = reshape(Output_List{jj,27},[10 10 3]);
+    nspikes = Output_List{jj,15};
+    zmat = (im-mumat)./(sigmamat/sqrt(nspikes));
+    maxzscore = max(abs([zmat(:)]));
+    alpha = 0.05;
+    crit = norminv(1-alpha,0,1);
+    
+    % R-significance map
+    pmat = logical(abs(zmat(:,:,1))>crit);
+    im = zmat(:,:,1)./(2*maxzscore)+.5;
+    pmat = pmat.*sign(im-0.5);
+    im = repmat(im,[1 1 3]);
+    sigidxspos = find(pmat==1); sigidxsneg = find(pmat==-1);
+    im(sigidxspos) = 1;  im(sigidxspos+100) = 0.2; im(sigidxspos+200) = 0;
+    im(sigidxsneg) = 0;  im(sigidxsneg+100) = 0.5; im(sigidxsneg+200) = 1;
+    subplot(8,L,ii+L); image(im); axis image; set(gca,'XTick',[],'YTick',[]);
+
+   
+    % G-significance map
+    pmat = logical(abs(zmat(:,:,2))>crit);
+    im = zmat(:,:,2)./(2*maxzscore)+.5;
+    pmat = pmat.*sign(im-0.5);
+    im = repmat(im,[1 1 3]);
+    sigidxspos = find(pmat==1); sigidxsneg = find(pmat==-1);
+    im(sigidxspos) = 1;  im(sigidxspos+100) = 0.2; im(sigidxspos+200) = 0;
+    im(sigidxsneg) = 0;  im(sigidxsneg+100) = 0.5; im(sigidxsneg+200) = 1;
+    subplot(8,L,ii+2*L); image(im); axis image; set(gca,'XTick',[],'YTick',[]); 
+    
+    % B-significance map
+    pmat = logical(abs(zmat(:,:,3))>crit);
+    im = zmat(:,:,3)./(2*maxzscore)+.5;
+    pmat = pmat.*sign(im-0.5);
+    im = repmat(im,[1 1 3]);
+    sigidxspos = find(pmat==1); sigidxsneg = find(pmat==-1);
+    im(sigidxspos) = 1;  im(sigidxspos+100) = 0.2; im(sigidxspos+200) = 0;
+    im(sigidxsneg) = 0;  im(sigidxsneg+100) = 0.5; im(sigidxsneg+200) = 1;
+    % red to .5 where sig.  Looks red on dark and cyan on bright.
+    subplot(8,L,ii+3*L); image(im); axis image; set(gca,'XTick',[],'YTick',[]); 
+    
+    % Cone weights
+    wt = Mrgbtocc * Output_List{jj,5};
+    wt = sign(wt(2))*wt;
+    wt = wt/sum(abs(wt));
+    subplot(8,L,ii+4*L); bar(wt','FaceColor','k'); set(gca,'Ylim',[-1 1],'Xlim',[0 4],'XTick',[1 2 3],'XTicklabel',{'L','M','S'},'Tickdir','out'); axis square;
+    
+    % Spatial weighting function
+    im = swt_tmp(ii)*Output_List{jj,4};
+    im = sigmoid(im,lambda,0)-0.5;
+    subplot(8,L,ii+5*L); image(255*(im./(2*max(abs(im(:))))+.5)); set(gca,'Xlim',[0 10],'Ylim',[0 10],'XTick',[],'YTick',[]); axis image; colormap(gray(255));
+    
+    % Gabor fit
+    im = gf_tmp(ii)*modelfits{jj,2};
+    im = sigmoid(im,lambda,0)-0.5;
+    subplot(8,L,ii+6*L);image(255*(im./(2*max(abs(im(:))))+.5)); set(gca,'Xlim',[0 10],'Ylim',[0 10],'XTick',[],'YTick',[]); axis image; colormap(gray(255));
+    
+    % DoG fit
+    im = -1*dogf_tmp(ii)*modelfits{jj,3};
+    im = sigmoid(im,lambda,0)-0.5;
+    subplot(8,L,ii+7*L); image(255*(im./(2*max(abs(im(:))))+.5));  set(gca,'Xlim',[0 10],'Ylim',[0 10],'XTick',[],'YTick',[]); axis image; colormap(gray(255));
+end
+plot_counter = plot_counter + 1;
+
+%% Plotting the feature vectors of simple and complex cells based on the NLI criterion
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load Output_ListWN2.mat
+load Singleopponent.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+FV_simple = [];
+FV_complex = [];
+for ii = 1:size(Output_List,1) 
+   fr = Output_List{ii,24}; 
+   bins = Output_List{ii,25};
+   fr = (fr-min(fr));
+   fr = fr/max(abs(fr));
+   
+   if fr(1)>fr(end)
+       fr = fliplr(fr);
+   end
+   
+   if simplecells(ii)
+       FV_simple = [FV_simple; fr'];
+   else 
+       FV_complex = [FV_complex; fr'];
+   end
+ 
+end
+subplot(121); errorbar(mean(FV_simple,1),std(FV_simple,1)/sqrt(size(FV_simple,1)),'-ko'); axis square; xlabel('proj'); ylabel('Normalized firing rate'); 
+set(gca,'Tickdir','out','Ylim',[0 1],'YTick',0:0.25:1.0); title('NLI<0'); text(3,0.75,strcat('N=',num2str(size(FV_simple,1))));
+subplot(122); errorbar(mean(FV_complex,1),std(FV_complex,1)/sqrt(size(FV_complex,1)),'-ko'); axis square; xlabel('proj'); ylabel('Normalized firing rate'); 
+set(gca,'Tickdir','out','Ylim',[0 1],'YTick',0:0.25:1.0); title('NLI>0'); text(3,0.75,strcat('N=',num2str(size(FV_complex,1))));
+plot_counter = plot_counter + 1;
+
+%% Identifying the distribution of simple and DO cells for each monkey
+% For reviewer
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+% load Output_ListWN.mat
+load Output_ListWN2.mat
+load Singleopponent.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+
+conewts_svd = cell2mat(Output_List(~Singleopponent & simplecells,23)');
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); 
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+MonkeyID = [];
+for ii = 1:size(Output_List,1)
+    MonkeyID = [MonkeyID; Output_List{ii,1}(1)];
+end
+
+Monkey_K = [sum(ismember(LumIds_conewts,find(MonkeyID=='K'))) sum(ismember(ColorOpponentIds_conewts,find(MonkeyID=='K'))) sum(ismember(Sconedominated_conewts,find(MonkeyID=='K'))) sum(ismember(Other_conewts,find(MonkeyID=='K')))];
+Monkey_S = [sum(ismember(LumIds_conewts,find(MonkeyID=='S'))) sum(ismember(ColorOpponentIds_conewts,find(MonkeyID=='S'))) sum(ismember(Sconedominated_conewts,find(MonkeyID=='S'))) sum(ismember(Other_conewts,find(MonkeyID=='S')))];
+Monkey_M = [sum(ismember(LumIds_conewts,find(MonkeyID=='M'))) sum(ismember(ColorOpponentIds_conewts,find(MonkeyID=='M'))) sum(ismember(Sconedominated_conewts,find(MonkeyID=='M'))) sum(ismember(Other_conewts,find(MonkeyID=='M')))];
+Monkey_P = [sum(ismember(LumIds_conewts,find(MonkeyID=='P'))) sum(ismember(ColorOpponentIds_conewts,find(MonkeyID=='P'))) sum(ismember(Sconedominated_conewts,find(MonkeyID=='P'))) sum(ismember(Other_conewts,find(MonkeyID=='P')))];
+
+%% Analysis of Single Opponent cells 
+% Plotting the distribution of the ratio of response in the lowest frequency bin divided by the response in the highest bin 
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load Output_ListWN2.mat
+load Singleopponent.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+
+load Deviation.mat
+meanR = zeros(size(Deviation));
+Ratio_of_power = [];
+for ii = 1:size(Output_List,1)
+    im = Output_List{ii,4};
+    fim = fft2(im);
+    Ratio_of_power = [Ratio_of_power; max(abs(fim(:)))/abs(fim(1))]; 
+    
+    for jj = 1:size(Deviation,2)
+        meanR(ii,jj) = mean(cos(Deviation{ii,jj}*pi/180));
+    end 
+end
+
+x = logspace(0,4,51);
+figure(plot_counter); subplot(221); histogram(Ratio_of_power,x); axis square; set(gca,'Tickdir','out','XScale','log');
+ylabel('# cells'); xlabel('Highest response divided by response in lowest freq');
+subplot(222); plot(Ratio_of_power,meanR(:,3)-meanR(:,4),'o','MarkerFaceColor',[1 1 1],'MarkerEdgeColor',[0 0 0]); hold on;
+axis square; set(gca,'Tickdir','out','XScale','log'); ylabel('R(DOG-SG)'); xlabel('Highest response divided by response in lowest freq'); hold off;
+subplot(223); plot(Ratio_of_power,meanR(:,3),'o','MarkerSize',3,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Ratio_of_power,meanR(:,4),'o','MarkerSize',3,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Ratio_of_power,meanR(:,2),'o','MarkerSize',3,'MarkerFaceColor',[0 0.5 1],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Ratio_of_power,meanR(:,1),'o','MarkerSize',3,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+axis square; set(gca,'Tickdir','out','XScale','log'); ylabel('R[DOG,SG,Gabor]'); xlabel('Highest response divided by response in lowest freq'); 
+legend('DoG','SG','Gabor','Crescent'); hold off;
+subplot(224); histogram(meanR(:,3),0:0.05:1.0,'Displaystyle','stairs','EdgeColor',[1 0 0]); hold on;
+histogram(meanR(:,4),0:0.05:1.0,'Displaystyle','stairs','EdgeColor',[0 1 0]); hold on;
+histogram(meanR(:,2),0:0.05:1.0,'Displaystyle','stairs','EdgeColor',[0 0 1]); hold on;
+histogram(meanR(:,1),0:0.05:1.0,'Displaystyle','stairs','EdgeColor',[0 0 0]); hold on;
+axis square; set(gca,'Tickdir','out','Xlim',[0 1]); xlabel('R[DOG,SG,Gabor]'); ylabel('# cells');  
+legend('DoG','SG','Gabor','Crescent'); hold off;
+plot_counter = plot_counter + 1;
+
+% Plotting the STAs of the Single-opponent cells 

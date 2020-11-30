@@ -1,0 +1,150 @@
+% This is the what REX calls at the top of each LMTF experiment. It contains all
+% of the experiment setup and continuation calls. Also enables the IsoSamp
+% replay experiment ("validation") where a set of stimuli used in IsoSamp
+% experiments are shown to a psychophysical observer to get the thresholds.
+
+function to_rex = init_LMTF(minTF, maxTF, trials_per_block, nblocks)
+global gl
+gl.trials_per_block = trials_per_block + mod(trials_per_block, 2); % round up to nearest even # (REX does this too)
+gl.blocks_remaining = nblocks;
+
+% brand new experiment? set some sensible defaults
+if gl.init_new_exp
+    gl.nfiles = 0;
+    gl.processed_fnames = [];
+    replay_experiment = false;
+    if gl.std_inputs
+        new_stim = setup_starting_stimuli([1 -1 1; 1 -1 5; 1 -1 10; 1 -1 20]);
+        pred_threshs = [.03 .03 .03 .1]';
+    else
+        new_stim = setup_starting_stimuliM([1 1 minTF; 1 -1 minTF; 1 1 maxTF; 1 -1 maxTF]);
+        pred_threshs = inf(size(new_stim,1),1);
+    end
+else
+    % make sure the n stored filenames match the first n user-specified filenames
+    if gl.nfiles > length(gl.incoming_fnames) ...
+            || ~isequal(gl.incoming_fnames(1:gl.nfiles), gl.processed_fnames)
+        % incoming filenames don't match what we've processed; prepare to reload data
+        gl.nfiles = 0;
+        gl.data = [];
+        gl.isostim = [];
+        gl.rfxy = [];
+    end
+    
+    % get the stimuli from a set of incoming NEX files
+    % if there are IsoSamp NEX files, then those stimuli are stuck into
+    % gl.isostim. this facilitates the IsoSamp replay experiment where one can
+    % directly compare neural and behavioral responses to a fixed set of
+    % stimuli.
+    [gl.data,gl.isostim, gl.rfxy] = extract_nex_data(gl.data, gl.incoming_fnames, gl.nfiles+1, gl.isostim);
+        
+    replay_experiment = ~isempty(gl.isostim);
+    
+    gl.processed_fnames = gl.incoming_fnames;
+    gl.nfiles = length(gl.incoming_fnames);
+    
+    % gl.min/maxTF are the end points of a TF lattice
+    % used in evaluate_posterior below
+    if replay_experiment
+        gl.minTF = min(gl.isostim(:,1));
+        gl.maxTF = max(gl.isostim(:,1));
+    else
+        gl.minTF = min(gl.data(:,1));
+        gl.maxTF = max(gl.data(:,1));
+    end
+end
+
+hyp = default_hyperparameters();
+
+% choose up to NSTIMPERROUND IsoSamp stimuli not already shown until there are
+% none left
+if replay_experiment
+    if ~isempty(gl.data)
+        rounded_isostim = round(gl.isostim(:,1:2)*1e6)/1e6;
+        rounded_data = round(gl.data(:,1:2)*1e6)/1e6;
+        [~,Idiff] = setdiff(rounded_isostim, rounded_data, 'rows', 'stable');
+        remaining_stim = gl.isostim(Idiff,1:2);
+    else
+        remaining_stim = gl.isostim(:,1:2);
+        Idiff = 1:size(gl.isostim,1);
+    end
+    
+    nremaining = size(remaining_stim, 1);
+    if nremaining == 0
+        error('There are no more stimuli to test! You''re done!');
+    end
+    
+    if nremaining > gl.NSTIMPERROUND
+        picks = randsample(nremaining, gl.NSTIMPERROUND);
+        new_stim = remaining_stim(picks,:);
+        pred_threshs = 10.^gl.isostim(Idiff(picks),3);
+    else
+        new_stim = remaining_stim;
+        pred_threshs = 10.^gl.isostim(Idiff,3);
+    end
+elseif ~gl.init_new_exp % evaluate the posterior and pick new stimuli
+    xdata = gl.data(:,1:2); % [log10(tf) theta]
+    ydata = gl.data(:,3); % log10(threshold)
+    oog = gl.data(:,4);
+    
+    % now we use gpml, a Gaussian Process package, to help pick new color
+    % directions
+    if size(xdata, 1) > 12 % if we have enough data, then refit the hyperparameters
+        hyp = minimize_hyps(hyp, xdata(~oog,:), ydata(~oog));
+    end
+    [xs1,xs2,yhat,ps2] = evaluate_posterior(hyp, xdata, ydata, gl.minTF, gl.maxTF); % gl.minTF, gl.maxTF are log10(TF)
+    [new_stim,ynew] = next_directions_to_test(xs1, xs2, yhat, ps2, gl.NSTIMPERROUND, hyp, xdata, ydata); % xs1 is in log10(TF), xs2 is radians, yhat is in log10(thresholds)
+    plot_regression(xdata, ydata, xs1, xs2, yhat, new_stim, ynew);
+    pred_threshs = 10.^ynew;
+else % It's a new experiment - send [0 0] for rfxy which tells REX to use whatever the user chooses
+    gl.rfxy = [0 0];
+end
+
+nstims = size(new_stim, 1);
+print_stimuli(new_stim);
+
+% let the user edit the stimuli
+% you'll need to manually set gl.edit non-zero in the global gl struct before
+% every experiment (i.e., "global gl; gl.edit = 1;")
+if ~replay_experiment && isfield(gl, 'edit') && gl.edit
+    [new_stim,changed] = user_stim_edit(new_stim);
+    if any(changed)
+        ynew(changed) = interp2(xs1, xs2, reshape(yhat, size(xs1)), new_stim(changed,1), new_stim(changed,2), 'cubic');
+        plot_regression(xdata, ydata, xs1, xs2, yhat, new_stim, ynew);
+        pred_threshs = 10.^ynew;
+    end
+    gl.edit = 0; % the user has to opt-in each time
+end
+
+gl.stimuli = [cos(new_stim(:,2)) sin(new_stim(:,2)) 10.^new_stim(:,1)];
+
+% conditions is a matrix that has stimulus indices in the first column and a hemifield flag in the
+% second column (0: flip stimulus position signs; 1: don't).
+gl.conditions = fullfact([nstims 2]);
+gl.conditions(:,end) = gl.conditions(:,end)-1;
+% conds_remaining is a vector that decrements when the ith stimulus+hemifield condition is shown
+gl.conds_remaining = gl.trials_per_block/2*ones(size(gl.conditions,1),1);
+% this is an index into conditions and conds_remaining
+gl.cond_idx = randi(length(gl.conds_remaining));
+% If the above is confusing, blame Charlie; it's a relic from his time. We must
+% all deal with that legacy in various forms.
+
+% Make a set of initial QUEST functions for each stimulus, being mindful
+% of the monitor's gamut.
+[gl.Q.ranges,gl.max_cc_scales] = get_gamut_ranges(gl.stimuli(:,1:2));
+INITCONTRASTSCALE = 4; % boost up the contrast so the first few trials are easy to see
+% we use a Gaussian prior, so mu will be the first contrast shown
+mu = min([INITCONTRASTSCALE*pred_threshs gl.max_cc_scales'], [], 2);
+sd = 1.5*gl.max_cc_scales; % 1.5 is an arbitrary choice, although we do want a broad prior
+gl.Q.funcs = init_QUEST_with_priors(gl.Q.ranges, mu, sd);
+
+% Pass the hyperparameters to REX so they end up in the data file. There was
+% considerable effort expended to make this feature robust to changes in the
+% number of hyperparameters.
+
+% use orderfields to sort the field names lexicographically. this way there's an unambiguous
+% reconstruction of the hyp structure from the vector of hyperparameter values (paired with the
+% number of elements within each field and the number of fields--also passed to REX).
+hyp_vals = struct2cell(orderfields(hyp)); % all of the hyperparameter values
+nhyp_vals = cellfun(@length, hyp_vals); % how many values per hyperparameter
+to_rex = [nstims length(hyp_vals) nhyp_vals(:)' cat(1, hyp_vals{:})' gl.rfxy];

@@ -1,0 +1,190 @@
+% This is a new analysis to where I want to see if there is any correlation
+% between changes in RGB triplets between checkerboard and subunit STA and
+% logresidual ratio of the fits of cells
+% Author - Abhishek De, 12/17
+
+close all; clearvars;
+load S1LMS.mat 
+load S2LMS.mat
+
+% Loading the files 
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM WNthresh');
+NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+close(conn);
+filename = filename(strcmp(string(NTmode),"subunit"));
+NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+RGBsubunits = cell(1,numel(filename));
+RGBcheck = cell(1,numel(filename));
+latencySTAcheck = [];
+latencySTAsubunit = [];
+latencybetweensubunits = [];
+latencydiffWNchecksubunit = [];
+anglediffWNchecksubunit = [];
+eig_PC = [];
+for ii = 1:numel(filename)
+    ind = ii;
+    fileofinterest = char(filename(ind,:));
+    disp(ii);
+%     if strcmp(fileofinterest(1),'M') == 1
+%         Maui = [Maui; ii];
+%     else
+%         Pangu = [Pangu; ii];
+%     end
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a'; %getSpikenum(stro);
+    maskidx = strcmp(stro.sum.rasterCells(1,:), 'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ngammasteps = 2^16; % 65536
+    seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+    nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    %     latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+    sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+    msperframe = 1000/stro.sum.exptParams.framerate;
+    ntrials = size(stro.trial,1);
+    maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+    xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+    yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+    
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    if numel(unique(basisvecidx))>1
+        Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+        inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+        if isempty(inds)
+            inds = size(stro.trial,1)-1;
+        end
+        last_wntrial =  inds(1)-1;
+    else
+        last_wntrial = ntrials;
+    end
+    for k = 3:last_wntrial
+        if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+            continue
+        else
+            mask_changes = [mask_changes k-1 k];
+        end
+    end
+    if mask_changes(end) == last_wntrial
+        mask_changes(end) = [];
+    else
+        mask_changes = [mask_changes  last_wntrial];
+    end
+    mask_changes = reshape(mask_changes , 2, []);
+    for jj = 1:2 % 1st column is for checkerboard noise, 2nd column is for the subunit noise
+        trial_span = mask_changes(:,jj);
+        st_mask = stro.ras{trial_span(1),maskidx}; % subunit mask
+        st_mask(st_mask == 0) = Inf;
+        [stIdxs,~,~] = unique(st_mask); % now the Infs map to nsubunits+1
+        num_subunits = length(stIdxs)-any(isinf(stIdxs)); % nsubunits, like subunits A and B
+        if ~num_subunits
+            num_subunits = nstixperside^2;
+        end
+        STCOV_st('init', {num_subunits 3 maxT});
+        for k = trial_span(1):trial_span(2)
+            nframes = stro.trial(k,nframesidx);
+            if (nframes == 0)
+                continue;
+            end
+            seed = stro.trial(k,seedidx);
+            mu = stro.trial(k,muidxs)/1000;
+            sigma = stro.trial(k,sigmaidxs)/1000;
+            org_mask = stro.ras{k,maskidx};
+            if any(org_mask)
+                org_mask(org_mask == 0) = Inf;
+                [subunitIdxs,~,mask] = unique(org_mask); % now the Infs map to nsubunits+1
+                nrandnums_perchannel = length(subunitIdxs)-any(isinf(subunitIdxs)); % nsubunits, like subunits A and B
+                mask = [mask; mask+max(mask); mask+2*max(mask)]; %#ok<AGROW>
+            else
+                nrandnums_perchannel = nstixperside^2; % In this case, it is the 100 pixels which are flickering when no subunits are selected
+            end
+            invnormcdf = bsxfun(@plus, bsxfun(@times, yy, sigma), mu);
+            randnums = getEJrandnums(3*nrandnums_perchannel*nframes, seed); % random numbers for 300 x 9 pixels
+            % This is the extracted colors for subunits/pixels using the seed number
+            randnums = reshape(randnums, 3*nrandnums_perchannel, nframes);
+            for gun = 1:3
+                idxs = (1:nrandnums_perchannel)+nrandnums_perchannel*(gun-1);
+                randnums(idxs,:) = reshape(invnormcdf(randnums(idxs,:)+1,gun),[length(idxs) nframes]);
+            end
+            rgbs = randnums;
+            t_stimon = stro.trial(k, stimonidx);
+            spiketimes = (stro.ras{k,spikeidx}-t_stimon)*1000; % observing spiketimes in milliseconds
+            frametimes = linspace(0, nframes*msperframe, nframes)+(msperframe/2)';
+            spiketimes(spiketimes < maxT*msperframe) = [];
+            spiketimes(spiketimes > frametimes(end)) = [];
+            n = hist(spiketimes, frametimes);
+            STCOV_st(rgbs(:),n);
+        end
+        out = STCOV_st('return'); % returns the covariance matrix on frame by frame basis
+        STS = out{1};  % A (dimension) x 9(frames) matrix
+        nspikes = out{3};
+        
+        if jj == 1
+            STAcheck = STS/nspikes;
+        else
+            STAsubunit = STS/nspikes; % Storing the STA subunit
+            STCross = out{2};
+            STAs = STS/nspikes;
+            tmp = STS(:)*STS(:)';
+            STCs = (nspikes.*STCross-tmp)/(nspikes*(nspikes-1));
+            P = eye(size(STCs)) - STAs(:)*inv(STAs(:)'*STAs(:))*STAs(:)'; % WHAT DOES THIS LINE MEAN
+            STCs = P*STCs*P';
+            [~,d] = eig(STCs);
+            eig_PC = [eig_PC; sort(diag(d)')]; % storing all the eigenvalues
+        end
+        clear STCOV_st out
+    end
+
+    % Calculating stuff for STA subunit
+    STAsubunit = fliplr(STAsubunit);
+    [~,whichframe] = max(sum(STAsubunit.^2,1));
+    [~,whichframe1] = max(sum(STAsubunit(1:2:5,:).^2,1));
+    [~,whichframe2] = max(sum(STAsubunit(2:2:6,:).^2,1));
+    RGBsubunits{ii} = [STAsubunit(1:2:5,whichframe); STAsubunit(2:2:6,whichframe)];
+    latencySTAsubunit = [latencySTAsubunit; whichframe*msperframe];
+    latencybetweensubunits = [latencybetweensubunits; (whichframe1-whichframe2)*msperframe];
+    
+    % Calculating stuff for STA check
+    STAcheck = fliplr(STAcheck);
+    [~,whichframe4] = max(sum(STAcheck.^2,1));
+    latencySTAcheck = [latencySTAcheck; whichframe4*msperframe];
+    latencydiffWNchecksubunit = [latencydiffWNchecksubunit; (whichframe-whichframe4)*msperframe];
+    subunit1R = mean(STAcheck(find(mask==1),whichframe4)); subunit2R = mean(STAcheck(find(mask==2),whichframe4));
+    subunit1G = mean(STAcheck(find(mask==4),whichframe4)); subunit2G = mean(STAcheck(find(mask==5),whichframe4));
+    subunit1B = mean(STAcheck(find(mask==7),whichframe4)); subunit2B = mean(STAcheck(find(mask==8),whichframe4));
+    RGBcheck{ii} = [subunit1R; subunit1G; subunit1B; subunit2R; subunit2G; subunit2B];
+    anglediffWNchecksubunit = [anglediffWNchecksubunit; 180*acos(dot(RGBcheck{ii},RGBsubunits{ii})/(norm(RGBcheck{ii})*norm(RGBsubunits{ii})))/pi];
+    
+end
+
+
+savevariables = 0; % 0-don't save, 1 -save 
+if savevariables
+    save latencySTAcheck latencySTAcheck
+    save latencySTAsubunit latencySTAsubunit
+    save latencybetweensubunits latencybetweensubunits
+    save latencydiffWNchecksubunit latencydiffWNchecksubunit
+    save anglediffWNchecksubunit anglediffWNchecksubunit
+    save eig_PC eig_PC
+end
+
+%%
+load logresidualratio.mat
+load absS.mat
+load anglebwvectorsRGB.mat
+
+% Here I would like to use prettycorr
+N1 = numel(filename_c);
+prettycorr([logresidualratio(1:N1),anglediffENchecksubunit(1:N1),absS(1:N1)',latencybetweensubunits(1:N1),latencySTAsubunit(1:N1),latencySTAcheck(1:N1),latencydiffWNchecksubunit(1:N1),anglebwvectorsRGB(1:N1)],{'LogResRat','Anglediffchecksubunit','S','Latencybwsubunits','LatencySTAsubunit','LatencySTAcheck','Latencydiffchecksubunits','AngleRGB'});
+prettycorr([logresidualratio(N1+1:end),anglediffENchecksubunit(N1+1:end),absS(N1+1:end)',latencybetweensubunits(N1+1:end),latencySTAsubunit(N1+1:end),latencySTAcheck(N1+1:end),latencydiffWNchecksubunit(N1+1:end),anglebwvectorsRGB(N1+1:end)],{'LogResRat','Anglediffchecksubunit','S','Latencybwsubunits','LatencySTAsubunit','LatencySTAcheck','Latencydiffchecksubunits','AngleRGB'});

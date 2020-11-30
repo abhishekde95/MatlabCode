@@ -1,0 +1,12 @@
+% Checking non-stationarity: Population Analyses of cells
+% Author - Abhishek De, 2/20
+
+close all; clearvars;
+load baselineFRstats.mat
+
+r = []; p = [];
+for ii=1:numel(baselineFRstats)
+    [tmp_r, tmp_p] = corr((1:numel(baselineFRstats{ii}))',baselineFRstats{ii},'type','Pearson');
+    r = [r; tmp_r];
+    p = [p; tmp_p];
+end

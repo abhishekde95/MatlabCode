@@ -1,0 +1,417 @@
+% A derivative of PopAnalysis_WNthresh_isoresp_LM_OC.m
+% Cross validation of linear and non-linear models on the isoresponse curve.
+% Author- Abhishek De, 12/19
+
+close all; clearvars;
+plot_counter = 1;
+
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM WNthresh');
+NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+close(conn);
+filename = filename(strcmp(string(NTmode),"subunit"));
+NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+count = 1;
+THETA_all = cell(2,numel(filename));
+RHO_all = cell(2,numel(filename));
+oog_idx_all = cell(2,numel(filename));
+not_oog_idx_all = cell(2,numel(filename));
+bkgndRGB = cell(1,numel(filename)); % for storing the background RGBs
+subunitbasisvec = cell(1,numel(filename));
+baselineFRstats = cell(1,numel(filename));
+TFR = zeros(2,numel(filename));
+baselineexceedsTFR = zeros(1,numel(filename));
+confidence_score = zeros(1,numel(filename)); % a measure of how often the baselineFR exceeded the TFR
+RF_loc = [];
+Pangu = [];
+Maui = [];
+anglebwvectorsRGB = [];
+WTS = cell(2,numel(filename));
+SpikeCounts = cell(2,numel(filename));
+S1LMS = []; S2LMS = [];
+S1RGB = []; S2RGB = [];
+pixelswithinsubunit1 = [];
+pixelswithinsubunit2 = [];
+GAMUTEDGE = 10;
+num_rows = 4;
+linear_modelparams = [];
+quad_modelparams = [];
+SSE_linearmodel =  cell(1,numel(filename)); % residuals from the linear model
+SSE_quadmodel = cell(1,numel(filename)); % residuals from the quadratic model
+RSSE_linearmodel = cell(1,numel(filename)); % residuals from the linear model from robust regression
+RSSE_quadmodel = cell(1,numel(filename)); % residuals from the quadratic model from robust regression
+RSSE_linearmodel_train = cell(1,numel(filename)); % residuals from the linear model from robust regression, training set
+RSSE_quadmodel_train = cell(1,numel(filename)); % residuals from the quadratic model from robust regression, training set
+fitmodels = 0;
+for aa= 1:numel(filename)
+    global reversalflagidx stepsizescale stepsize nreversals
+    fileofinterest = char(filename(aa,:));
+    disp(fileofinterest);
+    if strcmp(fileofinterest(1),'M') == 1
+        Maui = [Maui; aa];
+    else
+        Pangu = [Pangu; aa];
+    end
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
+    parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ngammasteps = 2^16; % 65536
+    linepredtol = stro.sum.exptParams.linepredtol;
+    stepsizescale = stro.sum.exptParams.stepsizescale;
+    stepsize = stro.sum.exptParams.stepsize;
+    nreversals = stro.sum.exptParams.nreversals;
+    oogscale = stro.sum.exptParams.oogscale;
+    seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+    nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    fponidx = strcmp(stro.sum.trialFields(1,:),'fp_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    basisvecdiridx = strcmp(stro.sum.trialFields(1,:),'weights_idx');
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh'); % when exactly the neurothresh trials started
+    targetspikerateidx = strcmp(stro.sum.trialFields(1,:),'targetspikerate');
+    correctidx = strcmp(stro.sum.trialFields(1,:),'correct');
+    muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+    sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    reversalflagidx = strcmp(stro.sum.trialFields(1,:),'reversalflag');
+    msperframe = 1000/stro.sum.exptParams.framerate;
+    ntrials = size(stro.trial,1);
+    maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+    xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+    yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+    
+    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+    M = inv(M');
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    pixelswithinsubunit1 = [pixelswithinsubunit1; sum(stro.ras{inds(end)-1,maskidx}==1)];
+    pixelswithinsubunit2 = [pixelswithinsubunit2; sum(stro.ras{inds(end)-1,maskidx}==2)];
+    neurothreshmode = stro.trial(:,neurothreshidx);
+    basisvec_dropidx = inds(end);
+    neurothresh_startidx = max(find(neurothreshmode==1,1),basisvec_dropidx+1); % There is possibility of pressing the Neurothresh button multiple times
+    num_targetspikerates = unique(stro.trial(neurothresh_startidx:end,targetspikerateidx));
+    t_offset = stro.trial(end,latencyidx)/1000;
+    vect = stro.ras{basisvec_dropidx,basisvecidx};
+    basisvec_size = nstixperside*nstixperside*3;
+    numvect = (numel(vect)/basisvec_size)-1;
+    basisvec = cell(1,numvect);
+    for ii = 1:numvect
+        tmp_vec = vect((ii-1)*basisvec_size+1:basisvec_size*ii) + vect(numvect*basisvec_size+1:basisvec_size*(numvect+1));
+        basisvec{ii} = reshape(tmp_vec,[nstixperside nstixperside 3]);
+    end
+    bkgnd_monitor = reshape(vect(numvect*basisvec_size+1:basisvec_size*(numvect+1)),[nstixperside nstixperside 3]);
+    % Calculating cone and gun weights
+    tmp1 = unique(basisvec{1}-bkgnd_monitor,'stable');
+    tmp2 = unique(basisvec{2}-bkgnd_monitor,'stable');
+    S1RGB = [S1RGB tmp1(tmp1~=0)];
+    S2RGB = [S2RGB tmp2(tmp2~=0)];
+    tmpLMS1 = M*tmp1(tmp1~=0);
+    tmpLMS1 = tmpLMS1/sum(abs(tmpLMS1));
+    S1LMS = [S1LMS tmpLMS1]; % subunit 1 cone weights
+    tmpLMS2 = M*tmp2(tmp2~=0);
+    tmpLMS2 = tmpLMS2/sum(abs(tmpLMS2));
+    S2LMS = [S2LMS tmpLMS2]; % subunit 2 cone weights
+    
+    norms = cell(1,numel(num_targetspikerates));
+    completed_search_alongdir = cell(1,numel(num_targetspikerates));
+    for jj = 1:numel(num_targetspikerates) % as of now just focusing on 1 target firing rates
+        tmp_wts = [];
+        spikecounts = [];
+        idxs = find(~isnan(stro.trial(:,correctidx)) & stro.trial(:,targetspikerateidx)==num_targetspikerates(jj));
+        idxs(idxs<=neurothresh_startidx) = [];
+        different_weights = unique(stro.trial(idxs,basisvecdiridx));
+        tmp_norm = [];
+        tmp_completed_search_alongdir = [];
+        for kk = 1:numel(different_weights)
+            idxs1 = find(stro.trial(:,basisvecdiridx) == different_weights(kk));
+            idxs1(idxs1<neurothresh_startidx) = [];
+            raster_data = stro.ras(idxs1,1);
+            tmp_norm = [tmp_norm; stro.ras{idxs1(end),weightsidx}'];
+            tmp_wts = [tmp_wts;cell2mat(stro.ras(idxs1,weightsidx)')'];
+            for ii = 1:size(raster_data,1)
+                tmp = raster_data{ii} ;
+                spikes = tmp(tmp>stro.trial(idxs1(ii),stimonidx)+t_offset & tmp < stro.trial(idxs1(ii),stimoffidx));
+                spikes = spikes - stro.trial(idxs1(ii),stimonidx)-t_offset;
+                spikecounts = [spikecounts; numel(spikes)];
+            end
+            [flag, gamutViolation] = Check_ifcompletely_probed(stro,basisvec,bkgnd_monitor,idxs1,tmp_norm(end,:));
+            % flag = 0, incompletely probed
+            % flag = 1, completely probed
+            % gamutViolation = 1, out of gamut point
+            tmp_completed_search_alongdir = [tmp_completed_search_alongdir; flag gamutViolation];
+        end
+        norms{jj} = tmp_norm;
+        completed_search_alongdir{jj} = tmp_completed_search_alongdir;
+        WTS{jj,aa} = tmp_wts;
+        SpikeCounts{jj,aa} = spikecounts;
+    end
+    basisvec1 = basisvec{1}-bkgnd_monitor;
+    basisvec2 = basisvec{2}-bkgnd_monitor;
+    oog1 = min(abs((1-bkgnd_monitor(:))./basisvec1(:)));
+    oog2 = min(abs((1-bkgnd_monitor(:))./basisvec2(:)));
+    tmp = basisvec1 + basisvec2;
+    subunitbasisvec{aa} = (0.5 * tmp./(max(abs(tmp(:))) + 0.01)) + 0.5;
+    % Calculate baselineFR
+    num_spikes =[];
+    num_dur = [];
+    for ii = 1:size(stro.ras,1)
+        tmp = stro.ras{ii,1} ;
+        if ~isnan((stro.trial(ii,stimonidx)- stro.trial(ii,fpacqidx)))
+            spikes = tmp(tmp<stro.trial(ii,stimonidx) & tmp>stro.trial(ii,fpacqidx));
+            num_spikes = [num_spikes; numel(spikes)];
+            num_dur = [num_dur; (stro.trial(ii,stimonidx)- stro.trial(ii,fpacqidx))];
+        end
+    end
+    baselineFRstats{aa} = num_spikes./num_dur;
+    TFR(1,aa) = num_targetspikerates(1);
+    if numel(num_targetspikerates)>1
+        TFR(2,aa) = num_targetspikerates(2);
+    end
+    baselineexceedsTFR(aa) = any(baselineFRstats{aa}>TFR(aa));
+    confidence_score(aa) = 1-(numel(find(baselineFRstats{aa}>TFR(aa)))/numel(baselineFRstats{aa}));
+    
+    for ii = 1:numel(num_targetspikerates)
+        tmp = norms{ii};
+        completed_dir = completed_search_alongdir{ii};
+        probed_dirs = logical(completed_dir(:,1)==1); % only including the directions that have been completely probed
+        oog_idx = find(completed_dir(:,1)==1 & completed_dir(:,2)==1); % probed and out of gamut
+        not_oog_idx = find(completed_dir(:,1)==1 & completed_dir(:,2)==0);
+        fact = 0.5./sqrt(tmp(probed_dirs,1).^2 + tmp(probed_dirs,2).^2); % factor needed to extract unit vector
+        [THETA1,RHO1] = cart2pol(tmp(:,1),tmp(:,2));
+        ind = (1:numel(THETA1))';
+        r = fliplr(linspace(0,1,numel(ind)));
+        b = fliplr(r);
+        THETA1 = THETA1 * (180/pi);
+        THETA_all{ii,aa} = THETA1;
+        RHO_all{ii,aa} = RHO1;
+        oog_idx_all{ii,aa} = oog_idx;
+        not_oog_idx_all{ii,aa} = not_oog_idx;
+    end
+    
+    
+    % Acquiring the receptive field location
+    RF_loc = [RF_loc; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+    
+    % Calculating angle between vectors
+    vec3 = S1RGB(:,end);
+    vec4 = S2RGB(:,end);
+    anglebwvectorsRGB = [anglebwvectorsRGB; 180*acos(dot(vec3,vec4)/(norm(vec3)*norm(vec4)))/pi];
+    
+    if fitmodels
+        % Fitting the model
+        THETA_orig = THETA_all{1,aa};
+        THETA_orig = THETA_orig * pi/180; % converting to radians
+        if any(THETA_orig>(135*pi/180))
+            allthetas = linspace(-pi,pi,100);
+            newtheta = linspace(-pi,pi,101);
+        else
+            allthetas = linspace(-pi/4,3*pi/4,100);
+            newtheta = linspace(-pi/4,3*pi/4,101);
+        end
+        RHO_orig = RHO_all{1,aa};
+        oog_idx_orig = oog_idx_all{1,aa};
+        not_oog_idx_orig = not_oog_idx_all{1,aa};
+        
+        % Plotting the isoresponse data
+        [X,Y] = pol2cart(THETA_orig,RHO_orig);
+        figure(plot_counter), subplot(num_rows,2,2*count-1); plot(THETA_orig(not_oog_idx),log(RHO_orig(not_oog_idx)),'o','MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+        plot(THETA_orig(oog_idx),log(RHO_orig(oog_idx)),'o','MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+        subplot(num_rows,2,2*count); plot(THETA_orig(not_oog_idx),log(RHO_orig(not_oog_idx)),'o','MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on;
+        plot(THETA_orig(oog_idx),log(RHO_orig(oog_idx)),'o','MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+        
+        % Need to create a cross validation set here
+        c = cvpartition(not_oog_idx_orig,'LeaveOut');
+        
+        tmp_RSSE_linearmodel = []; tmp_RSSE_quadmodel = [];
+        tmp_SSE_linearmodel = []; tmp_SSE_quadmodel = [];
+        tmp_RSSE_linearmodel_train = []; tmp_RSSE_quadmodel_train = [];
+        for cvset = 1:c.NumTestSets
+            % First, redefining the essential terms below
+            THETA = [THETA_orig(not_oog_idx_orig(c.training(cvset))); THETA_orig(oog_idx_orig)];
+            RHO = [RHO_orig(not_oog_idx_orig(c.training(cvset))); RHO_orig(oog_idx_orig)];
+            not_oog_idx = 1:c.TrainSize(cvset);
+            oog_idx = not_oog_idx(end)+1 : not_oog_idx(end)+numel(oog_idx_orig);
+            outofgamut = zeros(size(THETA));
+            outofgamut(oog_idx) = 1;
+            outofgamut = logical(outofgamut);
+            
+            % Fitting the linear model: fval1R -> robust regression, fval1OLS -> Ordinary least square fitting
+            [x_orig, y_orig] = pol2cart(THETA,RHO);
+            initguess1 = [x_orig(not_oog_idx) y_orig(not_oog_idx)]\ones(numel(x_orig(not_oog_idx)),1);
+            [final_model1,fval1R_train] = linefit_AD2(RHO, THETA,not_oog_idx,outofgamut,initguess1');
+            rho1 = 1./(final_model1*[cos(allthetas); sin(allthetas)]);
+            LOOGtmp1= rho1<0;
+            [x_lin,y_lin] = pol2cart(allthetas(~LOOGtmp1),rho1(~LOOGtmp1));
+            [~,~,~,fval1R,fval1OLS] = calclinSSE(final_model1,RHO_orig(not_oog_idx_orig(c.test(cvset))),THETA_orig(not_oog_idx_orig(c.test(cvset))),1:c.TestSize(cvset)); % Testing the linear model
+            
+            % Fitting the quadratic model
+            initguess3 = [0 0 0 final_model1];
+            [final_model31] = quadfit_AD2(RHO, THETA, not_oog_idx,outofgamut,initguess3);
+            [final_model32] = conicsectionfit(x_orig(not_oog_idx),y_orig(not_oog_idx),initguess3); % passing on the values to conicsection fit which fits in x-y plane
+            [final_model32] = quadfit_AD2(RHO, THETA, not_oog_idx,outofgamut,final_model32); % repassing the values to quadfit which fits in r-theta plane
+            
+            % Selecting the best quadratic model
+            [~,~,fval3R0_train] = calcquadSSE(initguess3,RHO,THETA,not_oog_idx);
+            [~,~,fval3R1_train] = calcquadSSE(final_model31,RHO,THETA,not_oog_idx);
+            [~,~,fval3R2_train] = calcquadSSE(final_model32,RHO,THETA,not_oog_idx);
+            error = [fval3R0_train fval3R1_train fval3R2_train];
+            [~,min_ind] = min(error);
+            fval3R_train = error(min_ind);
+            switch min_ind
+                case 1
+                    final_model3 = initguess3;
+                case 2
+                    final_model3 = final_model31;
+                otherwise
+                    final_model3 = final_model32;
+            end
+            
+            [x_quad,y_quad,rho3] = calc_xyvalues(allthetas, final_model3);
+            L = rho3>0 & rho3==real(rho3);
+            [x_quad2,y_quad2] = pol2cart(newtheta(L),rho3(L)');
+            [~,~,fval3R,fval3OLS] = calcquadSSE(final_model3,RHO_orig(not_oog_idx_orig(c.test(cvset))),THETA_orig(not_oog_idx_orig(c.test(cvset))),1:c.TestSize(cvset)); % Testing the quadratic model
+            
+            % Storing the linear and quadratic model residuals
+            tmp_RSSE_linearmodel = [tmp_RSSE_linearmodel; fval1R];
+            tmp_RSSE_quadmodel = [tmp_RSSE_quadmodel; fval3R];
+            tmp_SSE_linearmodel = [tmp_SSE_linearmodel; fval1OLS];
+            tmp_SSE_quadmodel = [tmp_SSE_quadmodel; fval3OLS];
+            tmp_RSSE_linearmodel_train = [tmp_RSSE_linearmodel_train; fval1R_train];
+            tmp_RSSE_quadmodel_train = [tmp_RSSE_quadmodel_train; fval3R_train];
+            
+            % Plotting the linear and quadratic fits to the isoresponse data
+            figure(plot_counter), subplot(num_rows,2,2*count-1); plot(allthetas(~LOOGtmp1),log(rho1(~LOOGtmp1)),'r'); hold on;
+            subplot(num_rows,2,2*count);plot(newtheta(L),log(rho3(L)),'r'); hold on;
+            
+        end
+        subplot(num_rows,2,2*count-1); axis square; set(gca,'Tickdir','out','Xlim',[-1.0 2.5],'Ylim',[-4 2]); hold off;
+        subplot(num_rows,2,2*count); axis square; set(gca,'Tickdir','out','Xlim',[-1.0 2.5],'Ylim',[-4 2]); hold off;
+        
+        RSSE_linearmodel{aa} = tmp_RSSE_linearmodel;
+        RSSE_quadmodel{aa} = tmp_RSSE_quadmodel;
+        SSE_linearmodel{aa} = tmp_SSE_linearmodel;
+        SSE_quadmodel{aa} = tmp_SSE_quadmodel;
+        RSSE_linearmodel_train{aa} = tmp_RSSE_linearmodel_train;
+        RSSE_quadmodel_train{aa} = tmp_RSSE_quadmodel_train;
+        
+        count  = count + 1;
+        if count == (num_rows + 1)
+            count = 1;
+            plot_counter = plot_counter + 1;
+        end
+    end
+end
+
+savevariables = 0;
+if savevariables
+    save RSSE_linearmodel_CV RSSE_linearmodel
+    save RSSE_quadmodel_CV RSSE_quadmodel
+    save SSE_linearmodel_CV SSE_linearmodel
+    save SSE_quadmodel_CV SSE_quadmodel
+    save RSSE_linearmodel_CV_train RSSE_linearmodel_train
+    save RSSE_quadmodel_CV_train RSSE_quadmodel_train
+    save THETA_all THETA_all
+    save RHO_all RHO_all
+    save oog_idx_all oog_idx_all
+    save not_oog_idx_all not_oog_idx_all
+end
+%%
+load RSSE_linearmodel_CV.mat
+load RSSE_quadmodel_CV
+load SSE_linearmodel_CV
+load SSE_quadmodel_CV
+load RSSE_linearmodel_CV_train
+load RSSE_quadmodel_CV_train
+
+% Storing the median RSSE values
+Quad_errors_median = []; Lin_errors_median = [];
+Quad_errors_mean = []; Lin_errors_mean = [];
+Quad_errors_median_train = []; Lin_errors_median_train = [];
+Quad_errors_mean_train = []; Lin_errors_mean_train = [];
+p_signrank = []; p_signrank_train = [];
+for ii = 1:numel(RSSE_linearmodel)
+    Lin_errors_median = [Lin_errors_median; median(RSSE_linearmodel{ii})];
+    Quad_errors_median = [Quad_errors_median; median(RSSE_quadmodel{ii})];
+    Lin_errors_mean = [Lin_errors_mean; mean(RSSE_linearmodel{ii})];
+    Quad_errors_mean = [Quad_errors_mean; mean(RSSE_quadmodel{ii})];
+    
+    Lin_errors_median_train = [Lin_errors_median_train; median(RSSE_linearmodel_train{ii})];
+    Quad_errors_median_train = [Quad_errors_median_train; median(RSSE_quadmodel_train{ii})];
+    Lin_errors_mean_train = [Lin_errors_mean_train; mean(RSSE_linearmodel_train{ii})];
+    Quad_errors_mean_train = [Quad_errors_mean_train; mean(RSSE_quadmodel_train{ii})];
+    
+    p_signrank = [p_signrank; signrank(RSSE_linearmodel{ii},RSSE_quadmodel{ii})];
+    p_signrank_train = [p_signrank_train; signrank(RSSE_linearmodel_train{ii},RSSE_quadmodel_train{ii})];
+end
+
+% Looking at the testing errors
+pcrit = 0.05;
+bins1 = -0.2:0.1:4;
+bins2 = logspace(-1,3,41);
+figure(plot_counter); set(gcf,'Name','Test set: Leave-one-out cross-validation');
+subplot(321); plot(Lin_errors_median(p_signrank>=pcrit),Quad_errors_median(p_signrank>=pcrit),'o','MarkerSize',4,'MarkerFaceColor',[1 1 1],'MarkerEdgeColor',[0 0 0]); hold on;
+plot(Lin_errors_median(p_signrank<pcrit),Quad_errors_median(p_signrank<pcrit),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.001;10],[0.001;10],'k');
+set(gca,'Tickdir','out','Xlim',[0.001 10],'XScale','log','Ylim',[0.001 10],'YScale','log','Xtick',[0.001 0.01 0.1 1.0 10],'Ytick',[0.001 0.01 0.1 1.0 10]); title('Median error'); xlabel('Linear'); ylabel('Quadratic'); legend('p>0.05','p<0.05'); axis square;
+subplot(322); plot(Lin_errors_mean(p_signrank>=pcrit),Quad_errors_mean(p_signrank>=pcrit),'o','MarkerSize',4,'MarkerFaceColor',[1 1 1],'MarkerEdgeColor',[0 0 0]); hold on;
+plot(Lin_errors_mean(p_signrank<pcrit),Quad_errors_mean(p_signrank<pcrit),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.001;10],[0.001;10],'k');
+set(gca,'Tickdir','out','Xlim',[0.001 10],'XScale','log','Ylim',[0.001 10],'YScale','log','Xtick',[0.001 0.01 0.1 1.0 10],'Ytick',[0.001 0.01 0.1 1.0 10]); title('Mean error'); xlabel('Linear'); ylabel('Quadratic'); axis square;
+subplot(323); histogram(Lin_errors_median-Quad_errors_median,bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_median(p_signrank<pcrit)-Quad_errors_median(p_signrank<pcrit),bins1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.2 4]); title('Median error'); xlabel('Linear error - Quadratic error'); ylabel('# cells'); legend('p>0.05','p<0.05'); axis square;
+subplot(324); histogram(Lin_errors_mean-Quad_errors_mean,bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_mean(p_signrank<pcrit)-Quad_errors_mean(p_signrank<pcrit),bins1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.2 4]); title('Mean error'); xlabel('Linear error - Quadratic error');  ylabel('# cells'); axis square;
+subplot(325); histogram(Lin_errors_median./Quad_errors_median,bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_median(p_signrank<pcrit)./Quad_errors_median(p_signrank<pcrit),bins2,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 1000],'XScale','log','Xtick',[0.1 1.0 10 100 1000]); title('Median error'); ylabel('# cells'); xlabel('Linear error/Quadratic error'); legend('p>0.05','p<0.05'); axis square;
+subplot(326); histogram(Lin_errors_mean./Quad_errors_mean,bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_mean(p_signrank<pcrit)./Quad_errors_mean(p_signrank<pcrit),bins2,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 1000],'XScale','log','Xtick',[0.1 1.0 10 100 1000]); title('Mean error'); ylabel('# cells'); xlabel('Linear error/Quadratic error');  axis square;
+plot_counter = plot_counter + 1;
+
+[r,p] = corr(Lin_errors_median./Quad_errors_median,Lin_errors_mean./Quad_errors_mean);
+
+% Looking at the training errors
+figure(plot_counter); set(gcf,'Name','Training set: Leave-one-out cross-validation');
+subplot(321); plot(Lin_errors_median_train(p_signrank_train>=pcrit),Quad_errors_median_train(p_signrank_train>=pcrit),'o','MarkerSize',4,'MarkerFaceColor',[1 1 1],'MarkerEdgeColor',[0 0 0]); hold on;
+plot(Lin_errors_median_train(p_signrank_train<pcrit),Quad_errors_median_train(p_signrank_train<pcrit),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.001;10],[0.001;10],'k');
+set(gca,'Tickdir','out','Xlim',[0.001 10],'XScale','log','Ylim',[0.001 10],'YScale','log','Xtick',[0.001 0.01 0.1 1.0 10],'Ytick',[0.001 0.01 0.1 1.0 10]); title('Median error'); xlabel('Linear'); ylabel('Quadratic'); legend('p>0.05','p<0.05'); axis square;
+subplot(322); plot(Lin_errors_mean_train(p_signrank_train>=pcrit),Quad_errors_mean_train(p_signrank_train>=pcrit),'o','MarkerSize',4,'MarkerFaceColor',[1 1 1],'MarkerEdgeColor',[0 0 0]); hold on;
+plot(Lin_errors_mean_train(p_signrank_train<pcrit),Quad_errors_mean_train(p_signrank_train<pcrit),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.001;10],[0.001;10],'k');
+set(gca,'Tickdir','out','Xlim',[0.001 10],'XScale','log','Ylim',[0.001 10],'YScale','log','Xtick',[0.001 0.01 0.1 1.0 10],'Ytick',[0.001 0.01 0.1 1.0 10]); title('Mean error'); xlabel('Linear'); ylabel('Quadratic'); axis square;
+subplot(323); histogram(Lin_errors_median_train-Quad_errors_median_train,bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_median_train(p_signrank_train<pcrit)-Quad_errors_median_train(p_signrank_train<pcrit),bins1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.2 4]); title('Median error'); xlabel('Linear error - Quadratic error'); ylabel('# cells'); legend('p>0.05','p<0.05'); axis square;
+subplot(324); histogram(Lin_errors_mean_train-Quad_errors_mean_train,bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_mean_train(p_signrank_train<pcrit)-Quad_errors_mean_train(p_signrank_train<pcrit),bins1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.2 4]); title('Mean error'); xlabel('Linear error - Quadratic error');  ylabel('# cells'); axis square;
+subplot(325); histogram(Lin_errors_median_train./Quad_errors_median_train,bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_median_train(p_signrank_train<pcrit)./Quad_errors_median_train(p_signrank_train<pcrit),bins2,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 1000],'XScale','log','Xtick',[0.1 1.0 10 100 1000]); title('Median error'); ylabel('# cells'); xlabel('Linear error/Quadratic error'); legend('p>0.05','p<0.05'); axis square;
+subplot(326); histogram(Lin_errors_mean_train./Quad_errors_mean_train,bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+histogram(Lin_errors_mean_train(p_signrank_train<pcrit)./Quad_errors_mean_train(p_signrank_train<pcrit),bins2,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 1000],'XScale','log','Xtick',[0.1 1.0 10 100 1000]); title('Mean error'); ylabel('# cells'); xlabel('Linear error/Quadratic error');  axis square;
+plot_counter = plot_counter + 1;

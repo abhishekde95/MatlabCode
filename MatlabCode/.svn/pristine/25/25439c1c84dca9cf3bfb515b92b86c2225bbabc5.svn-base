@@ -1,0 +1,18 @@
+% Fitting a glm to neuronal response 
+% Author - Abhishek De, 2/20
+close all; clearvars;
+plot_counter = 1;
+
+% Created a whitenoise stimulus 
+T = 1; % in seconds 
+dt = 0.001; % Sampling time
+t = 0:dt:T;
+Stim = randn(size(t));
+
+% Generate a dummy filter
+Filt = 
+
+figure(plot_counter);
+plot(t,Stim,'k'); axis square; set(gca,'Tickdir','out');
+xlabel('T'); ylabel('Stim'); 
+plot_counter = plot_counter + 1;

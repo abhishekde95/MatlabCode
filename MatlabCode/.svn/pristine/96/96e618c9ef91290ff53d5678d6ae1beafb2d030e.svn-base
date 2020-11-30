@@ -1,0 +1,77 @@
+% Population analysis for Fixstim CR, quantifying suppression and
+% excitation
+% Author - Abhishek De, 6/18
+close all; clearvars;
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM Fixstim_CR');
+training = fetch(conn,'SELECT isolation FROM Fixstim_CR');
+comments = fetch(conn,'SELECT comments FROM Fixstim_CR');
+close(conn);
+plot_counter = 1;
+offset = [-1.0 .75];
+binwidth = .005;
+bins = offset(1):binwidth:offset(2);
+baselinebins = (bins>-0.5 & bins<0);
+N = ceil(sqrt(numel(filename)));
+figure(plot_counter); set(gcf,'Name','Population FixStim Analysis');
+figure(plot_counter+1); set(gcf,'Name','Suppression or Activation');
+baselineFR = [];
+lasertrialsFR = [];
+for aa = 1:numel(filename)
+    stro = nex2stro(findfile(char(filename(aa))));
+    stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+    stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+    targon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targon_t'));
+    targoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targoff_t'));
+    targ_shown = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targ_shown'));
+    laser_power = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'laser_power'));
+    contrasts = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'contrast'));
+    fpacq_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpacq_t'));
+    uniquecontrasts = unique(contrasts);
+    uniquepowers = unique(laser_power);
+    sync_t = targon_t;  % Ecode for alignment
+    Lspikechans = strncmp(stro.sum.rasterCells,'sig0',4);
+    % Plotting the laser Trials
+    samplingrate = stro.sum.analog.storeRates{3};
+    multiplicationfactor = 0.75;
+    spikecounts = cell(1,numel(uniquepowers));
+    figure(plot_counter);subplot(N,N,aa);
+    for jj = 2:numel(uniquepowers)
+        L = find(laser_power==uniquepowers(jj));
+        laserinterval = [];
+        targetinterval = [];
+        tmp_spikecounts = [];
+        PSTH = zeros(1,length(bins));
+        for ii = 1:numel(L)
+            ind = L(ii);
+            reference = targon_t(ind);
+            analogstarttime = stro.ras{ind,5};
+            spiketimes = stro.ras{ind,1};
+            tmp_spikecounts = [tmp_spikecounts; numel(find((spiketimes>targon_t(ind) & spiketimes<targoff_t(ind))>0))];
+            time = linspace(analogstarttime,(analogstarttime + numel(stro.ras{ind,4})/samplingrate),numel(stro.ras{ind,4}));
+            spiketimes = spiketimes - reference;
+            time = time - reference;
+            laserinterval = [laserinterval; stimoff_t(ind)-stimon_t(ind)];
+            targetinterval = [targetinterval; targoff_t(ind)-targon_t(ind)];
+            plot(spiketimes,multiplicationfactor*ii + 0.1*ones(size(spiketimes)),'k.'); hold on;
+            PSTH = PSTH + hist(spiketimes, bins);
+        end
+        laserindsbins = bins > nanmean(stimon_t-targon_t) & bins < nanmean(stimon_t-targon_t) + mean(laserinterval);
+        baselineFR = [baselineFR; sum(PSTH(baselinebins))/(numel(L)*0.5)];
+        lasertrialsFR = [lasertrialsFR; sum(PSTH(laserindsbins))/(numel(L)*mean(laserinterval))];
+        spikecounts{jj} = tmp_spikecounts;
+        subplot(N,N,aa); hold on; plot(bins,PSTH,'r','Linewidth',2); hold on;
+        title(char(filename(aa))); xlabel('Time'), ylabel('Trial Number');
+        line([0 0],[0 multiplicationfactor*ii+1],'Color',[0 1 0]); line([mean(targetinterval) mean(targetinterval)],[0 multiplicationfactor*ii+1],'Color',[0 1 0]); hold off;
+        line([nanmean(stimon_t-targon_t) nanmean(stimon_t-targon_t)],[0 multiplicationfactor*ii+1],'Color',[0 0 1]); line([nanmean(stimon_t-targon_t)+mean(laserinterval) nanmean(stimon_t-targon_t)+mean(laserinterval)],[0 multiplicationfactor*ii+1],'Color',[0 0 1]); 
+        set(gca,'Xlim',[-0.75 0.75]); axis square; hold off;
+        drawnow; 
+    end
+    figure(plot_counter+1); subplot(N,N,aa); bar([baselineFR(aa) lasertrialsFR(aa)]); ylabel('FR'); title(char(filename(aa))); axis square;
+    set(gca,'XTick',[1 2],'XTickLabel',{'BL','Laser'},'Xlim',[0 3]);
+    
+end
+plot_counter = plot_counter + 2;
+figure(plot_counter); plot(baselineFR,lasertrialsFR,'o','MarkerSize',7,'LineWidth',1.0,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); axis square;
+xlabel('baseline'); ylabel('laser'); set(gca,'Xlim',[0 250],'Ylim',[0 250]); line([0 250],[0 250]);
+plot_counter = plot_counter + 1;

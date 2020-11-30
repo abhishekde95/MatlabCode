@@ -1,0 +1,622 @@
+% Author - Abhishek De, 2/18
+% Classifying lime-magenta and orange-cyan cells: This part is pretty much for CoSYNE
+close all; clearvars;
+plot_counter = 1;
+load filename_c.mat
+load filename_l.mat
+filename = [filename_c; filename_l];
+% filename_additional = leftoverfiles(filename); % These are the leftover files whose isoresponse contours looked noisy by eye
+% filename = [filename_additional(1:29);filename_additional(32:end)];
+count = 1;
+THETA_all = cell(2,numel(filename));
+RHO_all = cell(2,numel(filename));
+oog_idx_all = cell(2,numel(filename));
+not_oog_idx_all = cell(2,numel(filename));
+bkgndRGB = cell(1,numel(filename)); % for storing the background RGBs 
+subunitbasisvec = cell(1,numel(filename));
+baselineFRstats = cell(1,numel(filename));
+TFR = zeros(2,numel(filename));
+baselineexceedsTFR = zeros(1,numel(filename));
+confidence_score = zeros(1,numel(filename)); % a measure of how often the baselineFR exceeded the TFR
+RF_loc = [];
+Pangu = [];
+Maui = [];
+anglebwvectorsRGB = [];
+WTS = cell(2,numel(filename));
+SpikeCounts = cell(2,numel(filename));
+S1LMS = []; S2LMS = [];
+S1RGB = []; S2RGB = [];
+pixelswithinsubunit1 = [];
+pixelswithinsubunit2 = [];
+for aa= 1:numel(filename)
+    global reversalflagidx stepsizescale stepsize nreversals
+    fileofinterest = char(filename(aa,:));
+    disp(fileofinterest);
+    if strcmp(fileofinterest(1),'M') == 1
+        Maui = [Maui; aa];
+    else
+        Pangu = [Pangu; aa];
+    end
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
+    parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ngammasteps = 2^16; % 65536
+    linepredtol = stro.sum.exptParams.linepredtol;
+    stepsizescale = stro.sum.exptParams.stepsizescale;
+    stepsize = stro.sum.exptParams.stepsize;
+    nreversals = stro.sum.exptParams.nreversals;
+    oogscale = stro.sum.exptParams.oogscale;
+    seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+    nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    fponidx = strcmp(stro.sum.trialFields(1,:),'fp_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    basisvecdiridx = strcmp(stro.sum.trialFields(1,:),'weights_idx');
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh'); % when exactly the neurothresh trials started
+    targetspikerateidx = strcmp(stro.sum.trialFields(1,:),'targetspikerate');
+    correctidx = strcmp(stro.sum.trialFields(1,:),'correct');
+    muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+    sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    reversalflagidx = strcmp(stro.sum.trialFields(1,:),'reversalflag');
+    msperframe = 1000/stro.sum.exptParams.framerate;
+    ntrials = size(stro.trial,1);
+    maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+    xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+    yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+ 
+    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+    M = inv(M');
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    pixelswithinsubunit1 = [pixelswithinsubunit1; sum(stro.ras{inds(end)-1,maskidx}==1)];
+    pixelswithinsubunit2 = [pixelswithinsubunit2; sum(stro.ras{inds(end)-1,maskidx}==2)];
+    neurothreshmode = stro.trial(:,neurothreshidx);
+    basisvec_dropidx = inds(end);
+    neurothresh_startidx = max(find(neurothreshmode==1,1),basisvec_dropidx+1); % There is possibility of pressing the Neurothresh button multiple times
+    num_targetspikerates = unique(stro.trial(neurothresh_startidx:end,targetspikerateidx));
+    t_offset = stro.trial(end,latencyidx)/1000;
+    vect = stro.ras{basisvec_dropidx,basisvecidx};
+    basisvec_size = nstixperside*nstixperside*3;
+    numvect = (numel(vect)/basisvec_size)-1;
+    basisvec = cell(1,numvect);
+    for ii = 1:numvect
+        tmp_vec = vect((ii-1)*basisvec_size+1:basisvec_size*ii) + vect(numvect*basisvec_size+1:basisvec_size*(numvect+1));
+        basisvec{ii} = reshape(tmp_vec,[nstixperside nstixperside 3]);
+    end
+    bkgnd_monitor = reshape(vect(numvect*basisvec_size+1:basisvec_size*(numvect+1)),[nstixperside nstixperside 3]);
+    % Calculating cone and gun weights
+    tmp1 = unique(basisvec{1}-bkgnd_monitor,'stable');
+    tmp2 = unique(basisvec{2}-bkgnd_monitor,'stable');
+    S1RGB = [S1RGB tmp1(tmp1~=0)];
+    S2RGB = [S2RGB tmp2(tmp2~=0)];
+    tmpLMS1 = M*tmp1(tmp1~=0);
+    tmpLMS1 = tmpLMS1/sum(abs(tmpLMS1));
+    S1LMS = [S1LMS tmpLMS1]; % subunit 1 cone weights
+    tmpLMS2 = M*tmp2(tmp2~=0);
+    tmpLMS2 = tmpLMS2/sum(abs(tmpLMS2));
+    S2LMS = [S2LMS tmpLMS2]; % subunit 2 cone weights
+
+    norms = cell(1,numel(num_targetspikerates));
+    completed_search_alongdir = cell(1,numel(num_targetspikerates));
+    for jj = 1:numel(num_targetspikerates) % as of now just focusing on 1 target firing rates
+        tmp_wts = [];
+        spikecounts = [];
+        idxs = find(~isnan(stro.trial(:,correctidx)) & stro.trial(:,targetspikerateidx)==num_targetspikerates(jj));
+        idxs(idxs<=neurothresh_startidx) = [];
+        different_weights = unique(stro.trial(idxs,basisvecdiridx));
+        tmp_norm = [];
+        tmp_completed_search_alongdir = [];
+        for kk = 1:numel(different_weights)
+            idxs1 = find(stro.trial(:,basisvecdiridx) == different_weights(kk));
+            idxs1(idxs1<neurothresh_startidx) = [];
+            raster_data = stro.ras(idxs1,1);
+            tmp_norm = [tmp_norm; stro.ras{idxs1(end),weightsidx}'];
+            tmp_wts = [tmp_wts;cell2mat(stro.ras(idxs1,weightsidx)')'];
+            for ii = 1:size(raster_data,1)
+                tmp = raster_data{ii} ;
+                spikes = tmp(tmp>stro.trial(idxs1(ii),stimonidx)+t_offset & tmp < stro.trial(idxs1(ii),stimoffidx));
+                spikes = spikes - stro.trial(idxs1(ii),stimonidx)-t_offset;
+                spikecounts = [spikecounts; numel(spikes)];
+            end
+            [flag, gamutViolation] = Check_ifcompletely_probed(stro,basisvec,bkgnd_monitor,idxs1,tmp_norm(end,:));
+            % flag = 0, incompletely probed
+            % flag = 1, completely probed
+            % gamutViolation = 1, out of gamut point
+            tmp_completed_search_alongdir = [tmp_completed_search_alongdir; flag gamutViolation];
+        end
+        norms{jj} = tmp_norm;
+        completed_search_alongdir{jj} = tmp_completed_search_alongdir;
+        WTS{jj,aa} = tmp_wts;
+        SpikeCounts{jj,aa} = spikecounts;
+        
+    end
+    basisvec1 = basisvec{1}-bkgnd_monitor;
+    basisvec2 = basisvec{2}-bkgnd_monitor;
+    oog1 = min(abs((1-bkgnd_monitor(:))./basisvec1(:)));
+    oog2 = min(abs((1-bkgnd_monitor(:))./basisvec2(:)));
+    tmp = basisvec1 + basisvec2;
+    subunitbasisvec{aa} = (0.5 * tmp./(max(abs(tmp(:))) + 0.01)) + 0.5;
+    % Calculate baselineFR
+    num_spikes =[];
+    num_dur = [];
+    for ii = 1:size(stro.ras,1)
+        tmp = stro.ras{ii,1} ;
+        if ~isnan((stro.trial(ii,stimonidx)- stro.trial(ii,fpacqidx)))
+            spikes = tmp(tmp<stro.trial(ii,stimonidx) & tmp>stro.trial(ii,fpacqidx));
+            num_spikes = [num_spikes; numel(spikes)];
+            num_dur = [num_dur; (stro.trial(ii,stimonidx)- stro.trial(ii,fpacqidx))];
+        end
+    end
+    baselineFRstats{aa} = num_spikes./num_dur;
+    TFR(1,aa) = num_targetspikerates(1);
+    if numel(num_targetspikerates)>1
+        TFR(2,aa) = num_targetspikerates(2);
+    end
+    baselineexceedsTFR(aa) = any(baselineFRstats{aa}>TFR(aa));
+    confidence_score(aa) = 1-(numel(find(baselineFRstats{aa}>TFR(aa)))/numel(baselineFRstats{aa}));
+        
+    for ii = 1:numel(num_targetspikerates)
+        tmp = norms{ii};
+        completed_dir = completed_search_alongdir{ii};
+        probed_dirs = logical(completed_dir(:,1)==1); % only including the directions that have been completely probed
+        oog_idx = find(completed_dir(:,1)==1 & completed_dir(:,2)==1); % probed and out of gamut
+        not_oog_idx = find(completed_dir(:,1)==1 & completed_dir(:,2)==0);
+        fact = 0.5./sqrt(tmp(probed_dirs,1).^2 + tmp(probed_dirs,2).^2); % factor needed to extract unit vector
+        [THETA1,RHO1] = cart2pol(tmp(:,1),tmp(:,2));
+        ind = (1:numel(THETA1))';
+        r = fliplr(linspace(0,1,numel(ind)));
+        b = fliplr(r);
+        THETA1 = THETA1 * (180/pi);
+        THETA_all{ii,aa} = THETA1;
+        RHO_all{ii,aa} = RHO1;
+        oog_idx_all{ii,aa} = oog_idx;
+        not_oog_idx_all{ii,aa} = not_oog_idx;
+    end
+    if aa == numel(filename_c)
+        plot_counter = plot_counter + 1;
+        count = 0;
+    end
+    count = count + 1;
+    
+    % Acquiring the receptive field location
+    RF_loc = [RF_loc; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y]; 
+    
+    % Calculating angle between vectors
+    vec3 = S1RGB(:,aa);
+    vec4 = S2RGB(:,aa);
+    anglebwvectorsRGB = [anglebwvectorsRGB; 180*acos(dot(vec3,vec4)/(norm(vec3)*norm(vec4)))/pi];
+end
+
+savevariables = 0;
+if savevariables
+    save S1LMS S1LMS
+    save S2LMS S2LMS
+    save S1RGB S1RGB
+    save S2RGB S2RGB
+    save THETA_all THETA_all
+    save RHO_all RHO_all
+    save oog_idx_all oog_idx_all
+    save not_oog_idx_all not_oog_idx_all
+    save pixelswithinsubunit1 pixelswithinsubunit1
+    save pixelswithinsubunit2 pixelswithinsubunit2
+    save WTS WTS 
+    save SpikeCounts SpikeCounts
+    save TFR TFR
+    save baselineFRstats baselineFRstats
+    save RF_loc RF_loc
+    save Pangu Pangu
+    save Maui Maui
+end
+
+%% Next task is to fit the points and see which curve/ line describes the data well
+% I am using linefit_AD2.m to fit a line and quadfit_AD.m to fit a quadratic equation which is currently doing a good job.
+% I am storing the model parameters in linear_modelparams.mat and quad_modelparams.mat
+
+Ssignal = abs(S1LMS(3,:))+abs(S2LMS(3,:)); % absolute S cone signal from 2 subunits
+Ssignal = Ssignal';
+count = 1;
+GAMUTEDGE = 10;
+num_rows = 4;
+linear_modelparams = [];
+quad_modelparams = [];
+SSE_linearmodel = []; % residuals from the linear model 
+SSE_quadmodel = []; % residuals from the quadratic model
+RSSE_linearmodel = []; % residuals from the linear model from robust regression 
+RSSE_quadmodel = []; % residuals from the quadratic model from robust regression
+hruns_linearmodel = []; 
+hruns_quadmodel = [];
+pruns_linearmodel = []; % p value from runs test: linear model
+pruns_quadmodel = []; % p value from runs test: quadratic model
+rho_spearman = []; % spearman correlation coefficient for x and y
+p_spearman = []; % p value for spearmann correlation coefficient
+F_statistic = [];
+F_testresult = [];
+plotmode = 0; % 0-don't plot, 1-plot
+ratioeig = [];
+numInFs = [];
+garbageval = 5;
+Monkeyidentity = zeros(numel(filename),1);
+Monkeyidentity(Maui) = 1;
+Monkeyidentity(Pangu) = 2;
+linear_FRsurfacefitparams = [];
+quad_FRsurfacefitparams = [];
+linear_FRsurfacefitLL = [];
+quad_FRsurfacefitLL = [];
+colormap('gray');
+for ii = 1:numel(filename)
+    ind = ii;
+    THETA = THETA_all{1,ind};
+    THETA = THETA * pi/180; % converting to radians
+    if any(THETA>(135*pi/180))
+        allthetas = linspace(-pi,pi,100);
+        newtheta = linspace(-pi,pi,101);
+    else
+        allthetas = linspace(-pi/4,3*pi/4,100);
+        newtheta = linspace(-pi/4,3*pi/4,101);
+    end
+    RHO = RHO_all{1,ind};
+    oog_idx = oog_idx_all{1,ind};
+    not_oog_idx = not_oog_idx_all{1,ind};
+    outofgamut = zeros(size(THETA));
+    outofgamut(oog_idx) = 1;
+    outofgamut = logical(outofgamut);
+    [x_orig, y_orig] = pol2cart(THETA,RHO);
+    [~,eigval] = eig(cov([x_orig(not_oog_idx) y_orig(not_oog_idx)]));
+    ratioeig = [ratioeig; max(diag(eigval))/sum(abs(diag(eigval)))];
+    
+    % Fitting the linear model
+    initguess1 = [x_orig(not_oog_idx) y_orig(not_oog_idx)]\ones(numel(x_orig(not_oog_idx)),1);
+    [final_model1] = linefit_AD2(RHO, THETA,not_oog_idx,outofgamut,initguess1'); 
+    rho1 = 1./(final_model1*[cos(allthetas); sin(allthetas)]);
+    LOOGtmp1= rho1<0;
+    [x_lin,y_lin] = pol2cart(allthetas(~LOOGtmp1),rho1(~LOOGtmp1));
+    [h_runlin,p_runlin,nInF,fval1R,fval1OLS] = calclinSSE(final_model1,RHO,THETA,not_oog_idx);
+    
+    initguess3 = [0 0 0 final_model1];
+    [final_model3] = quadfit_AD2(RHO, THETA, not_oog_idx,outofgamut,initguess3);
+    [final_model3] = conicsectionfit(x_orig(not_oog_idx),y_orig(not_oog_idx),initguess3); % passing on the values to conicsection fit which fits in x-y plane
+    [final_model3] = quadfit_AD2(RHO, THETA, not_oog_idx,outofgamut,final_model3); % repassing the values to quadfit which fits in r-theta plane
+    [x_quad,y_quad,rho3] = calc_xyvalues(allthetas, final_model3);
+    L = rho3>0 & rho3==real(rho3);
+    [x_quad2,y_quad2] = pol2cart(newtheta(L),rho3(L)');
+    [h_runquad,p_runquad,fval3R,fval3OLS] = calcquadSSE(final_model3,RHO,THETA,not_oog_idx);
+            
+    % Storing the linear and quadratic model parameters
+    linear_modelparams = [linear_modelparams; final_model1];
+    quad_modelparams = [quad_modelparams; final_model3];
+    RSSE_linearmodel = [RSSE_linearmodel; fval1R];
+    RSSE_quadmodel = [RSSE_quadmodel; fval3R];
+    SSE_linearmodel = [SSE_linearmodel; fval1OLS];
+    SSE_quadmodel = [SSE_quadmodel; fval3OLS];
+    
+    F_statistic = [F_statistic; (SSE_linearmodel(end)-SSE_quadmodel(end))/(SSE_quadmodel(end)/(numel(not_oog_idx)-3))];
+    F_testresult = [F_testresult; F_statistic(end)>finv(0.999,1,numel(not_oog_idx)-3)]; % i.e p<0.01
+    hruns_linearmodel = [hruns_linearmodel; h_runlin];
+    pruns_linearmodel = [pruns_linearmodel; p_runlin];
+    hruns_quadmodel = [hruns_quadmodel; h_runquad];
+    pruns_quadmodel = [pruns_quadmodel; p_runquad];
+    [rho,p] = corr(x_orig(not_oog_idx),y_orig(not_oog_idx),'Type','Spearman');
+    rho_spearman = [rho_spearman; rho];
+    p_spearman = [p_spearman; p];
+    numInFs = [numInFs; nInF];
+   
+    if p_runlin<0.05
+        c = [1 0 1]; % magenta
+        disp(filename(ind));
+    else 
+        c = [0 1 1]; % sky blue 
+    end
+    
+    %Plotting the figures
+    figure(plot_counter), subplot(num_rows,7,7*count-6),plot(x_lin,y_lin,'g','Linewidth',2); hold on; 
+    plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]);
+    set(gca,'XLim',[-4 4],'YLim',[-4 4]); drawnow; axis square; hold off;
+    subplot(num_rows,7,7*count-5),plot(allthetas(~LOOGtmp1),log10(rho1(~LOOGtmp1)),'g','Linewidth',2); hold on; 
+    plot(THETA(not_oog_idx), log10(RHO(not_oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'PickableParts','none','MarkerEdgeColor',[1 0 0]);
+    axis equal; drawnow; title(filename{ind});hold off;
+    subplot(num_rows,7,7*count-4), bar([S1LMS(:,ind) S2LMS(:,ind)]); set(gca,'XTick',[1 2 3],'XTickLabel',{'L','M','S'}); axis square;% plotting the cone weights 
+    subplot(num_rows,7,7*count-3), bar([S1RGB(:,ind) S2RGB(:,ind)]); set(gca,'XTick',[1 2 3],'XTickLabel',{'R','G','B'}); axis square;% plotting the gun weights 
+    subplot(num_rows,7,7*count-2), image(subunitbasisvec{ind}); set(gca,'XTick',[],'YTick',[]);axis square;
+    subplot(num_rows,7,7*count-1), plot(x_quad2,y_quad2,'k','Linewidth',2); hold on; 
+    plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]);
+    plot(x_orig(oog_idx), y_orig(oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]);
+    set(gca,'XLim',[-4 4],'YLim',[-4 4]); axis square; drawnow;hold off;
+    subplot(num_rows,7,7*count),plot(newtheta(L),log10(rho3(L)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'PickableParts','none','MarkerEdgeColor',[0 0 0]); hold on; 
+    plot(THETA(not_oog_idx), log10(RHO(not_oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',c,'PickableParts','none','MarkerEdgeColor',c);
+    plot(THETA(oog_idx), log10(RHO(oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]); axis equal; 
+    drawnow;
+
+% figure(plot_counter), subplot(num_rows,4,4*count-3),plot(allthetas(~LOOGtmp1),log10(rho1(~LOOGtmp1)),'g','Linewidth',2); hold on;
+% plot(THETA(not_oog_idx), log10(RHO(not_oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'PickableParts','none','MarkerEdgeColor',[1 0 0]);
+% axis equal; drawnow; hold off;
+% subplot(num_rows,4,4*count-2),plot(x_lin,y_lin,'g','Linewidth',2); hold on;
+% plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]);
+% set(gca,'XLim',[-4 4],'YLim',[-4 4]); drawnow; axis square; hold off;
+% subplot(num_rows,4,4*count-1);plot(newtheta(L),log10(rho3(L)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'PickableParts','none','MarkerEdgeColor',[0 0 0]); hold on;
+% plot(THETA(not_oog_idx), log10(RHO(not_oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',c,'PickableParts','none','MarkerEdgeColor',c);
+% plot(THETA(oog_idx), log10(RHO(oog_idx)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]); axis equal;
+% subplot(num_rows,4,4*count),plot(x_quad2,y_quad2,'k','Linewidth',2); hold on;
+% plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]);
+% plot(x_orig(oog_idx), y_orig(oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]);
+% set(gca,'XLim',[-4 4],'YLim',[-4 4]); axis square;
+% equation = strcat(num2str(final_model3(1)),'*x.^2+',num2str(final_model3(2)),'*y.^2+',num2str(final_model3(3)),'*x.*y+',num2str(final_model3(4)),'*x+',num2str(final_model3(5)),'*y-1');
+% ezplot(equation); axis square; drawnow;
+
+count  = count + 1;
+if count == (num_rows + 1)
+    count = 1;
+    plot_counter = plot_counter + 2;
+end
+end
+
+savevariables = 0;
+if savevariables
+    save linear_modelparams linear_modelparams
+    save quad_modelparams quad_modelparams
+    save SSE_linearmodel SSE_linearmodel 
+    save SSE_quadmodel SSE_quadmodel
+    save RSSE_linearmodel RSSE_linearmodel
+    save RSSE_quadmodel RSSE_quadmodel 
+    save hruns_linearmodel hruns_linearmodel
+    save hruns_quadmodel hruns_quadmodel
+    save pruns_linearmodel pruns_linearmodel
+    save pruns_quadmodel pruns_quadmodel
+    save rho_spearman rho_spearman
+    save p_spearman p_spearman
+    save F_statistic F_statistic
+    save F_testresult F_testresult
+    save ratioeig ratioeig
+    save anglebwvectorsRGB anglebwvectorsRGB
+end
+%% Comparing stats of linear and non-linear cells through different metrics 
+load DOGBIC.mat
+load GaborBIC.mat
+load RFstructure_c.mat
+load RFstructure_l.mat
+load z_scores.mat
+load Gaborerror.mat
+load DOGerror.mat
+PC1z_scores = z_scores;
+RFstructure =[RFstructure_c; RFstructure_l];
+deltaBIC = DOGBIC - GaborBIC;
+DOidx = [OCidx LMidx];
+plot_counter = plot_counter + 1;
+bins = -0.2:0.2:5;
+binsR = -0.2:0.1:2;
+rratio = log10(SSE_linearmodel./SSE_quadmodel); % Based on OLS statistics
+rratioRob = log10(RSSE_linearmodel./RSSE_quadmodel); % Based on Robust statistics
+FRfit_LLratio = log10(linear_FRsurfacefitLL./quad_FRsurfacefitLL); % Based on the fits to the FR surface
+c1 = hist(rratio(1:numel(OCidx)),bins);
+c2 = hist(rratio(numel(OCidx)+1:numel(OCidx)+numel(LMidx)),bins);
+c3 = hist(rratio(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx)),bins);
+c4 = hist(rratio(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end),bins);
+% Repeating the calculations for Robust regression derived SSEs
+c1R = hist(rratioRob(1:numel(OCidx)),binsR);
+c2R = hist(rratioRob(numel(OCidx)+1:numel(OCidx)+numel(LMidx)),binsR);
+c3R = hist(rratioRob(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx)),binsR);
+c4R = hist(rratioRob(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end),binsR);
+
+
+figure(plot_counter),set(gcf,'Name','Data Analysis:OLS and Robust regression');
+subplot(231),plot(log10(SSE_quadmodel(1:numel(OCidx))),log10(SSE_linearmodel(1:numel(OCidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]); hold on;
+plot(log10(SSE_quadmodel(numel(OCidx)+1:numel(OCidx)+numel(LMidx))),log10(SSE_linearmodel(numel(OCidx)+1:numel(OCidx)+numel(LMidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]); 
+plot(log10(SSE_quadmodel(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx))),log10(SSE_linearmodel(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'PickableParts','none','MarkerEdgeColor',[0 0 0]); 
+plot(log10(SSE_quadmodel(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end)),log10(SSE_linearmodel(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[1 0 1],'PickableParts','none','MarkerEdgeColor',[1 0 1]); 
+line([-2 4],[-2 4],'Color','k');xlabel('SSEquad'); ylabel('SSElin');
+subplot(232);bar(bins,[c1' c2' c3' c4'],'stacked'); legend(strcat('OC=',num2str(numel(OCidx))),strcat('LM=',num2str(numel(LMidx))),strcat('Lum=',num2str(numel(LUMidx))),strcat('others=',num2str(numel(hardtoclassifyidx)))); xlabel('log residual ratio'); ylabel('cell count');
+subplot(233); plot(confidence_score,rratio,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('Conf Score'); ylabel('log residual ratio'); axis square;
+subplot(234);plot(log10(RSSE_quadmodel(1:numel(OCidx))),log10(RSSE_linearmodel(1:numel(OCidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[0 0 1]); hold on;
+plot(log10(RSSE_quadmodel(numel(OCidx)+1:numel(OCidx)+numel(LMidx))),log10(RSSE_linearmodel(numel(OCidx)+1:numel(OCidx)+numel(LMidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'PickableParts','none','MarkerEdgeColor',[0 1 0]); 
+plot(log10(RSSE_quadmodel(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx))),log10(RSSE_linearmodel(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx))),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'PickableParts','none','MarkerEdgeColor',[0 0 0]); 
+plot(log10(RSSE_quadmodel(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end)),log10(RSSE_linearmodel(numel(OCidx)+numel(LMidx)+numel(LUMidx)+1:end)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[1 0 1],'PickableParts','none','MarkerEdgeColor',[1 0 1]); 
+line([-2 4],[-2 4],'Color','k');xlabel('RobSSEquad'); ylabel('RobSSElin');
+subplot(235);bar(binsR,[c1R' c2R' c3R' c4R'],'stacked'); legend(strcat('OC=',num2str(numel(OCidx))),strcat('LM=',num2str(numel(LMidx))),strcat('Lum=',num2str(numel(LUMidx))),strcat('others=',num2str(numel(hardtoclassifyidx)))); xlabel('log residual ratio'); ylabel('cell count');
+subplot(236); plot(confidence_score,rratioRob,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('Conf Score'); ylabel('Rob log residual ratio'); axis square;
+plot_counter = plot_counter + 1;
+
+% plottting the DO cells: lime magenta & orange-cyan
+RFstructure = RFstructure(idx);
+c5 = hist(rratio(RFstructure(1:numel(DOidx))==1),bins);
+c6 = hist(rratio(RFstructure(1:numel(DOidx))==2),bins);
+c7 = hist(rratio(Monkeyidentity(1:numel(DOidx))==1),bins);
+c8 = hist(rratio(Monkeyidentity(1:numel(DOidx))==2),bins);
+c5R = hist(rratioRob(RFstructure(1:numel(DOidx))==1),binsR);
+c6R = hist(rratioRob(RFstructure(1:numel(DOidx))==2),binsR);
+c7R = hist(rratioRob(Monkeyidentity(1:numel(DOidx))==1),binsR);
+c8R = hist(rratioRob(Monkeyidentity(1:numel(DOidx))==2),binsR);
+figure(plot_counter); set(gcf,'Name','DO cells: Influence of monkey or color tuning'); 
+subplot(231); bar(bins,[c5' c6'],'stacked'); legend('center-surround','adjacent subunits'); xlabel('log residual ratio'); ylabel('cell count'); axis square;
+Monkeyidentity = Monkeyidentity(idx);
+subplot(232); bar(bins,[c7' c8'],'stacked'); legend('Maui','Pangu'); xlabel('log residual ratio'); ylabel('cell count'); axis square;
+subplot(233); plot(rratio(1:numel(DOidx)),F_statistic(1:numel(DOidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]);
+xlabel('rratio'); ylabel('F stat'); axis square;
+subplot(234); bar(binsR,[c5R' c6R'],'stacked'); legend('center-surround','adjacent subunits'); xlabel('Rob log residual ratio'); ylabel('cell count'); axis square;
+Monkeyidentity = Monkeyidentity(idx);
+subplot(235); bar(binsR,[c7R' c8R'],'stacked');legend('Maui','Pangu'); xlabel('Rob log residual ratio'); ylabel('cell count'); axis square;
+subplot(236); plot(rratioRob(1:numel(DOidx)),F_statistic(1:numel(DOidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]);
+xlabel('rratioRob'); ylabel('F stat'); axis square;
+plot_counter = plot_counter + 1;
+
+% Repeating the same analysis but for all cells now
+% plotting log residual ratio for all cells and seeing if there is any monkey or RF specific correlation with the linearity or non-linearity
+c9 = hist(rratio(RFstructure==1),bins);
+c10 = hist(rratio(RFstructure==2),bins);
+c9R = hist(rratioRob(RFstructure==1),binsR);
+c10R = hist(rratioRob(RFstructure==2),binsR);
+c11 = hist(rratio(Monkeyidentity==1),bins);
+c12 = hist(rratio(Monkeyidentity==2),bins);
+c11R = hist(rratioRob(Monkeyidentity==1),binsR);
+c12R = hist(rratioRob(Monkeyidentity==2),binsR);
+figure(plot_counter); set(gcf,'Name','All cells: Influence of monkey or color tuning'); 
+subplot(221); bar(bins,[c9' c10'],'stacked'); legend('center-surround','adjacent subunits'); xlabel('log residual ratio'); ylabel('cell count');
+subplot(222); bar(bins,[c11' c12'],'stacked'); legend('Maui','Pangu'); xlabel('log residual ratio'); ylabel('cell count');
+subplot(223); bar(binsR,[c9R' c10R'],'stacked'); legend('center-surround','adjacent subunits'); xlabel('Rob log residual ratio'); ylabel('cell count');
+subplot(224); bar(binsR,[c11R' c12R'],'stacked'); legend('Maui','Pangu'); xlabel('Rob log residual ratio'); ylabel('cell count');
+plot_counter = plot_counter + 1;
+
+% Trying to see the ratio of eigenvalues for linear/non-linear DO & LUM cells classified according to robust regression and OLS statistics
+DOLUMidx = [OCidx LMidx LUMidx];
+ratioeigtmp = ratioeig(1:numel(DOLUMidx));
+rratioRobtmp = rratioRob(1:numel(DOLUMidx));
+rratiotmp = rratio(1:numel(DOLUMidx));
+bins = 0:0.03:1;
+figure(plot_counter); set(gcf,'Name','Ratio of eigs for linear/non-linear cells');
+subplot(121); histogram(ratioeigtmp(rratioRobtmp<=1),bins); hold on; histogram(ratioeigtmp(rratioRobtmp>1),bins); xlabel('ratio eig'); ylabel('count'); title('Robust'); hold off;
+subplot(122); histogram(ratioeigtmp(rratiotmp<=1),bins); hold on; histogram(ratioeigtmp(rratiotmp>1),bins); xlabel('ratio eig'); ylabel('count'); title('OLS'); hold off;
+
+% Log-likelihood ratio test on the both OLS and Robust regression SSEs
+D_ols = 2*log(SSE_linearmodel./SSE_quadmodel);
+D_Rob = 2*log(RSSE_linearmodel./RSSE_quadmodel);
+crit = chi2inv(0.95,3);
+Ltestpval_ols = 1-chi2cdf(D_ols,3);
+Ltesthval_ols = D_ols>crit;
+Ltestpval_Rob = 1-chi2cdf(D_Rob,3);
+Ltesthval_Rob = D_Rob>crit;
+
+% Trying to check if spatial structure is correlated with color tuning or linear/non-linear spatial summation
+% Check whether the angle between the RGB vectors has any correlation withthe RF structure;
+% deltaBIC = deltaBIC(idx);
+figure(plot_counter); set(gcf,'Name','RF structure vs angle between vectors'); 
+subplot(131); plot(deltaBIC(1:numel(DOidx)),anglebwvectorsRGB(1:numel(DOidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('deltaBIC'); ylabel('angle'); 
+hold on; lsline; title('DO cells'); set(gca,'Ylim',[100 180]); hold off;
+subplot(132); plot(deltaBIC(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),anglebwvectorsRGB(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('deltaBIC'); ylabel('angle'); 
+hold on; lsline; title('LUM cells'); set(gca,'Ylim',[100 180]); hold off; 
+subplot(133); plot(deltaBIC,anglebwvectorsRGB,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('deltaBIC'); ylabel('angle'); 
+hold on; lsline; title('All cells'); set(gca,'Ylim',[100 180]); hold off;
+plot_counter = plot_counter + 1;
+
+% trying to see if there is any trend in the deltaBIC with color tuning
+nonlinDOcellID = rratio(1:numel(OCidx)+numel(LMidx))>1;
+rratioDO = rratio(1:numel(OCidx)+numel(LMidx));
+figure(plot_counter); set(gcf,'Name','spatial structure fits');
+subplot(221); hist(deltaBIC(1:numel(DOidx)),20); xlabel('delta BIC'); ylabel('count'); title('All cells'); axis square;
+subplot(222); hist(deltaBIC(find(nonlinDOcellID==1)),20); xlabel('deltaBIC'); ylabel('count'); title('non-lin DO cells'); axis square;
+subplot(223); hist(deltaBIC(find(nonlinDOcellID==0)),20); xlabel('deltaBIC'); ylabel('count'); title('Lin DO cells'); axis square;
+subplot(224); hist(deltaBIC(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),20); xlabel('deltaBIC'); ylabel('count'); title('Lum cells'); axis square;
+plot_counter = plot_counter + 1;
+
+% Analysis for luminance cells - pretty linear
+figure(plot_counter); set(gcf,'Name','Luminance cells');
+subplot(221), hist(rratio(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx)),20); xlabel('rratio'); ylabel('count'); axis square;
+subplot(222); hist(deltaBIC(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),20); xlabel('deltaBIC'); ylabel('count'); title('Lum cells'); axis square;
+subplot(223); hist(anglebwvectorsRGB(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),20); xlabel('angle'); ylabel('count'); axis square;
+subplot(224); plot(anglebwvectorsRGB(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),rratio(numel(OCidx)+numel(LMidx)+1:numel(OCidx)+numel(LMidx)+numel(LUMidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); 
+xlabel('angle'); ylabel('rratio'); axis square; set(gca,'Xlim',[90 180]); 
+plot_counter = plot_counter + 1;
+
+% Combining analyses for DO cells: rratio, anglebwvectors & deltaBIC
+tmprratio = rratio;
+tmprratioRob = rratioRob;
+figure(plot_counter);set(gcf,'Name','DO & Luminance cells');
+subplot(121);plot3(tmprratio(1:numel(DOidx)),anglebwvectorsRGB(1:numel(DOidx)),deltaBIC(1:numel(DOidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on; 
+plot3(tmprratio(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),anglebwvectorsRGB(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),deltaBIC(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 0 0]);
+xlabel('rratio'); ylabel('angle'); zlabel('deltaBIC'); grid on;
+subplot(122);plot3(tmprratioRob(1:numel(DOidx)),anglebwvectorsRGB(1:numel(DOidx)),deltaBIC(1:numel(DOidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on; 
+plot3(tmprratioRob(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),anglebwvectorsRGB(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),deltaBIC(numel(DOidx)+1:numel(DOidx)+numel(LUMidx)),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 0 0]);
+xlabel('rratioRob'); ylabel('angle'); zlabel('deltaBIC'); grid on;
+plot_counter = plot_counter + 1;
+
+% Same analyses as before but for all cells
+figure(plot_counter);set(gcf,'Name','All cells');
+subplot(121);plot3(rratio,anglebwvectorsRGB,deltaBIC,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on; 
+xlabel('rratio'); ylabel('angle'); zlabel('deltaBIC'); grid on;
+subplot(122);plot3(rratioRob,anglebwvectorsRGB,deltaBIC,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on; 
+xlabel('rratioRob'); ylabel('angle'); zlabel('deltaBIC'); grid on;
+plot_counter = plot_counter + 1;
+
+% Comparing the angle and the rratio for all cells where linear fit did not fail
+bins = 0:10:180;
+figure(plot_counter); set(gcf,'Name','Angle vs rratio: all cells'); 
+subplot(221);plot(anglebwvectorsRGB(rratio<1),rratio(rratio<1),'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on;
+lsline; xlabel('angle'); ylabel('rratio'); hold off; 
+subplot(222);plot(anglebwvectorsRGB,rratioRob,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); hold on;
+lsline; xlabel('angle'); ylabel('rratioRob'); hold off; 
+subplot(223),histogram(anglebwvectorsRGB(rratio<1),bins); hold on; 
+histogram(anglebwvectorsRGB(rratio>1),bins); xlabel('angle'); ylabel('count'); legend('Lin','Non-lin'); title('All cells: Acc to rratio'); hold off;
+% Classifying according to F_test
+subplot(224),histogram(anglebwvectorsRGB(F_testresult==0),bins); hold on; 
+histogram(anglebwvectorsRGB(F_testresult==1),bins); xlabel('angle'); ylabel('count'); legend('Lin','Non-lin'); title('All cells: Acc to F test'); hold off;
+plot_counter = plot_counter + 1;
+
+% Comparing the accuracy of the experimenter for selecting the subunits
+[h_fisher,p_fisher,stats_fisher] = fishertest([sum(deltaBIC>=0 & RFstructure==1), sum(deltaBIC>=0 & RFstructure==2); sum(deltaBIC<0 & RFstructure==1), sum(deltaBIC<0 & RFstructure==2)]);
+mdl = fitglm(deltaBIC,RFstructure-1,'linear','Distribution','binomial','Link','logit');
+bins = -100:10:300;
+figure(plot_counter); set(gcf,'Name','RF structure vs delta BIC');
+subplot(221);plot(deltaBIC,RFstructure-1,'o','MarkerSize',5,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]); xlabel('delta BIC'); hold on;
+plot([-100:1:300],predict(mdl,[-100:1:300]'),'Linewidth',2); axis square; text(100,0.5,strcat('p=',num2str(p_fisher))); hold off;
+subplot(222); plot(GaborBIC,DOGBIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('BIC'); hold off;
+subplot(223); histogram(deltaBIC,bins); axis square; xlabel('delta BIC'); ylabel('count'); set(gca,'TickDir','out');hold off;
+subplot(224); plot(Gaborerror,DOGerror,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('RSS'); hold off;
+plot_counter = plot_counter + 1;
+
+% Thinking of a new analysis where I am trying to see if the z-score of the
+% target firing rate is correlated with the linearity/non-linearity of the
+% neuron
+zscoreTFR = [];
+for ii = 1:numel(idx)
+    ind = idx(ii);
+    zscoreTFR = [zscoreTFR; (TFR(1,ind)-mean(baselineFRstats{ind}))/std(baselineFRstats{ind})];
+end
+zscoreTFRDO = zscoreTFR(1:numel(DOidx));
+bins = 0:10:200;
+figure(plot_counter); set(gcf,'Name','zscore: TFR wrt baseline');
+subplot(121);histogram(zscoreTFRDO(nonlinDOcellID==0),bins); hold on; histogram(zscoreTFRDO(nonlinDOcellID==1),bins); xlabel('z score'); ylabel('count'); title('TFR z score: DO cells'); hold off; 
+subplot(122);histogram(zscoreTFR(rratio<100),bins); hold on; histogram(zscoreTFR(rratio>100),bins); xlabel('z score'); ylabel('count'); title('TFR z score: All cells'); hold off; 
+plot_counter = plot_counter + 1;
+
+% Plotting the PC1 z scores for linear/non-linear DO and all cells
+bins = -1:0.5:20;
+PC1z_scoresDO = PC1z_scores(1:numel(DOidx));
+figure(plot_counter); set(gcf,'Name','zscore: PC1');
+subplot(121); histogram(PC1z_scoresDO(nonlinDOcellID==0),bins); hold on; histogram(PC1z_scoresDO(nonlinDOcellID==1),bins); xlabel('PC1 z score'); ylabel('count'); title('PC1 z score: DO cells'); hold off;  
+subplot(122); histogram(PC1z_scores(rratio<1),bins); hold on; histogram(PC1z_scores(rratio>1),bins); xlabel('PC1 z score'); ylabel('count'); title('PC1 z score: All cells'); hold off;  
+plot_counter = plot_counter + 1;
+
+%% Trying to see a relation between all params for DO and LUM cells
+load latencySTAcheck.mat
+load latencySTAsubunit.mat
+load latencybetweensubunits.mat
+load latencydiffWNchecksubunit.mat
+load anglediffWNchecksubunit.mat
+
+prettycorr([rratio(1:numel(DOLUMidx)),rratioRob(1:numel(DOLUMidx)),Ssignal(1:numel(DOLUMidx)),hruns_linearmodel(1:numel(DOLUMidx)),pruns_linearmodel(1:numel(DOLUMidx)),RFstructure(1:numel(DOLUMidx)),deltaBIC(1:numel(DOLUMidx)),ratioeig(1:numel(DOLUMidx)),anglebwvectorsRGB(1:numel(DOLUMidx)),PC1z_scores(1:numel(DOLUMidx)),latencySTAcheck(1:numel(DOLUMidx)),latencySTAsubunit(1:numel(DOLUMidx)),latencybetweensubunits(1:numel(DOLUMidx)),latencydiffWNchecksubunit(1:numel(DOLUMidx)),anglediffWNchecksubunit(1:numel(DOLUMidx)),Ltestpval_ols(1:numel(DOLUMidx)),Ltestpval_Rob(1:numel(DOLUMidx)),FRfit_LLratio(1:numel(DOLUMidx))],{'rratio','rratioRob','Scone','hrunsl','prunsl','RFstruct','dBIC','ratioeig','angleRGB','PC1zsc','latcheck','latsub','latbwsub','latdiffchecksub','anglediffchecksub','LLtest','LLtestRob','FRLLratio'});
+set(gcf,'Name','DO & LUM cells');
+
+prettycorr([rratio,rratioRob,Ssignal,hruns_linearmodel,pruns_linearmodel,RFstructure,deltaBIC,ratioeig,anglebwvectorsRGB,PC1z_scores,latencySTAcheck,latencySTAsubunit,latencybetweensubunits,latencydiffWNchecksubunit,anglediffWNchecksubunit,Ltestpval_ols,Ltestpval_Rob,FRfit_LLratio],{'rratio','rratioRob','Scone','hrunsl','prunsl','RFstruct','dBIC','ratioeig','angleRGB','PC1zsc','latcheck','latsub','latbwsub','latdiffchecksub','anglediffchecksub','LLtest','LLtestRob','FRLLratio'});
+set(gcf,'Name','All cells');
+
+prettycorr([rratio(1:numel(DOidx)),rratioRob(1:numel(DOidx)),Ssignal(1:numel(DOidx)),hruns_linearmodel(1:numel(DOidx)),pruns_linearmodel(1:numel(DOidx)),RFstructure(1:numel(DOidx)),deltaBIC(1:numel(DOidx)),ratioeig(1:numel(DOidx)),anglebwvectorsRGB(1:numel(DOidx)),PC1z_scores(1:numel(DOidx)),latencySTAcheck(1:numel(DOidx)),latencySTAsubunit(1:numel(DOidx)),latencybetweensubunits(1:numel(DOidx)),latencydiffWNchecksubunit(1:numel(DOidx)),anglediffWNchecksubunit(1:numel(DOidx)),Ltestpval_ols(1:numel(DOidx)),Ltestpval_Rob(1:numel(DOidx)),FRfit_LLratio(1:numel(DOidx))],{'rratio','rratioRob','Scone','hrunsl','prunsl','RFstruct','dBIC','ratioeig','angleRGB','PC1zsc','latcheck','latsub','latbwsub','latdiffchecksub','anglediffchecksub','LLtest','LLtestRob','FRLLratio'});
+set(gcf,'Name','DO cells ');
+
+prettycorr([rratio(numel(DOidx)+1:numel(DOLUMidx)),rratioRob(numel(DOidx)+1:numel(DOLUMidx)),Ssignal(numel(DOidx)+1:numel(DOLUMidx)),hruns_linearmodel(numel(DOidx)+1:numel(DOLUMidx)),pruns_linearmodel(numel(DOidx)+1:numel(DOLUMidx)),RFstructure(numel(DOidx)+1:numel(DOLUMidx)),deltaBIC(numel(DOidx)+1:numel(DOLUMidx)),ratioeig(numel(DOidx)+1:numel(DOLUMidx)),anglebwvectorsRGB(numel(DOidx)+1:numel(DOLUMidx)),PC1z_scores(numel(DOidx)+1:numel(DOLUMidx)),latencySTAcheck(numel(DOidx)+1:numel(DOLUMidx)),latencySTAsubunit(numel(DOidx)+1:numel(DOLUMidx)),latencybetweensubunits(numel(DOidx)+1:numel(DOLUMidx)),latencydiffWNchecksubunit(numel(DOidx)+1:numel(DOLUMidx)),anglediffWNchecksubunit(numel(DOidx)+1:numel(DOLUMidx)),Ltestpval_ols(numel(DOidx)+1:numel(DOLUMidx)),Ltestpval_Rob(numel(DOidx)+1:numel(DOLUMidx)),FRfit_LLratio(numel(DOidx)+1:numel(DOLUMidx))],{'rratio','rratioRob','Scone','hrunsl','prunsl','RFstruct','dBIC','ratioeig','angleRGB','PC1zsc','latcheck','latsub','latbwsub','latdiffchecksub','anglediffchecksub','LLtest','LLtestRob','FRLLratio'},'Spearman');
+set(gcf,'Name','LUM cells ');
+
+prettycorr([rratio(numel(DOLUMidx)+1:end),rratioRob(numel(DOLUMidx)+1:end),Ssignal(numel(DOLUMidx)+1:end),hruns_linearmodel(numel(DOLUMidx)+1:end),pruns_linearmodel(numel(DOLUMidx)+1:end),RFstructure(numel(DOLUMidx)+1:end),deltaBIC(numel(DOLUMidx)+1:end),ratioeig(numel(DOLUMidx)+1:end),anglebwvectorsRGB(numel(DOLUMidx)+1:end),PC1z_scores(numel(DOLUMidx)+1:end),latencySTAcheck(numel(DOLUMidx)+1:end),latencySTAsubunit(numel(DOLUMidx)+1:end),latencybetweensubunits(numel(DOLUMidx)+1:end),latencydiffWNchecksubunit(numel(DOLUMidx)+1:end),anglediffWNchecksubunit(numel(DOLUMidx)+1:end),Ltestpval_ols(numel(DOLUMidx)+1:end),Ltestpval_Rob(numel(DOLUMidx)+1:end),FRfit_LLratio(numel(DOLUMidx)+1:end)],{'rratio','rratioRob','Scone','hrunsl','prunsl','RFstruct','dBIC','ratioeig','angleRGB','PC1zsc','latcheck','latsub','latbwsub','latdiffchecksub','anglediffchecksub','LLtest','LLtestRob','FRLLratio'});
+set(gcf,'Name','hard to classify cells');
+
+
+

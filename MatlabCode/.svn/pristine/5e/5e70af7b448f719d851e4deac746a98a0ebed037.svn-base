@@ -1,0 +1,240 @@
+% This exercise is based on suggestions of the committee to come up with a well-principled way of selecting the subunuits 
+% Author - Abhishek De, 6/18
+close all; clearvars;
+load filename_c.mat
+load filename_l.mat
+load fundamentals.mat 
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+resize_fact = 1;
+% Include Gun noise data for statistical tests in order to estimate the RF size
+channels = 3;
+Input_List = [filename_c;filename_l];
+Gaborerror = [];
+DOGerror = [];
+kk = 1;
+num_rows = 10; % Number of cells in a figure
+C = 5;
+resize_fact2 = 1;
+for ii = 1:numel(Input_List)
+    disp(ii);
+    filename = Input_List{ii}; % acquiring the filename from the List
+    Output_List{ii,1} = filename;
+    WN=nex2stro(findfile(filename));
+    framerate = WN.sum.exptParams.framerate;
+    nstixperside = WN.sum.exptParams.nstixperside;
+    ntrials = length(WN.sum.absTrialNum);
+    basisvecidx = strcmp(WN.sum.rasterCells(1,:),'basis_vec');
+    stimonidx = find(strcmp(WN.sum.trialFields(1,:),'stim_on'));
+    stimoffidx = find(strcmp(WN.sum.trialFields(1,:),'all_off'));
+    nframesidx = find(strcmp(WN.sum.trialFields(1,:),'num_frames'));
+    noisetypeidx = find(strcmp(WN.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',WN.sum.trialFields(1,:));
+    hepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD11'));
+    vepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD12'));
+    maskidx = strcmp(WN.sum.rasterCells(1,:), 'subunit_mask');
+    anlgStartTimeidx = find(strcmp(WN.sum.rasterCells(1,:),'anlgStartTime'));
+    eyestart_t = [WN.ras{:,anlgStartTimeidx}]';
+    eyesampperiod = 1/WN.sum.analog.storeRates{1};
+    gammaTable = WN.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    gammaTable1 = interp1(linspace(0,255,256),gammaTable,linspace(0,255,65536), 'spline');
+    invgamma = InvertGamma(gammaTable, 0);
+    
+    % Getting the background rgb/lms
+    ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+    mask_changes = [2];
+    all_masks = WN.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,WN.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(WN.trial,1)-1;
+    end
+    last_wntrial =  inds(1)-1;
+    basisvec_dropidx = inds(end);
+    for k = 3:last_wntrial
+        if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+            continue
+        else
+            mask_changes = [mask_changes k-1 k]; %#ok<AGROW>
+        end
+    end
+    if mask_changes(end) == last_wntrial
+        mask_changes(end) = [];
+    else
+        mask_changes = [mask_changes  last_wntrial];
+    end
+    mask_changes = reshape(mask_changes , 2, []);
+    
+    spikename = 'sig001a'; %getSpikenum(WN,'first'); % Getting the spikes present in the first channel
+    spikeidx = find(strcmp(WN.sum.rasterCells(1,:),spikename));
+    maxT = 15;
+    tmpstro_gun = WN; % creating a temporary stro that will be used for analysing stimulus presented in gun space
+    tmpstro_gun.ras(mask_changes(2,1)+1:end,:) = [];
+    tmpstro_gun.trial(mask_changes(2,1)+1:end,:) = [];
+    out_gun = getWhtnsStats(tmpstro_gun,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, spikename);
+    STAs_gun = out_gun{1}; STCs_gun = out_gun{2}; nspikes_gun = out_gun{3};
+     
+    % Code for Statistical testing begins here 
+    CHI2CRIT = .95; % For flaging a stixel as significant (adding gun and cone noise z-scores, squared)
+    s_gun = std(STAs_gun(:,1));
+    STAs_gun_z = STAs_gun./s_gun;
+    
+    % Spatial map
+    grandz = zeros([nstixperside nstixperside]);
+    maxzs = [];
+    for i = 1:maxT
+        tmp_gun = reshape(STAs_gun_z(:,i),[nstixperside nstixperside 3]); % This is the only place in the code where I use data from gun noise
+        grandz = grandz+sum(tmp_gun.^2,3);
+        maxzs = [maxzs; sum(sum(tmp_gun(:,:,1).^2)) sum(sum(tmp_gun(:,:,2).^2)) sum(sum(tmp_gun(:,:,3).^2))];
+    end
+%     keyboard;
+    peakframe1 = max(maxzs(:,1)) == maxzs(:,1);
+    peakframe2 = max(maxzs(:,2)) == maxzs(:,2);
+    peakframe3 = max(maxzs(:,3)) == maxzs(:,3);
+    peakframe = max(sum(maxzs,2)) == sum(maxzs,2);
+    id = find(peakframe==1);
+    if id~=1
+        peakframe(id-1)= 1;
+    end
+    if id <=maxT-1
+        peakframe(id+1)=1;
+    end
+    crit = chi2inv(CHI2CRIT,channels*maxT); % 3 color channels 
+    L = grandz > crit;
+    
+    % Now get largest contiguous block
+    [i,j] = ind2sub(size(L),find(L));
+    ij = [i,j];
+    T = clusterdata(ij,'linkage','single','distance','euclidean','criterion','distance','cutoff',sqrt(2));
+    clusternmembers = [];
+    for k =1:max(T)
+        clusternmembers(k) = sum(T == k);
+    end
+    dominantcluster = find(clusternmembers == max(clusternmembers));
+    clustermat = zeros(nstixperside, nstixperside);
+    clustermat(sub2ind(size(clustermat),ij(T==dominantcluster(1),1),ij(T==dominantcluster(1),2))) = 1;
+    % Then get convex hull
+    dominantclusteridxs = ij(T==dominantcluster(1),:);
+    tmpSTA = reshape(STAs_gun, [nstixperside^2 3 maxT]);
+    Output_List{ii,2} = squeeze(sum(tmpSTA(:,:,peakframe),3));
+    tmpSTA = permute(tmpSTA, [2 1 3]);
+    try
+        K=convhull(dominantclusteridxs(:,1), dominantclusteridxs(:,2));
+        tmp = dominantclusteridxs(K,:);
+        [x,y] = meshgrid(1:nstixperside,1:nstixperside);
+        inRF = reshape(inpolygon(x(:),y(:),dominantclusteridxs(K,2),dominantclusteridxs(K,1)),[nstixperside, nstixperside]);
+        Output_List{ii,3} = inRF;
+    catch
+        Output_List{ii,3} = zeros(nstixperside,nstixperside);
+    end
+    STAgunmat_pf = Output_List{ii,2};
+    [u1,~,v1] = svd(STAgunmat_pf');
+    m = reshape(v1(:,1),[nstixperside nstixperside]);
+    
+    Output_List{ii,4} = sign(m).*(abs(m).^(1.0));
+    [out1,Output_List{ii,5}] = gaborfit_AD(imresize(Output_List{ii,4},resize_fact)); % fitting gabor
+    Gaborerror = [Gaborerror; out1.fval];
+    [out2,Output_List{ii,6}] = DOGfit(imresize(Output_List{ii,4},resize_fact)); % fitting DOG
+    DOGerror = [DOGerror; out2.fval];
+    vect = WN.ras{basisvec_dropidx,basisvecidx};
+    basisvec_size = nstixperside*nstixperside*3;
+    numvect = (numel(vect)/basisvec_size)-1;
+    basisvec = cell(1,numvect);
+    for jj = 1:numvect
+        tmp_vec = vect((jj-1)*basisvec_size+1:basisvec_size*jj) + vect(numvect*basisvec_size+1:basisvec_size*(numvect+1));
+        basisvec{jj} = reshape(tmp_vec,[nstixperside nstixperside 3]);
+    end
+    bkgnd_monitor = reshape(vect(numvect*basisvec_size+1:basisvec_size*(numvect+1)),[nstixperside nstixperside 3]);
+    basisvec1 = basisvec{1}-bkgnd_monitor;
+    basisvec2 = basisvec{2}-bkgnd_monitor;
+    oog1 = min(abs((1-bkgnd_monitor(:))./basisvec1(:)));
+    oog2 = min(abs((1-bkgnd_monitor(:))./basisvec2(:)));
+    tmp = basisvec1 + basisvec2;
+    Output_List{ii,7} = (0.5 * tmp./(max(abs(tmp(:))) + 0.01)) + 0.5;
+    Output_List{ii,8} = u1(:,1);
+    
+    figure(kk)
+    % gunnoise based STA
+    tmp_vec_gun = Output_List{ii,2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*Output_List{ii,2} + 0.5;
+    im = reshape(im,[nstixperside nstixperside 3]);
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+1); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gun');
+    end
+    
+    % Peak Frame
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+2); imagesc(imresize(Output_List{ii,4},resize_fact2)); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('RF');
+    end
+   
+    % Gabor Fit R 
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+3); imagesc(Output_List{ii,5}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gabor');
+    end
+    
+    % DOG fit 
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+4); imagesc(Output_List{ii,6}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('DOG');
+    end
+    
+    % Subunits 
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+5); imagesc(Output_List{ii,7}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Subunits');
+    end
+      
+    if mod(ii,num_rows) == 0
+        kk = kk + 1;
+    end
+       
+end
+%% Need to come up with a summary statistics for which is a better fit, This statistic probably won't work since the models are not nested.
+% Lets test if AIC or BIC works or not.
+N = nstixperside.^2;
+numgaborparams = 8;
+numDOGparams = 6;
+bins = -100:10:300;
+GaborBIC = N*log(Gaborerror/N) + numgaborparams*log(N);
+DOGBIC = N*log(DOGerror/N) + numDOGparams*log(N);
+deltaBIC = DOGBIC-GaborBIC;
+GaborAIC = 2*numgaborparams + N*log(Gaborerror/N);
+DOGAIC = 2*numDOGparams + N*log(DOGerror/N);
+deltaAIC = DOGAIC-GaborAIC;
+plot_counter = kk+1;
+figure(plot_counter); set(gcf,'Name','model comparison');
+subplot(321); plot(Gaborerror,DOGerror,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Gabor error'); ylabel('DOG Error'); title('RSS'); hold off;
+subplot(322); plot(GaborBIC,DOGBIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]);xlabel('Gabor BIC'); ylabel('DOG BIC'); title('BIC'); hold off;
+subplot(323); stem(deltaBIC); hold on;line([0 numel(Input_List)+1],[6 6]); set(gca,'TickDir','out'); axis square; ylabel('delta BIC'); hold off;
+subplot(324); histogram(deltaBIC,bins); axis square; xlabel('delta BIC'); ylabel('count'); set(gca,'TickDir','out');hold off;
+subplot(325); plot(GaborAIC,DOGAIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'TickDir','out'); xlabel('Gabor AIC'); ylabel('DOG AIC'); title('AIC'); hold off;
+subplot(326); histogram(deltaAIC,40); axis square; xlabel('delta AIC'); ylabel('count'); set(gca,'TickDir','out');hold off;
+plot_counter = plot_counter+1;
+
+savevariables = 1;
+if savevariables == 1
+    save GaborBIC GaborBIC
+    save DOGBIC DOGBIC
+    save GaborAIC GaborAIC
+    save DOGAIC DOGAIC
+    save Gaborerror Gaborerror
+    save DOGerror DOGerror
+end
+
+

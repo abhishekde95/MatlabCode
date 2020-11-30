@@ -1,0 +1,229 @@
+% DToneloc Analyses for Utu: just the training
+% Author - Abhishek De, 6/19
+close all; clearvars;
+plot_counter = 1;
+load('T_vos1978_Y');
+Vlambda = T_vos1978_Y';
+% Increment the filenames whenever you add a new row of filenames. Each row represents data from one session. The sessions are color coded from gray (earlier sessions) to black (later sessions)
+filename1 = {'U061419001.nex';'U061419002.nex';'U061419003.nex';'U061419004.nex';'U061419005.nex';'U061419006.nex'};
+filename2 = {'U061719001.nex';'U061719002.nex';'U061719003.nex';'U061719004.nex';'U061719005.nex';'U061719006.nex';'U061719007.nex';};
+filename3 = {'U061919001.nex';'U061919002.nex';'U061919003.nex';'U061919004.nex';'U061919005.nex';'U061919006.nex';'U061919007.nex'};
+filename4 = {'U062019001.nex';'U062019002.nex';'U062019003.nex';'U062019004.nex';'U062019005.nex';'U062019006.nex'};
+filename5 = {'U062119001.nex';'U062119002.nex';'U062119003.nex';'U062119004.nex';'U062119005.nex';'U062119006.nex'};
+filename6 = {'U062419001.nex';'U062419002.nex';'U062419003.nex';'U062419004.nex';'U062419005.nex'};
+numsessions = 6;
+
+coloridx = linspace(0.75,0,numsessions);
+FalseAlarms = cell(numsessions,1);
+Staircases = cell(numsessions,1);
+DetectionThresholds = cell(numsessions,1);
+contrastlattice = logspace(log10(0.01),log10(0.3),51);
+for aa = 1:numsessions
+    filename = eval(strcat('filename',num2str(aa)));
+    RWmultiplier = ones(numel(filename),1);
+    laserdial = zeros(numel(filename),1);
+    HitL = []; HitNL = [];
+    MissL = []; MissNL = [];
+    CRL = []; CRNL = [];
+    FAL = []; FANL = [];
+    TPRNL = []; TPRL = [];
+    FPRNL = []; FPRL = [];
+    RF = [];
+    stimabsentL = []; stimabsentNL = [];
+    stimpresentL = []; stimpresentNL = [];
+    HitsaccadeRT = []; MisssaccadeRT = [];
+    CRsaccadeRT = []; FAsaccadeRT = [];
+    newfilename = [];
+    newRWmultiplier = [];
+    newstimsize = [];
+    newlaserdial = [];
+    thresholdsNL = [];
+    thresholdsL = [];
+    outofgamutptsNL = [];
+    averaged_staircasecontrastNL = [];
+    averaged_staircasecontrastL = [];
+    dprime_diff = [];
+    staircaseterminationptNL = [];
+    cgrad = coloridx(aa);
+    tmp_staircase = [];
+    figure(plot_counter), set(gcf,'Name','Data: Utu training');
+    for jj = 1:size(filename,1)
+        stro = nex2stro(findfile(char(filename(jj,:))));
+        fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+        fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+        fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+        stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+        stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+        targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+        saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+        saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+        rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+        stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+        Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+        Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+        Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+        tf = strcmp(stro.sum.trialFields(1,:),'tf');
+        oog = strcmp(stro.sum.trialFields(1,:),'oog');
+        stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+        optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+        correct = strcmp(stro.sum.trialFields(1,:),'correct');
+        laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+        laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+        correcttrials = stro.trial(:,correct);
+        diridxs = stro.trial(:,stimidx);
+        stimpresent = logical(stro.trial(:,stimpresentidx));
+        LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+        lasertrials = logical(stro.trial(:,optstim));
+        if isnan(unique(stro.trial(:,21:22)))
+            stimlocations = [stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+            RF = [RF; stimlocations];
+            newfilename = [newfilename; filename(jj)];
+            newRWmultiplier = [newRWmultiplier; RWmultiplier(jj)];
+            newlaserdial = [newlaserdial; laserdial(jj)];
+            ib = ones(size(lasertrials));
+            newstimsize = [newstimsize; stro.sum.exptParams.sigma];
+        else
+            [stimlocations,~,ib] = unique(stro.trial(:,21:22),'rows');
+            RF = [RF; stimlocations];
+            L = size(stimlocations,1);
+            newfilename = [newfilename; repmat(filename(jj),[L 1])];
+            newRWmultiplier = [newRWmultiplier; repmat(RWmultiplier(jj),[L 1])];
+            newlaserdial = [newlaserdial; repmat(laserdial(jj),[L 1])];
+            newstimsize = [newstimsize; repmat(stro.sum.exptParams.sigma,[L 1])];
+        end
+        
+        for ii = 1:numel(unique(ib))
+            ind = logical(ib==ii);
+            lasertrialidxs = logical(stro.trial(ind,optstim));
+            colordirchoiceidxs = correcttrials(ind);
+            colorstimpresent = logical(stimpresent(ind));
+            percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+            percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+            
+            % Laser trials
+            Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+            Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+            CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+            FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+            CRlasertrialidxs = find(lasertrialidxs & ~colorstimpresent); L1 = numel(CRlasertrialidxs);
+            
+            % Non-Laser trials
+            Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+            Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+            CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+            FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+            CRnonlasertrialidxs = find(~lasertrialidxs & ~colorstimpresent); L2 = numel(CRnonlasertrialidxs);
+            
+            
+            stimabsentL = [stimabsentL; sum(CRlasertrial) + sum(FAlasertrial)];
+            stimabsentNL = [stimabsentNL; sum(CRnonlasertrial) + sum(FAnonlasertrial)];
+            stimpresentL = [stimpresentL; sum(Hitlasertrial) + sum(Misslasertrial)];
+            stimpresentNL = [stimpresentNL; sum(Hitnonlasertrial) + sum(Missnonlasertrial)];
+            
+            % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+            HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+            MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+            CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+            FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+            TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+            FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+            TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+            FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial
+            
+            % Calculating psychophysical detection threshold for non-laser trials
+            LMStripletfile = LMStriplet(ind,:);
+            LMScontrastfileNL = sqrt(sum(LMStripletfile(colorstimpresent & ~lasertrialidxs,:).^2,2));
+            LMScontrastfileL = sqrt(sum(LMStripletfile(colorstimpresent & lasertrialidxs,:).^2,2));
+            staircaseterminationptNL = [staircaseterminationptNL; LMScontrastfileNL(end)];
+            
+            fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+            fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+            mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+            mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+            mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+            M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+            Lb = M*stro.sum.exptParams.bkgndrgb;
+            % Converting all the contrasts to Luminance contrast
+            Bkgnd_luminance = stro.sum.exptParams.bkgndrgb'*mon_spd*Vlambda;
+            Peak_luminance = (inv(M)*((1+LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+            Trough_luminance = (inv(M)*((1-LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+            Contrast_luminance = (Peak_luminance - Trough_luminance)./(Peak_luminance + Trough_luminance);
+            LMScontrastfile = Contrast_luminance(colorstimpresent,:);
+            % calculating gamut edge luminance contrast
+            t = min(((1./stro.sum.exptParams.bkgndrgb)-1));
+            OOG_luminance = (stro.sum.exptParams.bkgndrgb*(1+t))' * mon_spd*Vlambda;
+            putativeoogcontrast =  (OOG_luminance - Bkgnd_luminance)/Bkgnd_luminance;
+            
+            % A simple criteria for detecting "bad files"
+            tmp = stro.trial(ind & stimpresent & ~lasertrials,oog);
+            outofgamutptsNL = [outofgamutptsNL; sum(tmp(end-4:end))];
+            
+            answers = colordirchoiceidxs(colorstimpresent);
+            LMScontrastfile(LMScontrastfile>putativeoogcontrast) = putativeoogcontrast;
+            
+            contrast = unique(LMScontrastfile);
+            correctanswers = zeros(size(contrast));
+            wronganswers = zeros(size(contrast));
+            trialspercontrast = zeros(size(contrast));
+            
+            for mm = 1:numel(contrast)
+                trialspercontrast(mm) = numel(answers(LMScontrastfile==contrast(mm)));
+                correctanswers(mm) = sum(answers(LMScontrastfile==contrast(mm)));
+                wronganswers(mm) = trialspercontrast(mm) - correctanswers(mm);
+            end
+            [a,b,g] = weibullFitforDToneloc(contrast,[correctanswers wronganswers],'mle');
+            thresholdsNL = [thresholdsNL; a];
+            
+        end
+        
+        averaged_staircasecontrastL = [averaged_staircasecontrastL; mean(LMScontrastfileL(1:numel(LMScontrastfileL)/2+1))];
+        averaged_staircasecontrastNL = [averaged_staircasecontrastNL; mean(LMScontrastfileNL(numel(LMScontrastfileNL)/2+1:end))];
+        dprimeL = norminv(min([1-(0.5./stimpresentL(jj)) HitL(jj)./stimpresentL(jj)],[],2)) - norminv(max([0.5./stimabsentL(jj) FAL(jj)./stimabsentL(jj)],[],2));
+        dprimeNL = norminv(min([1-(0.5./stimpresentNL(jj)) HitNL(jj)./stimpresentNL(jj)],[],2)) - norminv(max([0.5./stimabsentNL(jj) FANL(jj)./stimabsentNL(jj)],[],2));
+        dprime_diff = [dprime_diff; dprimeNL-dprimeL];
+        
+        
+        fit = g*(1-exp(-((contrastlattice./a).^b)));
+        
+        figure(plot_counter);
+        subplot(3,3,jj);
+        for oo = 1:size(contrast)
+            plot(contrast(oo),correctanswers(oo)./(correctanswers(oo)+wronganswers(oo)),'o','MarkerSize',trialspercontrast(oo)/2,'MarkerFaceColor',[cgrad cgrad cgrad],'MarkerEdgeColor',[1 1 1]); hold on;
+        end
+        plot(contrastlattice,fit,'color',[cgrad cgrad cgrad],'Linewidth',2); title(num2str(a,2));
+        set(gca,'Xlim',[0.01 0.1],'Ylim',[0 1],'YTick',0:0.25:1.0,'XTick',[0.01 0.03 0.1],'XTickLabels', {'0.01','0.03','0.1'},'Xscale','log','Tickdir','out'); xlabel('Contrast'); ylabel('prop correct'); axis square;
+        
+        N = size(stro.ras,1);
+        figure(plot_counter+1);
+        subplot(3,3,jj); h = bar([HitL(jj)+HitNL(jj); MissL(jj)+MissNL(jj); CRL(jj)+CRNL(jj); FAL(jj)+FANL(jj)]); set(h(1),'FaceColor',[cgrad cgrad cgrad]);
+        set(gca,'XTick',[1 2 3 4],'XTickLabel',{'H','M','CR','FA'},'TickDir','out','Xlim',[0 5],'YTick',0:N/4:N/2,'Ylim',[0 N/2]); ylabel('Prop of trials'); axis square;
+        
+        figure(plot_counter+2);
+        subplot(3,3,jj); plot(mean([LMScontrastfileL LMScontrastfileNL],2),'color',[cgrad cgrad cgrad],'Linewidth',2); set(h(1),'FaceColor',[cgrad cgrad cgrad]);
+        set(gca,'TickDir','out','Xlim',[0 5],'XTick',0:N/8:N/4,'Xlim',[0 N/4],'Ylim',[0.03 0.2],'YScale','log'); ylabel('Luminance contrast'); axis square;
+        tmp_staircase = [tmp_staircase mean([LMScontrastfileL LMScontrastfileNL],2)];
+    end
+    plot_counter = plot_counter + 3;
+    FalseAlarms{aa} = mean([FAL FANL],2);
+    Staircases{aa} = tmp_staircase;
+    DetectionThresholds{aa} = thresholdsNL;
+end
+
+% Need to plot the summary statistics 
+figure(plot_counter); set(gcf,'Name','Summary Statistics');
+for aa = 1:numsessions
+    cgrad = coloridx(aa);
+    subplot(221); plot(Staircases{aa},'Color',[cgrad cgrad cgrad],'MarkerEdgeColor',[1 1 1],'Linewidth',2); hold on;
+    subplot(222); plot(mean(Staircases{aa},2),'Color',[cgrad cgrad cgrad],'MarkerEdgeColor',[1 1 1],'Linewidth',2); hold on;
+    subplot(223); plot(aa*ones(size(DetectionThresholds{aa})),DetectionThresholds{aa},'o','MarkerFaceColor',[cgrad cgrad cgrad],'MarkerEdgeColor',[1 1 1]); hold on;
+    subplot(224); plot(aa*ones(size(FalseAlarms{aa})),FalseAlarms{aa},'o','MarkerFaceColor',[cgrad cgrad cgrad],'MarkerEdgeColor',[1 1 1]); hold on;
+    
+end
+subplot(221); set(gca,'TickDir','out','Xlim',[0 5],'XTick',0:N/8:N/4,'Xlim',[0 N/4],'Ylim',[0.03 0.2],'YScale','log'); ylabel('Luminance contrast'); title('All staircases'); axis square; hold off; 
+subplot(222); set(gca,'TickDir','out','Xlim',[0 5],'XTick',0:N/8:N/4,'Xlim',[0 N/4],'Ylim',[0.03 0.2],'YScale','log'); ylabel('Luminance contrast'); title('Averaged staircases'); axis square; hold off;
+subplot(223); set(gca,'TickDir','out','Xlim',[0 numsessions+1],'YScale','log','Ylim',[0.03 0.06]); xlabel('Sessions'); ylabel('Detection thresholds'); axis square;  hold off;
+subplot(224); set(gca,'TickDir','out','Xlim',[0 numsessions+1],'YTick',0:10:50,'Ylim',[0 50]); xlabel('Sessions'); ylabel('False Alarms'); axis square; hold off;
+
+
+plot_counter = plot_counter + 1;
+plot_counter = plot_counter + 1;

@@ -1,0 +1,297 @@
+% Some additional info for Elife
+% Author - Abhishek De, 10/19
+
+% Figure 6
+% •	DToneloc population: A scatter plot of hits in control vs laser trials at tested locations for Maui and Apollo
+% (Total 4 figures: 2 hits control vs laser population plot, 2 mapped RF locations for those session)
+close all; clearvars;
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load('T_vos1978_Y');
+Vlambda = T_vos1978_Y';
+ratio_controloverlaser = [];
+timeperblock = [];
+trialsperblock = [];
+T = []; % for storing data in a table
+for mm = 1:2
+    if mm == 1
+        load filenameoptoM.mat
+        load RWmultiplieroptoM.mat
+        load laserdialoptoM.mat
+        monkeyname = 'Maui';
+    else
+        load filenameoptoA.mat
+        load RWmultiplieroptoA.mat
+        load laserdialoptoA.mat
+        monkeyname = 'Apollo';
+    end
+    filename = [filenameopto];
+    RWmultiplier = [RWmultiplieropto];
+    laserdial = [laserdialopto];
+    HitL = []; HitNL = [];
+    MissL = []; MissNL = [];
+    CRL = []; CRNL = [];
+    numdivisionsperfile = 3;
+    CRearlylateL = []; % for storing the number of CRs in first half and second half of the block of experiment (laser trials)
+    CRearlylateNL = [];% for storing the number of CRs in first half and second half of the block of experiment (no-laser trials)
+    FAL = []; FANL = [];
+    stimdur = [];
+    laserdur = [];
+    h_hit = []; p_hit = [];
+    h_FA = []; p_FA = [];
+    TPRNL = []; TPRL = [];
+    FPRNL = []; FPRL = [];
+    alpha = 0.05;
+    RF = [];
+    stimabsentL = []; stimabsentNL = [];
+    stimpresentL = []; stimpresentNL = [];
+    newfilename = [];
+    newRWmultiplier = [];
+    newstimsize = [];
+    newlaserdial = [];
+    oogvals = [];
+    count = 1;
+    for jj = 1:size(filename,1)
+        stro = nex2stro(findfile(char(filename(jj,:))));
+        fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+        fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+        fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+        stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+        stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+        targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+        saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+        saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+        rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+        stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+        Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+        Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+        Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+        tf = strcmp(stro.sum.trialFields(1,:),'tf');
+        oog = strcmp(stro.sum.trialFields(1,:),'oog');
+        stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+        optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+        correct = strcmp(stro.sum.trialFields(1,:),'correct');
+        laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+        laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+        anlgStartTime = strcmp(stro.sum.rasterCells,'anlgStartTime');
+        timeperblock = [timeperblock; stro.ras{end,anlgStartTime}-stro.ras{1,anlgStartTime}];
+        trialsperblock = [trialsperblock; size(stro.ras,1)];
+        
+        correcttrials = stro.trial(:,correct);
+        diridxs = stro.trial(:,stimidx);
+        stimpresent = logical(stro.trial(:,stimpresentidx));
+        LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+        lasertrials = logical(stro.trial(:,optstim));
+        if isnan(unique(stro.trial(:,21:22)))
+            stimlocations = [stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+            RF = [RF; stimlocations];
+            newfilename = [newfilename; filename(jj)];
+            newRWmultiplier = [newRWmultiplier; RWmultiplier(jj)];
+            newlaserdial = [newlaserdial; laserdial(jj)];
+            ib = ones(size(lasertrials));
+            newstimsize = [newstimsize; stro.sum.exptParams.sigma];
+        else
+            [stimlocations,~,ib] = unique(stro.trial(:,21:22),'rows');
+            RF = [RF; stimlocations];
+            L = size(stimlocations,1);
+            newfilename = [newfilename; repmat(filename(jj),[L 1])];
+            newRWmultiplier = [newRWmultiplier; repmat(RWmultiplier(jj),[L 1])];
+            newlaserdial = [newlaserdial; repmat(laserdial(jj),[L 1])];
+            newstimsize = [newstimsize; repmat(stro.sum.exptParams.sigma,[L 1])];
+        end
+        
+        for ii = 1:numel(unique(ib))
+            ind = logical(ib==ii);
+            lasertrialidxs = logical(stro.trial(ind,optstim));
+            colordirchoiceidxs = correcttrials(ind);
+            colorstimpresent = logical(stimpresent(ind));
+            percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+            percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+            
+            % Laser trials
+            Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+            Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+            CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+            FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+            CRlasertrialidxs = find(lasertrialidxs & ~colorstimpresent); L1 = numel(CRlasertrialidxs);
+            
+            % Non-Laser trials
+            Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+            Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+            CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+            FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+            CRnonlasertrialidxs = find(~lasertrialidxs & ~colorstimpresent); L2 = numel(CRnonlasertrialidxs);
+            
+            
+            stimabsentL = [stimabsentL; sum(CRlasertrial) + sum(FAlasertrial)];
+            stimabsentNL = [stimabsentNL; sum(CRnonlasertrial) + sum(FAnonlasertrial)];
+            stimpresentL = [stimpresentL; sum(Hitlasertrial) + sum(Misslasertrial)];
+            stimpresentNL = [stimpresentNL; sum(Hitnonlasertrial) + sum(Missnonlasertrial)];
+            
+            % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+            HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+            MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+            CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+            FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+            TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+            FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+            TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+            FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial
+            
+            fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+            fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+            mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+            mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+            mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+            M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+            Lb = M*stro.sum.exptParams.bkgndrgb;
+            % Converting all the contrasts to Luminance contrast
+            Bkgnd_luminance = stro.sum.exptParams.bkgndrgb'*mon_spd*Vlambda;
+            Peak_luminance = (inv(M)*((1+LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+            Trough_luminance = (inv(M)*((1-LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+            Contrast_luminance = (Peak_luminance - Trough_luminance)./(Peak_luminance + Trough_luminance);
+            %             Contrast_luminance = ((inv(M)*((LMStriplet+1).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda-Bkgnd_luminance)/Bkgnd_luminance; % Same as Michelson contrast
+            LMScontrastfileNL = Contrast_luminance(colorstimpresent & ~lasertrialidxs,:);
+            LMScontrastfileL = Contrast_luminance(colorstimpresent & lasertrialidxs,:);
+            % calculating gamut edge luminance contrast
+            t = min(((1./stro.sum.exptParams.bkgndrgb)-1));
+            OOG_luminance = (stro.sum.exptParams.bkgndrgb*(1+t))' * mon_spd*Vlambda;
+            putativeoogcontrast =  (OOG_luminance - Bkgnd_luminance)/Bkgnd_luminance;
+            oogvals = [oogvals; putativeoogcontrast];
+            
+            % Calculating psychophysical detection threshold for non-laser trials
+            LMStripletfile = LMStriplet(ind,:);
+            trials = lasertrialidxs;
+        end
+    end
+    % Accumulating files over different sessions
+    filedates = cell2mat(newfilename);
+    datesind = 2:10;
+    filedates = str2num(filedates(:,datesind));
+    [filedates,~,ib] = unique([filedates RF newRWmultiplier newlaserdial newstimsize],'rows');
+    HitLSession = []; HitNLSession = [];
+    MissLSession = []; MissNLSession = [];
+    CRLSession = []; CRNLSession = [];
+    FALSession = []; FANLSession = [];
+    stimabsentLSession = [];
+    stimabsentNLSession = [];
+    stimpresentLSession = [];
+    stimpresentNLSession = [];
+    p_hits = [];
+    p_FA = [];
+    p_hitsLFANL = [];
+    numfilespersession = [];
+    nrows = ceil(sqrt(numel(unique(ib))));
+    for ii = 1:numel(unique(ib))
+        idx = ii;
+        HitLSession = [HitLSession; sum(HitL(idx))];
+        HitNLSession = [HitNLSession ;sum(HitNL(idx))];
+        MissLSession = [MissLSession; sum(MissL(idx))];
+        MissNLSession = [MissNLSession; sum(MissNL(idx))];
+        CRLSession = [CRLSession; sum(CRL(idx))];
+        CRNLSession = [CRNLSession; sum(CRNL(idx))];
+        FALSession = [FALSession; sum(FAL(idx)) ];
+        FANLSession = [FANLSession; sum(FANL(idx))];
+        stimabsentLSession = [stimabsentLSession; sum(stimabsentL(idx))];
+        stimabsentNLSession = [stimabsentNLSession; sum(stimabsentNL(idx))];
+        stimpresentLSession = [stimpresentLSession; sum(stimpresentL(idx))];
+        stimpresentNLSession = [stimpresentNLSession; sum(stimpresentNL(idx))];
+        [~,p1] = equalproptest([sum(HitL(idx)) sum(HitNL(idx))],[sum(stimpresentL(idx)) sum(stimpresentNL(idx))],alpha);
+        [~,p2] = equalproptest([sum(FAL(idx)) sum(FANL(idx))],[sum(stimabsentL(idx)) sum(stimabsentNL(idx))],alpha);
+        [~,p3] = equalproptest([sum(HitL(idx)) sum(FANL(idx))],[sum(stimpresentL(idx)) sum(stimabsentNL(idx))],alpha);
+        p_hits = [p_hits;p1]; p_FA = [p_FA;p2]; p_hitsLFANL = [p_hitsLFANL; p3];
+        numfilespersession = [numfilespersession; sum(idx)];
+    end
+    
+    idx = p_hits<1.0;
+    HitLSession = HitLSession(idx);
+    HitNLSession = HitNLSession(idx);
+    MissLSession = MissLSession(idx);
+    MissNLSession = MissNLSession(idx);
+    CRLSession = CRLSession(idx);
+    CRNLSession = CRNLSession(idx);
+    FALSession = FALSession(idx);
+    FANLSession = FANLSession(idx);
+    stimabsentLSession = stimabsentLSession(idx);
+    stimabsentNLSession = stimabsentNLSession(idx);
+    stimpresentLSession = stimpresentLSession(idx);
+    stimpresentNLSession = stimpresentNLSession(idx);
+    TPRLSession = HitLSession./(HitLSession+MissLSession);
+    TPRNLSession = HitNLSession./(HitNLSession+MissNLSession);
+    FPRLSession = FALSession./(FALSession+CRLSession);
+    FPRNLSession = FANLSession./(FANLSession+CRNLSession);
+    p_hits = p_hits(idx); p_FA = p_FA(idx); p_hitsLFANL = p_hitsLFANL(idx);
+    
+    figure(plot_counter); set(gcf,'Name',strcat('stats:',monkeyname));
+    subplot(2,2,2*mm-1);
+    for ii = 1:numel(p_hits)
+        if (p_hits(ii)<0.05)
+            color = [0 0 0];
+        else
+            color = [0.5 0.5 0.5];
+        end
+        px = HitNLSession(ii)./stimpresentNLSession(ii); errorx = sqrt(px*(1-px)/stimpresentNLSession(ii));
+        py = HitLSession(ii)./stimpresentLSession(ii); errory = sqrt(py*(1-py)/stimpresentLSession(ii));
+        plot(px,py,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',color,'MarkerEdgeColor',[1 1 1],'Color','k'); hold on;
+    end
+    line([0 1],[0 1],'Linewidth',1);axis square; xlabel('Hits control'); ylabel('Hits laser'); set(gca,'Xlim',[0 1],'Ylim',[0 1],'Tickdir','out','XTick',[0:0.5:1],'YTick',[0:0.5:1]);
+    if mm == 1
+        title('Maui');
+    else
+        title('Apollo');
+    end
+    [~,p] = corr((HitNLSession./stimpresentNLSession)-(HitLSession./stimpresentLSession),(CRNLSession./stimabsentNLSession)-(CRLSession./stimabsentLSession));
+    
+   
+    dprimeL = norminv(min([1-(0.5./stimpresentLSession) HitLSession./stimpresentLSession],[],2))-norminv(max([0.5./stimabsentLSession FALSession./stimabsentLSession],[],2));
+    dprimeNL = norminv(min([1-(0.5./stimpresentNLSession) HitNLSession./stimpresentNLSession],[],2))-norminv(max([0.5./stimabsentNLSession FANLSession./stimabsentNLSession],[],2));
+    if any(HitLSession==0)
+        ind = HitLSession==0;
+        dprimeL(ind) = norminv(0.5./stimabsentLSession(ind))-norminv(max([0.5./stimabsentLSession(ind) FALSession(ind)./stimabsentLSession(ind)],[],2));
+    elseif any(HitNLSession==0)
+        ind = HitNLSession==0;
+        dprimeNL(ind) = norminv(0.5./stimabsentNLSession(ind))-norminv(max([0.5./stimabsentNLSession(ind) FANLSession(ind)./stimabsentNLSession(ind)],[],2));
+    elseif any(HitLSession==30)
+        ind = HitLSession==30;
+        dprimeL(ind) = norminv(1-(0.5./stimpresentLSession(ind)))-norminv(max([0.5./stimabsentLSession(ind) FALSession(ind)./stimabsentLSession(ind)],[],2));
+    elseif any(HitNLSession==30)
+        ind = HitNLSession==30;
+        dprimeNL(ind) = norminv(1-(0.5./stimpresentNLSession(ind)))-norminv(max([0.5./stimabsentNLSession(ind) FANLSession(ind)./stimabsentNLSession(ind)],[],2));
+    elseif any(FALSession==0)
+        ind = FALSession==0;
+        dprimeL(ind) = norminv(min([1-(0.5./stimpresentLSession(ind)) HitLSession(ind)./stimpresentLSession(ind)],[],2))-norminv(0.5./stimabsentLSession(ind));
+    elseif any(FANLSession==0)
+        ind = FANLSession==0;
+        dprimeNL(ind) = norminv(min([1-(0.5./stimpresentNLSession(ind)) HitNLSession(ind)./stimpresentNLSession(ind)],[],2))-norminv(0.5./stimabsentNLSession(ind));
+    end
+    figure(plot_counter); subplot(2,2,2*mm); plot(dprimeNL,dprimeL,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on
+    set(gca,'Ylim',[-1 4],'Xlim',[-1 4],'Tickdir','out','XTick',[-1:1:4],'YTick',[-1:1:4]); line([-1 4],[-1 4],'Linewidth',1);axis square; xlabel('d prime:control'); ylabel('d prime:laser'); hold off;
+    
+    % Trying to create a table 
+    Hit_laser = HitLSession;
+    Miss_laser = MissLSession;
+    False_alarm_laser = FALSession;
+    Correct_reject_laser = CRLSession;
+    Gabor_absent_laser = stimabsentLSession;
+    Gabor_present_laser = stimpresentLSession;
+    
+    Hit_control = HitNLSession;
+    Miss_control = MissNLSession;
+    False_alarm_control = FANLSession;
+    Correct_reject_control = CRNLSession;
+    Gabor_absent_control = stimabsentNLSession;
+    Gabor_present_control = stimpresentNLSession;
+
+    tmp = char(filename);
+    Monkey_ID = tmp(:,1);
+    Dates = strcat(tmp(:,2:3),'/',tmp(:,4:5),'/',tmp(:,6:7));
+    T = [T; table(Monkey_ID, Dates,Hit_laser,Miss_laser,False_alarm_laser,Correct_reject_laser,Gabor_present_laser,Gabor_absent_laser,Hit_control,Miss_control,False_alarm_control,Correct_reject_control,Gabor_present_control,Gabor_absent_control)];
+    
+end
+figure(plot_counter); set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% Storing the files in an excel sheet format
+excelfilename = 'DLX_OPTO_data.xlsx';
+writetable(T,excelfilename,'Sheet',1);

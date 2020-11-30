@@ -1,0 +1,1635 @@
+% IsoSampPaperStuff
+%
+% Section 0) Constants
+%
+% Section 1) Data justification for formulas for magno and parvo RF sizes
+% Largely taken from RGC_RF_sizes.m
+%
+% Section 2) t-SNE and STAs from whitenoise. Take largely from WNPop.m
+% section 13
+%
+% Section 3) Average single neuron d' (and extrapolated population d') as a
+% function of retinal eccentricity. Also as a function of temporal frequency.
+% See IsoSampPop.m sections 2 and 4.
+%
+% Section 4) Example rasters and d-prime curves
+%
+% Section 5) Input efficiency (one plots/monkey)
+%
+% Section 6) Population d-prime with cone ideal observer(s)
+%
+% Section 7) Comparison of d-prime from ON and OFF cells.
+%
+% Section 8) Microsaccade-triggered PSTHs.
+%
+% Section 9) PSTHs of microsaccade occurrences.
+%
+% Section 10) Noise spectra
+%
+% Section 11) Psychophysical temporal integration
+%
+% Section 12) Sliding window d' & firing rate analysis.
+%
+% Section 13) Looking at distribution of standard deviation estimates of
+% the "normalized" Mahalanobis distance.
+%
+% Section 14) Stats showing that d' increases for M-neurons from 1 to 8 Hz.
+%%
+% Section 0)
+% Constants that should be ashared across cells in this script so that I
+% don't accidentally switch formulas here and there.
+MMPERDEG = 0.223; % mm/deg (Perry and Cowey 1985)
+DEGPERMM = 1/MMPERDEG; % deg/mm
+DPRIMEMETHOD = 1;
+MONKEYS={'Apollo','Utu'};
+CELLTYPES = {'M','P'};
+DPRIMEMETHOD = 1;
+TEMPORONASALSCALEFACTOR = .8;
+ONOFFCORRELATION = 0.05;
+RFTRUNCATIONINSD = 3;
+HUMAN2MONKPSCALEFACTOR = .80; % From Dacey and Petersen. reasonable range: [.77 .81];
+
+%TFBINEDGES = logspace(0,log10(60),8);
+%TFBINCENTERS = sqrt(TFBINEDGES(1:end-1).*TFBINEDGES(2:end)); % geomean
+
+TFBINCENTERS = logspace(log10(1), log10(60), 15); % Native bins
+binwidth = log10(TFBINCENTERS(2))-log10(TFBINCENTERS(1));
+TFBINEDGES = 10.^(linspace(log10(TFBINCENTERS(1))-binwidth/2,log10(TFBINCENTERS(end))+binwidth/2,length(TFBINCENTERS)+1));
+MONKEY2MARKER = '^';
+EXAMPLEMAGNOCELL = 'A061517005.nex'; % example magnocell
+EXAMPLEPARVOCELL = 'A061617006.nex'; % example parvocell
+GETRFFROMSTAMODE = 2;
+GETRFFROMSTATHRESH = .95;
+MAXT= 6; % n frames back to compute STA
+
+ecc_to_diam_deg_M = @(rf_r_deg) 10.^(-1.2459+0.0345*rf_r_deg); % temporal retina equivalent
+a = 0.9729; % Table 1
+r2 = 1.084; % Table 1
+re = 7.633; % Table 1
+dc_0 = 14804.6; % Cone density of fovea
+rm = 41.03; % See Equation 7
+ecc_to_diam_deg_P = @(x)(sqrt(2./(sqrt(3).*... % Equation 9. Distance between adjacent midget RF centers.
+    (2*dc_0.*(1+x./rm).^-1.*(a*(1+(x./r2)).^-2+(1-a)*exp(-x./re)))...
+    ./2))... % Dividing y by 2 to estimate RF size from only ON or OFF mosaics (halving the density).
+    *HUMAN2MONKPSCALEFACTOR); % Monkey midget RFs are slightly smaller than human midget RFs
+
+bpdf_vec=@(x,y,mu_x,mu_y,sigma)(exp(-((x-mu_x).^2)./(2*sigma^2)-((y-mu_y).^2)/(2*sigma^2))./(2*pi*sigma^2)); % bivariate normpdf
+
+% Stuff for DTcones_gh
+fundamentals = load('T_cones_smj10');
+params = [];
+params.runType = 'isosamp';
+params.obsMethod = 'obsMethod_filteredWtFxn';
+params.impulseResponse = 'rieke';
+params.DTV1_fname = [];
+params.DTNT_fname = [];
+params.unitTest = false;
+params.eqMosaic = false;
+params.saveDir = '/Users/greghorwitz/Documents/MATLAB';
+params.notes = 'IsoSamp test';
+params.parallelOperations = false;
+params.eyeType = 'monkey';
+params.eyeNumber = 1; % LGN neurons are monocular
+params.coneSampRate = 2400;
+params.flatPowerSpect = false;
+params.enableScones = false;
+params.sacamp_deg = 0;
+params.sacdur_s = 0;
+%%
+% Section 1) Magnocellular and parvocellular receptive field sizes
+
+DL_magno_nasal_data = xlsread('RGC_RFsizes_vs_eccentricity','DL1984MagnoNasalData'); % x = eccentricity (deg), y = RF field radius (deg)
+DL_magno_temporal_data = xlsread('RGC_RFsizes_vs_eccentricity','DL1984MagnoTemporalData'); % x = eccentricity (deg), y = RF field radius (deg)
+
+% "*0.61" to convert nasal RFs to equivalent temporal eccentricity
+% "*2" to convert radius to diameter
+% "/sqrt(2)" to go out only 1 SD instead of 1/e
+
+rf_r_deg = logspace(log10(2),log10(18),20);
+hobj = []; % handles for legend
+
+figprefs; axes;
+hobj(1) = plot(DL_magno_nasal_data(:,1)*.61,DL_magno_nasal_data(:,2)*2/sqrt(2),'ko');
+hobj(2) = plot(DL_magno_temporal_data(:,1),DL_magno_temporal_data(:,2)*2/sqrt(2),'k+');
+set(gca,'Yscale','log');
+y = log10([DL_magno_nasal_data(:,2); DL_magno_temporal_data(:,2)].*2./sqrt(2));
+X = [ones(length(DL_magno_nasal_data)+length(DL_magno_temporal_data),1) [DL_magno_nasal_data(:,1)*.61; DL_magno_temporal_data(:,1)]];
+b_equiv_temporal = regress(y,X);
+% Error checking
+if b_equiv_temporal(1) - -1.2459 > 10^-4 || b_equiv_temporal(2)-.0345 > 10^-4 
+    error('regression coefficients do not match');
+end
+
+hobj(3) = plot(rf_r_deg,10.^([ones(length(rf_r_deg),1) rf_r_deg']*b_equiv_temporal),'k-');
+title('Derrington and Lennie 1984 magnocellular');
+xlabel('Temporal equivalent eccentricity (deg)');
+ylabel('Center diameter (2 SD in deg)');
+set(gca,'Yscale','log');
+
+%  midget RGC RF sizes from Watson model and cone RF sizes from Goodchild
+%  et al. 1996 model
+
+% First Watson (using data from nasal *visual field* (= temporal retina)).
+% Nasal retina has high cone/RGC density.
+a = 0.9729; % Table 1
+r2 = 1.084; % Table 1
+re = 7.633; % Table 1
+dc_0 = 14804.6; % Cone density of fovea
+rm = 41.03; % See Equation 7
+y = 2*dc_0.*(1+rf_r_deg./rm).^-1.*(a*(1+(rf_r_deg./r2)).^-2+(1-a)*exp(-rf_r_deg./re)); % From Equation 8
+
+% trying to back out RF size from RF density.
+% y is in RF density = RFs/deg^2
+% sqrt(1./y(1))
+% (pi*sqrt(3))/6) above to account for the fact that packed circles.
+% have slightly lower density than packed squares and therefore RFs
+% should be slightly smaller than 1/sqrt(density).
+% rfsize = (pi*sqrt(3))/6.*sqrt(1./y);
+
+% Using Equation 9
+% Dividing y by 2 to get density of ON (or OFF) cells only
+rfsize = sqrt(2./(sqrt(3).*y./2))*HUMAN2MONKPSCALEFACTOR; % Equation 9. Distance between adjacent midget RF centers. 
+if ~all(rfsize == ecc_to_diam_deg_P(rf_r_deg))
+    error('Disagreement between nominally identical ways of calculating P-cell RF size');
+end
+
+hobj(4) = plot(rf_r_deg,rfsize,'k--');
+
+% Now Goodchild et al. 1996
+% Also using temporal retina data
+temporalcoeffs=[150.9676 -1.2220 35.9979 -0.1567 9.9936 -0.0258]; % (Goodchild et al., 1996 Table 2)
+conedensfun = @(coeffs,x)(coeffs(1).*(exp(coeffs(2).*x)))+...
+    (coeffs(3).*(exp(coeffs(4).*x)))+...
+    (coeffs(5).*(exp(coeffs(6).*x)));
+coneDensity = conedensfun(temporalcoeffs,rf_r_deg);
+conesPerMM2=coneDensity*1e3;
+conesPerDeg = conesPerMM2*MMPERDEG.^2;
+
+% Using same conversion of density to hexagonal space from Watson 2014
+% Equation A4. Measuring the cone "RF" as the intercone spacing times 0.58
+% to make it comparable to the midget RF size measurements.
+
+rfsize = sqrt(2./(sqrt(3)*conedensfun(temporalcoeffs,rf_r_deg)*1e3*MMPERDEG.^2))*HUMAN2MONKPSCALEFACTOR;
+rfsize = sqrt(2./(sqrt(3)*conedensfun(temporalcoeffs,rf_r_deg)*1e3*MMPERDEG.^2));
+hobj(5) = plot(rf_r_deg,rfsize,'k:');
+labels = {'Magno nasal (Derrington and Lennie)','Magno temporal (Derrington and Lennie)','Magno fit (Derrington and Lennie)',...
+    'Midgets (Watson)','Cones (Goodchild et al.)'};
+legend(hobj,labels,'Location','northwest')
+set(gca,'Xlim',[0 18],'Ylim',[.01 .5],'TickDir','out');
+
+% Agrees reasonably well with Wool et al. 2018 who say that by ~9° the
+% average midget has two cones in the RF center.
+
+% Just some quick calculations to figure out how much of the probability
+% mass of a bivariate Gaussian is within 2 SDs (or within 2/.58 = 3.44 SDs)
+x = linspace(-6,6,1000)';
+y = normpdf(x,0,1)*normpdf(x,0,1)';
+y = y./sum(y(:));
+
+[xx,yy] = meshgrid(x,x);
+mask = (xx.^2+yy.^2) < 1; % going out 1 SD in all directions (=2 SD diameter)
+sum(sum(y.*mask))
+
+mask = (xx.^2+yy.^2) < 4; % 4 = 2^2
+sum(sum(y.*mask))
+
+mask = (xx.^2+yy.^2) < (2/HUMAN2MONKPSCALEFACTOR)^2; % 3.4^2 = 11.89
+sum(sum(y.*mask))
+
+y = normpdf(x,0,1);
+y = y./sum(y);
+sum(y(abs(x)<1))
+
+%%
+% Section 2
+% t-SNE plot showing clustering of STAs (just to show the different
+% physiological cells types in the data set are the ones people expect to
+% see and that the L-ON and M-ON parocellular neurons are a little harder
+% to discriminate than other neuronal types.)
+
+conn = database('Nex_Paradigm_Sort','','','Vendor','MySql','Server','128.95.153.12');
+whitenoisedata = fetch(conn, 'SELECT fileID, rfX, rfY, neuron, spikeCode FROM WhiteNoiseLGN_forIS WHERE quality = ''1''');
+isosampdata = fetch(conn, 'SELECT fileID, rfX, rfY, neuron, cellClass FROM IsoSamp_LGN WHERE quality = ''1''');
+close(conn);
+
+uniqueWNneurons = unique([whitenoisedata{:,4}]);
+WNfilenames = {};
+for neuronid = uniqueWNneurons
+    LWN =  [whitenoisedata{:,4}] == neuronid;
+    Lisosamp = [isosampdata{:,4}] == neuronid;
+    if any(Lisosamp)
+        tmp = [];
+        for i = find(LWN)       
+        	tmp = [tmp, whitenoisedata(i,1)];
+        end
+        WNfilenames{length(WNfilenames)+1} = tmp;
+        
+        % Sanity checks
+        tmp=[];
+        for i = find(Lisosamp)
+            tmp=[tmp;isosampdata{i,2:4}];
+        end
+        for i = find(LWN)
+            tmp=[tmp;whitenoisedata{i,2:4}];
+        end
+        if any(std(tmp))
+            error('White noise and IsoSamp entries into database disagree');
+        end
+    end
+end
+
+data=[];
+filenamestems = {};
+Ms = [];
+for i = 1:length(WNfilenames)
+    stro=[];
+    for j = 1:length(WNfilenames{i})
+        stro = strocat(stro,nex2stro(findfile(WNfilenames{i}{j})));
+    end
+    spikename = whitenoisedata{strcmp(whitenoisedata(:,1),WNfilenames{i}(1)),5};
+
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ntrials = length(stro.sum.absTrialNum);
+    spikeidx = find(strcmp(stro.sum.rasterCells(1,:),spikename));
+    
+    % Reconstructing the M matrix and gamma table
+    funds = stro.sum.exptParams.fundamentals;
+    funds = reshape(funds,[length(funds)/3,3]);
+    mon_spd = stro.sum.exptParams.mon_spd;
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    Ms(:,:,i) = funds'*mon_spd;
+
+    out = getWhtnsStats(stro,MAXT,'STCOVmex', {nstixperside^2, 3, MAXT}, spikename);
+    STA = out{1}/out{3};
+    inRF = getRFfromSTA(STA,GETRFFROMSTAMODE,GETRFFROMSTATHRESH);
+    STA = reshape(STA,[nstixperside.^2  3 MAXT]);
+    temporalSTA = squeeze(STA(logical(inRF(:)),:,:));
+    drawnow
+    if ~ismatrix(temporalSTA)
+        temporalSTA = mean(temporalSTA,1);
+    end
+    %temporalSTA = squeeze(STA(whichpix,:,:));
+    
+    data(:,:,i) = squeeze(temporalSTA);
+    filenames{i} =  WNfilenames{i}{1};
+end
+
+% --------------
+% Setting up clusters by hand and seeing where they fall in the t-SNE plot
+% 1) 1 = P, 2 = M, 3 = K
+% 2) 0 = OFF, 1 = ON
+% 3) 0 = L, 1 = M
+% --------------
+celltypemat = nan(size(data,3),3);
+for j = 1:size(data,3)
+    sta = squeeze(data(:,:,j));
+    [u,s,v] = svd(sta);
+    L = strcmp(filenames{j},whitenoisedata(:,1));
+    neuronidx = whitenoisedata{L,4};
+    celltype = isosampdata{[isosampdata{:,4}] == neuronidx,5};
+    switch(celltype)
+        case {'P'}
+            celltypemat(j,1) = 1;
+        case {'M'}
+            celltypemat(j,1) = 2;
+        case {'K'}
+            celltypemat(j,1) = 3;
+        otherwise
+            celltypemat(j,1) = 4;
+    end
+    rgb = u(:,1);
+    temporal = v(:,1);
+    if max(abs(rgb)) == -min(rgb)
+        rgb = -rgb;
+        temporal = -temporal;
+    end
+    if max(abs(temporal)) == max(temporal)
+        celltypemat(j,2) = 1; % ON
+    else
+        celltypemat(j,2) = 0; % OFF
+    end
+    M = Ms(:,:,j);
+    lm_ratio = sta(1,2)/sta(2,2);
+    if abs(lm_ratio-M(2,1)/M(2,2)) < abs(lm_ratio-M(1,1)/M(1,2))
+        celltypemat(j,3) = 1; % M
+    else
+        celltypemat(j,3) = 0; % L
+    end
+end
+
+clusterids = {'Parvo L-cone ON','Parvo M-cone ON','Parvo L-cone OFF','Parvo M-cone OFF','Magno ON','Magno OFF','K'};
+colors = [1 0 0; 0 .5 0; 0 1 1; 1 0 1; .75 .75 0; 0 0 0; 0 0 1];
+
+idx = zeros(size(celltypemat,1),1);
+nclusters = length(clusterids);
+for i = 1:nclusters
+    done = 0;
+    L = zeros(size(celltypemat,1),1);
+    if strfind(clusterids{i},'Parvo')
+        L = L | celltypemat(:,1) == 1;
+    elseif strfind(clusterids{i},'Magno')
+        L = L | celltypemat(:,1) == 2;
+    elseif strfind(clusterids{i},'K')
+        L = L | celltypemat(:,1) == 3;
+        done = 1;
+    end
+    if ~done
+        if strfind(clusterids{i},'ON')
+            L = L & celltypemat(:,2) == 1;
+        else
+            L = L & celltypemat(:,2) == 0;
+        end
+        if strfind(clusterids{i},'Parvo')
+            if strfind(clusterids{i},'L-cone')
+                L = L & celltypemat(:,3) == 0;
+            elseif strfind(clusterids{i},'M-cone')
+                L = L & celltypemat(:,3) == 1;
+            end
+        end
+    end
+    idx(logical(L)) = i;
+end
+
+% Reducing the dimensionality of each STA via SVD
+newdata = zeros(size(data,1)+size(data,2),size(data,3));
+for i = 1:size(data,3)
+    sta = squeeze(data(:,:,i));
+    [u,s,v] = svd(sta);
+    if sta(:,2)'*u(:,1) < 0
+        u = -u;
+        v = -v;
+    end
+    newdata(:,i) = [u(:,1);v(:,1)];
+end
+y = tsne(newdata','Algorithm','exact','Distance','euclidean','LearnRate',1,'Perplexity',5,'Exaggeration',1);
+
+figprefs; axes('Position',[1 1 10 10]);
+for i = 1:nclusters
+    for j = find(idx == i)'
+        h = plot(y(j,1),y(j,2),'ko','MarkerFaceColor',colors(i,:));
+    end
+end
+axis equal;
+
+% STAs for each cluster
+figprefs;
+framestep = stro.sum.exptParams.nrepframes/stro.sum.exptParams.framerate*1000; % ms/frame
+t = [0:size(data,2)-1]*framestep;
+for i = 1:nclusters
+    subplot(ceil(sqrt(nclusters)),ceil(sqrt(nclusters)),i); hold on;
+    set(gca,'ColorOrder',[1 0 0; 0 1 0; 0 0 1],'Ycolor',colors(i,:),'Xcolor',colors(i,:));
+    for j = find(idx == i)'
+        plot(t,squeeze(data(:,:,j))','LineWidth',2);
+    end
+    set(gca,'Xlim',[t(1) t(end)],'Ylim',[-.045 .045],'Ytick',[],'TickDir','out');
+end
+xlabel('Time (ms)');
+ylabel('STA (A.U.)');
+
+%%
+% Section 3
+% dprime (single neuron and population) as a function of eccentricity and
+% temporal frequency. LUM only.
+
+data = [];
+dprime_v_TF = [];
+ns = [];
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        for i = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{i})
+                stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            examplecell = 0;
+            if any(strcmp(EXAMPLEPARVOCELL,filenames{i})) | any(strcmp(EXAMPLEMAGNOCELL,filenames{i})) 
+                examplecell = 1;
+            end
+            if strcmp(CELLTYPE,'M')
+                ecc_to_diam_deg = ecc_to_diam_deg_M;
+            elseif strcmp(CELLTYPE,'P')
+                ecc_to_diam_deg = ecc_to_diam_deg_P;
+            else
+                error('Unknown celltype');
+            end
+            population_scalefactor = IsoSampGetPopulationScaleFactor(stro, ecc_to_diam_deg, TEMPORONASALSCALEFACTOR, RFTRUNCATIONINSD, ONOFFCORRELATION, 2);
+            rfx = stro.sum.exptParams.rf_x/10;
+            rfy = stro.sum.exptParams.rf_y/10;
+
+            [uniquestim, dprime] = IsoSampGetDPrime(stro,DPRIMEMETHOD,spikecds(i));
+            Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+            Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+      
+            tmp = nan*ones(2,length(TFBINCENTERS));
+            for j = 1:length(TFBINCENTERS)
+                Ltf = uniquestim(:,3) > TFBINEDGES(j) & uniquestim(:,3) <= TFBINEDGES(j+1);
+                if sum(Ltf&Llum) > 0
+                    tmp(1,j) = mean(dprime(Llum&Ltf));
+                    tmp(2,j) = 1; % each cell counts as an independent entity
+                end
+            end
+            
+            dprime_v_TF = [dprime_v_TF; tmp(1,:)];
+            ns = [ns; tmp(2,:)];
+            data = [data; find(strcmp(MONKEY,MONKEYS)) find(strcmp(CELLTYPE,CELLTYPES)) mean(dprime(Llum)) population_scalefactor rfx rfy examplecell];     
+        end
+    end
+end
+
+% Plotting the data
+xextent = [-14 0];
+yextent = [-10 10];
+aspect_ratio = (yextent(2)-yextent(1))./(xextent(2)-xextent(1));
+colors = [1 1 1; .5 .5 .5];
+hax = [];
+figprefs;
+hax(1) = axes('Position',[3 14 7 7*aspect_ratio]);
+hax(2) = axes('Position',[3 2 7 7*aspect_ratio]);
+hax(3) = axes('Position',[13 13 7 7]);
+hax(4) = axes('Position',[13 2 7 7]);
+hax(5) = axes('Position',[23 2 2 7]); % For the dot size bar
+
+for monkey_idx = unique(data(:,1))'
+    for celltype_idx = unique(data(:,2))'
+        L = data(:,1) == monkey_idx & data(:,2) == celltype_idx;
+        axes(hax(celltype_idx)); hold on;
+        for i = find(L)'
+            h = plot(data(i,5),data(i,6),'ko','MarkerFaceColor','none','LineWidth',1);
+            set(h,'MarkerSize',max(.1,data(i,3)./max(data(:,3))*40));
+            if monkey_idx ==2
+                set(h,'Marker',MONKEY2MARKER);
+            end
+            if data(i,7)
+                set(h,'LineWidth',2);
+            end
+        end
+    end
+end
+
+for i = 1:2
+    axes(hax(i));
+    set(gca,'Ylim',yextent,'Xlim',xextent);
+    plot(0,0,'r+','MarkerSize',10);
+end
+
+% Dot size bar
+axes(hax(5)); hold on;
+x = linspace(0,max(data(:,3)),5);
+for i = 1:length(x)
+   h = plot(0,4*i.^2,'ko');
+   set(h,'MarkerSize',max(.1,x(i)./max(data(:,3))*40));
+end
+set(gca,'Ylim',[0 120],'Box','off')
+set(gca,'Ytick',4*[1:length(x)].^2,'Xtick',[]);
+
+set(gca,'Yticklabel',[{'<0'};num2str(round(x(2:end)'*10)/10)])
+
+% Scatterplots of d-prime vs eccentricity
+for i = 1:2
+    axes(hax(i+2)); hold on;
+    set(gca,'Xlim',[2 14]);
+    xlabel('Eccentricity (°)');
+    for celltype_idx = unique(data(:,2))'
+        for monkey_idx = unique(data(:,1))'
+            L = data(:,1) == monkey_idx & data(:,2) == celltype_idx;
+            if i == 1
+                y = data(L,3); % single neuron d-prime
+                str = ' single neuron ';
+            else
+                y = data(L,4).*data(L,3); % Population d-prime
+                str = ' neuronal population ';
+            end
+            h = plot(sqrt(data(L,5).^2+data(L,6).^2),y,'ko','MarkerFaceColor',colors(celltype_idx,:));
+            if monkey_idx ==2
+                set(h,'Marker',MONKEY2MARKER);
+            end
+            [b,~,~,~,stats] = regress(y,[ones(sum(L),1) sqrt(data(L,5).^2+data(L,6).^2)]);
+            disp([MONKEYS{monkey_idx},': ',CELLTYPES{celltype_idx},': p = ',num2str(stats(3)),': b = ',num2str(b(2)),str]);
+        end
+        L = data(:,2) == celltype_idx;
+        if i == 1
+            y = data(L,3); % single neuron d-prime
+            str = ' single neuron ';
+        else
+            y = data(L,4).*data(L,3); % Population d-prime
+            str = ' neuronal population ';
+        end
+        [b,~,~,~,stats] = regress(y,[ones(sum(L),1) sqrt(data(L,5).^2+data(L,6).^2)]);
+        disp([CELLTYPES{celltype_idx},': p = ',num2str(stats(3)),': b = ',num2str(b(2)),str]);
+        plot([2 14],[[1 2]*b [1 14]*b],'k-');
+    end
+    if i == 1
+        ylabel('Sensitivity (d'')');
+        set(gca,'Ytick',[0 1 2],'Xtick',[2 6 10 14])
+    else
+        ylabel('Population sensitivity (d'')');        
+        set(gca,'Ytick',-1:2:8,'YtickLabel',[0:2:8],'Xtick',[2 6 10 14])
+    end
+end
+set(gcf,'Render','painters');
+
+% More statistical tests:
+% (1) Difference in slopes of magno and parvo cells' SNR with eccentricity
+% (single neuron SNR and neuron population SNR)
+y = data(:,3); % single neuron d-prime
+I_celltype = data(:,2)-1;
+ecc = sqrt(data(:,5).^2+data(:,6).^2);
+[b,bint,~,~,stats] = regress(y,[ones(length(y),1) I_celltype ecc ecc.*I_celltype]);
+bint(end,:)
+
+% Plot of dprime vs TF for magno and parvo (both monkeys).
+% Individual neuron d's averaged. Not using popn scalefactor.
+figprefs;
+hax = [];
+hax(1) = axes('Position',[4 14 7 7],'Tickdir','out'); hold on;
+hax(2) = axes('Position',[4 3 7 7],'Tickdir','out'); hold on;
+for monkey_idx = 1:2
+    for celltype_idx = 1:2
+        L = data(:,1) == monkey_idx & data(:,2) == celltype_idx;
+        popn_scale_fact = data(L,4);
+        %mn = nanmean(dprime_v_TF(L,:).*popn_scale_fact);
+        %sd = nanstd(dprime_v_TF(L,:).*popn_scale_fact);
+
+        mn = nanmean(dprime_v_TF(L,:));
+        sd = nanstd(dprime_v_TF(L,:));
+        sem = sd./sqrt(nansum(ns(L,:)));
+        axes(hax(monkey_idx));
+        Lbins = ~isnan(mn);
+        patch([TFBINCENTERS(Lbins), fliplr(TFBINCENTERS(Lbins))],[mn(Lbins)+sem(Lbins), fliplr(mn(Lbins)-sem(Lbins))],[.5 .5 .5],'Facealpha',.5);
+        h = plot(TFBINCENTERS(Lbins), mn(Lbins),'k-o','LineWidth',1);
+        if celltype_idx == 2
+            set(h,'MarkerEdgeColor','black','MarkerFaceColor',[.5 .5 .5]);
+        else
+            set(h,'MarkerEdgeColor','black','MarkerFaceColor','white','MarkerSize',6);
+        end
+    end
+    plot([TFBINEDGES(1) TFBINEDGES(end)],[1.27 1.27],'k-')
+    set(gca,'Xscale','log','Xlim',[TFBINEDGES(1) TFBINEDGES(end)],'Ylim',[-.25 4],'FontSize',12);
+    xlabel('Frequency (Hz)','FontSize',15);
+    ylabel('SNR','FontSize',15);
+end
+% Adding a second Y-axis showing contrast.
+for monkey_idx = 1:2
+    MONKEY = MONKEYS{monkey_idx};
+    [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','subjID',{MONKEY(1)});
+    stro = {};
+    for j = 1:length(filenames{end})
+        stro{j} = nex2stro(char(findfile(filenames{end}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+    end
+    stro = strocat(stro);
+    modelparams = LMTF_global_to_local_model(stro.sum.exptParams.modelparams, 5, 0, 5); % 5 degrees out on H meridian. mode 5.
+    TF = logspace(log10(TFBINCENTERS(1)), log10(TFBINCENTERS(end)),100);
+    r = LMTF_thresh_from_model(pi/4*ones(100,1), TF',modelparams);
+    % Reconstructing the M matrix and gamma table
+    %fundamentals = stro.sum.exptParams.fundamentals;
+    %fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+    %mon_spd = stro.sum.exptParams.mon_spd;
+    %mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    %mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    %M = fundamentals'*mon_spd;
+    
+    % Getting the background rgb/lms
+    % Gamma table is basically a straight line. I dont want to add noise so
+    % just using nominal "voltage" values for "intensity".
+    % I cold probably just use Lcone contrast and get the same answer since
+    % I'm normalizing at the end.
+    %bkgndRGB = stro.sum.exptParams.bkgndrgb;
+    %bkgndlms = M*bkgndRGB;
+  
+    %stimlms = repmat([bkgndlms(1) bkgndlms(2)],length(r),1).*repmat((1+r),1,2);
+    %bkgndlum = [bkgndlms(1) bkgndlms(2)]*[1.8 1]';
+    %contrast = (stimlms*[1.8 1]'-bkgndlum)./bkgndlum;
+    %contrast-r % that was a lot of work for nothing. Contrast = r.
+    axes(hax(monkey_idx));
+    yyaxis right
+    h = plot(TF,r,'b:','Linewidth',2,'Color',[.5 .5 .5]);
+    set(gca,'Yscale','log','Ylim',[0.04 1],'YtickLabel',{'0.1', '1'},'Xticklabel',{'1','10'},'Ycolor',[.5 .5 .5]);
+    ylabel('Contrast');
+    title(MONKEY);
+end
+set(gcf,'Render','painters');
+
+%%
+% Section 4
+% Rasters of example neurons. Taken from Section 4 of "IsoSampFigures.m"
+
+filename = EXAMPLEMAGNOCELL;
+
+STIMTYPE = 'LUM';
+
+spikeNum = 'sig001a';
+if iscell(filename)
+    stros = {};
+    for i = 1:length(filename)
+        stros{i} = nex2stro(findfile(filename{i},[nexfilepath,filesep,'Greg',filesep,'Apollo']));
+    end
+    stro = strocat(stros);
+else
+    stro = nex2stro(findfile(filename,[nexfilepath,filesep,'Greg',filesep,'Apollo']));
+end
+
+Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'rew_t'));
+
+dur = mean(stimoff_t-stimon_t);
+spikeidx = strcmp(stro.sum.rasterCells(1,:),spikeNum);
+spikes = stro.ras(:,spikeidx);
+[uniquestim, dprime, signal, noise] = IsoSampGetDPrime(stro,1);
+
+Lblank = all(uniquestim == 0,2);
+if strcmp(STIMTYPE, 'LUM')
+    Lstimtype = (sign(uniquestim(:,1)) == sign(uniquestim(:,2))) & ~Lblank;
+elseif strcmp(STIMTYPE, 'RG')
+    Lstimtype = (sign(uniquestim(:,1)) ~= sign(uniquestim(:,2))) & ~Lblank;
+else
+    error('unknown stimtype');
+end
+Lwhichstimtypes = Lstimtype | Lblank;
+
+% Rasters for all conditions
+offset = [-.1 .1];  % pre and post time wrt stimon/stimoff
+%figure('position',[900 80 375 725]); axes('units','centimeters','position',[2 3 9 20]); hold on; % One column
+%set(gca,'TickDir','out'); 
+figprefs; axes('position',[2 3 7 15]);
+counter = 0;
+for j = find(Lwhichstimtypes)'
+    L = Lcc == uniquestim(j,1) & Mcc == uniquestim(j,2) & TF == uniquestim(j,3);
+    for i = find(L)'
+        tmpspikes = spikes{i}-stimon_t(i);
+        tmpspikes(tmpspikes < offset(1) | tmpspikes > dur+offset(2)) = [];
+        nspikestot = length(tmpspikes);
+        plot([tmpspikes tmpspikes]',[zeros(nspikestot,1) 1*ones(nspikestot,1)]'+counter,'k-','linewidth',1);
+        counter = counter + 1;
+    end
+    if j ~= max(find(Lwhichstimtypes))
+        plot([offset(1) dur+offset(2)],counter*[1 1],'k-');
+    end
+    if uniquestim(j,3) == 0
+        h = text(-.15,counter-sum(L)/2,'Blank');
+    else
+        h = text(-.15,counter-sum(L)/2,num2str(round(uniquestim(j,3)*10)/10));
+    end
+    set(h,'HorizontalAlignment','right','FontSize',12,'FontAngle','Italic');
+    %if uniquestim(j,1) == 0 & uniquestim(j,2) == 0
+    %    plot([0 dur dur 0 0],[counter counter 0 0 counter],'k-','LineWidth',1);
+    %end
+    counter = counter + 1;
+end
+plot([0 0],[0 counter],'k-','LineWidth',.5);
+plot([dur dur],[0 counter],'k-','LineWidth',.5);
+set(gca,'Xlim',[0+offset(1) dur+offset(2)],'Ylim',[0 counter],'Ytick',[],'Xtick',[0 .2 .4 .6 .8],'Box','off','FontSize',12,'FontAngle','italic');
+xlabel('Time (s)');
+set(gcf,'Renderer','painters');
+
+% Dprime plot
+figprefs; axes;
+se = [];
+niter = 200; % Boot strapping SEs
+for i = find(Lstimtype)'
+    tmp = [];
+    for j = 1:niter
+        n_signal = length(signal{i});
+        n_noise = length(noise{i});
+        s = signal{i}(unidrnd(n_signal,n_signal,1));
+        n = noise{i}(unidrnd(n_noise,n_noise,1));
+        pooled_var = ((n_signal-1)*nanvar(s)+(n_noise-1)*nanvar(n))/(n_signal+n_noise-2);
+        tmp(j) = (nanmean(s)-nanmean(n))/sqrt(pooled_var);
+    end
+    se = [se; std(tmp)];
+end
+patch([uniquestim(Lstimtype,3)', flipud(uniquestim(Lstimtype,3))'],[dprime(Lstimtype)'+se', fliplr(dprime(Lstimtype)'-se')],[.5 .5 .5],'Facealpha',.5);
+plot(uniquestim(Lstimtype,3),dprime(Lstimtype),'ko-','LineWidth',1,'MarkerFaceColor','white');
+set(gca,'Xscale','log');
+set(gca,'FontSize',12,'FontAngle','italic','XtickLabel',{'1','10','100'},'Ylim',[-.5 4]);
+xlabel('Temporal frequency (Hz)');
+ylabel('SNR');
+filename = stro.sum.fileName(find(stro.sum.fileName == filesep,1,'last')+1:end-4);
+text(20,-.25,filename,'FontAngle','Italic','FontSize',9);
+
+%%
+% Section 5
+% Input efficiency (d' of LGN neurons/d' of cone model)
+
+data = [];
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        for a = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{a})
+                stro{j} = nex2stro(char(findfile(filenames{a}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            sigma_gabor = unique(stro.trial(:,strcmp(stro.sum.trialFields(1,:),'sigma'))); % DVA
+            
+            [uniquestim, dprime] = IsoSampGetDPrime(stro,DPRIMEMETHOD,spikecds(a));
+            
+            params.stro = stro;
+            params.eyenumber = 1;
+            spds = params.stro.sum.exptParams.mon_spd;
+            spds = SplineSpd([380:4:780]',reshape(spds,length(spds)/3,3),[380:5:780]');
+            cal.monSpect = spds(:);
+            M = fundamentals.T_cones_smj10*spds;
+            cal.Mmtx = M(:);
+            cal.frameRate = params.stro.sum.exptParams.framerate;
+            cal.bkgndrgb = params.stro.sum.exptParams.bkgndrgb';
+            cal.fname = 'test';
+            cal.monSpectWavelengths = linspace(380,780,101);
+            cal.pixperdeg = params.stro.sum.exptParams.pixperdeg;
+            params.monCalFile = cal;
+            
+            rfx = stro.sum.exptParams.rf_x/10;
+            rfy = stro.sum.exptParams.rf_y/10;
+            rf_r_deg = sqrt((rfx./TEMPORONASALSCALEFACTOR)^2+rfy^2);
+            if strcmp(CELLTYPE,'M')
+                rf_diam_deg = ecc_to_diam_deg_M(rf_r_deg); % diameter RF
+            elseif strcmp(CELLTYPE,'P')
+                rf_diam_deg = ecc_to_diam_deg_P(rf_r_deg); % diameter RF
+            else
+                error('unknown cell type');
+            end
+            RF_STD = rf_diam_deg/2; % 1 standard deviation of Gaussian RF
+            params.gab.sd = sqrt(1/((1/RF_STD.^2)+(1/sigma_gabor.^2))); % Product of RF Gaussian and Gabor Gaussian
+            [gab, cones, mon, idlob, params] = DTcones_gh(params,0);
+            
+            conemodeldata = [];
+            for i = 1:size(idlob.analyticMean,1) % looping over color direction
+                for j = 1:size(idlob.analyticMean(i,:),2) % looping over contrast/TF
+                    if ~isempty(idlob.analyticMean{i,j})
+                        tmp_lm_mu = idlob.analyticMean{i,j}([1 2]);
+                        tmp_lm_var = idlob.analyticVar{i,j}([1 2]);
+                        tf = gab.driftRates{i}(j);
+                        conemodeldata = [conemodeldata; gab.colorDirs(i,[1 2]) tf tmp_lm_mu tmp_lm_var];
+                    end
+                end
+            end
+            % columns of data: L, M, TF, mu_L, mu_M, sigma2_L, sigma2_M
+            cone_dprimes = [];
+            for i = 1:size(uniquestim,1)
+                L = sign(conemodeldata(:,1)) == sign(uniquestim(i,1)) &...
+                    sign(conemodeldata(:,2)) == sign(uniquestim(i,2)) &...
+                    conemodeldata(:,3) == uniquestim(i,3);
+                if sum(L) > 1
+                    disp('too many condition matches');
+                    continue
+                elseif sum(L) == 0
+                    cone_dprime = nan;
+                else
+                    cone_dprime = sqrt(conemodeldata(L,[4 5]).^2*(1./conemodeldata(L,[6 7])')); % Not assuming equal L:M
+                end
+                cone_dprimes = [cone_dprimes; cone_dprime];
+            end
+            tmp = nan*ones(1,length(TFBINCENTERS));
+            for i = 1:length(TFBINCENTERS)
+                Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+                Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+                LTF = uniquestim(:,3) >= TFBINEDGES(i) & uniquestim(:,3) < TFBINEDGES(i+1);
+                L = Llum & LTF;
+                tmp(i) = mean(dprime(L)./cone_dprimes(L));
+            end
+            data = [data; find(strcmp(MONKEY,MONKEYS)) find(strcmp(CELLTYPE,CELLTYPES)) tmp];     
+        end
+    end
+end
+
+figprefs;
+hax(1) = axes('position',[4 13 9 9]);
+hax(2) = axes('position',[4 2 9 9]);
+niter = 200;
+for monkey_idx = 1:2
+    axes(hax(monkey_idx));
+    for celltype_idx = 1:2
+        L = data(:,1) == monkey_idx & data(:,2) == celltype_idx;
+        med = nanmedian(data(L,3:end));
+        sem = nan*ones(1,length(med));
+        for i = 1:length(sem)
+            n = sum(L);
+            tmp = data(L,2+i);
+            sem(i) = std(nanmedian(tmp(unidrnd(n,n,niter))));
+        end
+        Lbins = ~isnan(med);
+        h_patch = patch([TFBINCENTERS(Lbins), fliplr(TFBINCENTERS(Lbins))],[med(Lbins)+sem(Lbins), fliplr(med(Lbins)-sem(Lbins))],[.5 .5 .5],'Facealpha',.5);
+        h_line = plot(TFBINCENTERS(Lbins), med(Lbins),'k-o','LineWidth',2);
+        if celltype_idx == 2
+            set(h_line,'MarkerSize',3);
+        else
+            set(h_line,'MarkerEdgeColor','black','MarkerFaceColor','black');
+        end
+        %if monkey_idx ==2
+        %    set(h_line,'Marker',MONKEY2MARKER);
+        %end
+    end
+    set(gca,'Xscale','log','Xlim',[TFBINEDGES(1) TFBINEDGES(end)],'FontSize',15,'FontAngle','italic');
+    set(gca,'Ytick',[0 1 2],'XTickLabel',{'1','10'},'Ylim',[-.25 2.25]);
+    plot([TFBINEDGES(1) TFBINEDGES(end)],[0 0],'k-');
+    plot([TFBINEDGES(1) TFBINEDGES(end)],[1 1],'k-');
+    ylabel('Efficiency');
+    xlabel('Frequency (Hz)');
+end
+set(gcf,'Renderer','Painters');
+
+%%
+% Section 6
+% Population d' from LGN neurons and cones (also cone absorptions)
+NUMBEROFEYES = 2;
+
+data = cell(2,2);
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});     
+        for i = 1:length(filenames)
+            tmp = [];
+            cal = [];
+            stro = {};
+            for j = 1:length(filenames{i})
+                stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            rfx = stro.sum.exptParams.rf_x/10;
+            rfy = stro.sum.exptParams.rf_y/10;
+            rf_r_deg = sqrt((rfx./TEMPORONASALSCALEFACTOR)^2+rfy^2);
+
+            [tmp.uniquestim, tmp.dprime] = IsoSampGetDPrime(stro,DPRIMEMETHOD,spikecds(i));
+            
+            Lblank = tmp.uniquestim(:,1) == 0 & tmp.uniquestim(:,2) == 0 & tmp.uniquestim(:,3) == 0;
+            Llum = sign(tmp.uniquestim(:,1)) == sign(tmp.uniquestim(:,2)) & ~Lblank;
+            
+            % Now getting population scale factor
+            % Getting RF size at rfx, rfy
+            if strcmp(CELLTYPE,'M')
+                ecc_to_diam_deg = ecc_to_diam_deg_M;
+            else
+                ecc_to_diam_deg = ecc_to_diam_deg_P;
+            end
+            tmp.population_scalefactor = IsoSampGetPopulationScaleFactor(stro, ecc_to_diam_deg, TEMPORONASALSCALEFACTOR,RFTRUNCATIONINSD, ONOFFCORRELATION,NUMBEROFEYES);
+
+            % Now getting cone ideal observer sensitivity
+            % Cut and paste from IsoSampPop section 4.1
+            params.stro = stro;
+            params.eyeNumber = NUMBEROFEYES;
+            spds = params.stro.sum.exptParams.mon_spd;
+            spds = SplineSpd([380:4:780]',reshape(spds,length(spds)/3,3),[380:5:780]');
+            M = fundamentals.T_cones_smj10*spds;
+            cal.monSpect = spds(:);
+            cal.Mmtx = M(:);
+            cal.frameRate = params.stro.sum.exptParams.framerate;
+            cal.bkgndrgb = params.stro.sum.exptParams.bkgndrgb';
+            cal.fname = 'test';
+            cal.monSpectWavelengths = linspace(380,780,101);
+            cal.pixperdeg = params.stro.sum.exptParams.pixperdeg;
+            params.monCalFile = cal;
+             
+            [gab, cones, mon, idlob, params] = DTcones_gh(params,0);
+            
+            conedata = [];
+            for k = 1:size(idlob.analyticMean,1) % looping over color direction
+                for j = 1:size(idlob.analyticMean(k,:),2) % looping over contrast/TF
+                    if ~isempty(idlob.analyticMean{k,j})
+                        tmp_lm_mu = idlob.analyticMean{k,j}([1 2]);
+                        tmp_lm_var = idlob.analyticVar{k,j}([1 2]);
+                        tf = gab.driftRates{k}(j);
+                        conedata = [conedata; gab.colorDirs(k,[1 2]).*gab.contrasts{k}(j) tf tmp_lm_mu tmp_lm_var];
+                    end
+                end
+            end
+            
+            % Using uniquestim to order the rows of tmpdata and calculating cone
+            % dprimes
+            tmp.conedprime = [];
+            for j = 1:size(tmp.uniquestim,1)
+                L = all(abs(tmp.uniquestim(j,:)-conedata(:,[1 2 3]))<1e-10,2);
+                if sum(L) ~= 1
+                    if all(tmp.uniquestim(j,:) == 0)
+                        tmp.conedprime(j) = nan;
+                    else
+                        error('sorting problem');
+                    end
+                else
+                    v = conedata(L,[6 7]); % variance
+                    m = conedata(L,[4 5]); % mean
+                    tmp.conedprime(j) = sqrt(m.^2*(1./v'));
+                end
+            end
+            
+            % Now getting photon counter d'. IsoSampFigures.m section 1
+            sigmaInPix = (gab.sd./10) .* mon.pixperdeg;
+            lambdaInPix = 1./ (gab.sf ./ mon.pixperdeg);
+            % Preallocate space for the movie (4D: [X, Y, Time, Guns])
+            nsteps = length(gab.flashTimeProf);
+            movie = nan(size(cones.num_L,1), size(cones.num_L,1), nsteps, 3); % every tenth frame
+            npix = size(cones.num_L,1);
+            gaborlim = 3; % sds
+            sperstep = 1./mon.frameRate;
+            for j = 1:size(tmp.uniquestim,1)
+                sinusoid = sin(2*pi*tmp.uniquestim(j,3)*linspace(0,nsteps*sperstep,nsteps));
+                temporalwtframes = gab.flashTimeProf.*sinusoid;
+                spatialwtpix1D = normpdf(linspace(-gaborlim,gaborlim,npix),0,1);
+                spatialwtpix1D = spatialwtpix1D./max(spatialwtpix1D);
+                spatialwtpix2D = spatialwtpix1D'*spatialwtpix1D;
+                spacetimewt = repmat(spatialwtpix2D,[1 1 nsteps]).*repmat(permute(temporalwtframes,[1 3 2]),[npix npix 1]);
+                
+                % Noise
+                LMScc = [0 0 0]; % cone contrast at peak
+                L = mon.bkgndlms_Rstar(1)*(1+LMScc(1).*spacetimewt).*repmat(cones.num_L,1,1,nsteps)*sperstep; % L isomerizations each pixel, each frame
+                M = mon.bkgndlms_Rstar(2)*(1+LMScc(2).*spacetimewt).*repmat(cones.num_M,1,1,nsteps)*sperstep; % M isomerizations each pixel, each frame
+                Lmn = sum(sum(sum(L.*spacetimewt)));
+                Lsd = sqrt(sum(sum(sum(L.*spacetimewt.^2)))); % Poisson assumption: var(spacetimewt*X(lambda)) = spacetimewt^2*lambda
+                Mmn = sum(sum(sum(M.*spacetimewt)));
+                Msd = sqrt(sum(sum(sum(M.*spacetimewt.^2))));
+                noisedist = [Lmn Mmn; Lsd Msd];
+                
+                % Signal
+                LMScc = [tmp.uniquestim(j,1) tmp.uniquestim(j,2) 0]; % cone contrast at peak
+                L = mon.bkgndlms_Rstar(1)*(1+LMScc(1).*spacetimewt).*repmat(cones.num_L,1,1,nsteps)*sperstep; % L isomerizations each pixel, each frame
+                M = mon.bkgndlms_Rstar(2)*(1+LMScc(2).*spacetimewt).*repmat(cones.num_M,1,1,nsteps)*sperstep; % M isomerizations each pixel, each frame
+                Lmn = sum(sum(sum(L.*spacetimewt)));
+                Lsd = sqrt(sum(sum(sum(L.*spacetimewt.^2)))); % Poisson assumption: var(spacetimewt*X(lambda)) = spacetimewt^2*lambda
+                Mmn = sum(sum(sum(M.*spacetimewt)));
+                Msd = sqrt(sum(sum(sum(M.*spacetimewt.^2))));
+                signaldist = [Lmn Mmn; Lsd Msd];
+                dprimes = (signaldist(1,:)-noisedist(1,:))./signaldist(2,:);
+                tmp.photondprime(j) = sqrt(dprimes*dprimes');
+            end
+
+            % Adding to the "data" cell array of cell arrays
+            listsofar = data{strcmp(MONKEY,MONKEYS),strcmp(CELLTYPE,CELLTYPES)};
+            listsofar{length(listsofar)+1} = tmp;
+            data{strcmp(MONKEY,MONKEYS),strcmp(CELLTYPE,CELLTYPES)}=listsofar;
+        end
+    end
+end
+
+% Doing the plotting
+figure('Position',[440 100 750 700],'DefaultAxesTickDirMode','manual','DefaultAxesTickdir','out','DefaultAxesYcolor','black','DefaultAxesXcolor','black')
+set(gcf,'DefaultAxesFontSize',15,'DefaultAxesFontAngle','italic','DefaultAxesUnits','centimeters');
+hax = [];
+hax(1,1) = axes('position',[2 2 9 9]); hold on;
+hax(1,2) = axes('position',[2 14 9 9]); hold on;
+hax(2,1) = axes('position',[14 2 9 9]); hold on;
+hax(2,2) = axes('position',[14 14 9 9]); hold on;
+
+for monkey_idx = 1:2
+    for celltype_idx = 1:2
+        monkey_celltype_data = data{monkey_idx,celltype_idx};
+        tmp = nan*ones(4,length(TFBINCENTERS),length(monkey_celltype_data)); % rows: LGN dprime, cone dprime, photon dprime, ns
+        for i = 1:length(monkey_celltype_data)
+            cell_data = monkey_celltype_data{i};
+            Lblank = cell_data.uniquestim(:,1) == 0 & cell_data.uniquestim(:,2) == 0 & cell_data.uniquestim(:,3) == 0;
+            Llum = sign(cell_data.uniquestim(:,1)) == sign(cell_data.uniquestim(:,2)) & ~Lblank;
+            for j = 1:length(TFBINCENTERS)
+                Ltf = cell_data.uniquestim(:,3) > TFBINEDGES(j) & cell_data.uniquestim(:,3) <= TFBINEDGES(j+1);
+                if sum(Ltf&Llum) > 0
+                    tmp(1,j,i) = mean(cell_data.dprime(Llum&Ltf))*cell_data.population_scalefactor;
+                    tmp(2,j,i) = mean(cell_data.conedprime(Llum&Ltf));
+                    tmp(3,j,i) = mean(cell_data.photondprime(Llum&Ltf));
+                    tmp(4,j,i) = 1; % each cell counts as an independent entity
+                end
+            end
+        end
+        allnans = all(isnan(squeeze(tmp(4,:,:))),2);
+        tmp = tmp(:,~allnans,:);
+        n = nansum(tmp(4,:,:),3);
+        mn_lgn = nanmean(tmp(1,:,:),3);
+        sd_lgn = nanstd(tmp(1,:,:),0,3);
+        sem_lgn = sd_lgn./sqrt(n);
+        mn_cone = nanmean(tmp(2,:,:),3);
+        sd_cone = nanstd(tmp(2,:,:),0,3);
+        sem_cone = sd_cone./sqrt(n);
+        mn_photon = nanmean(tmp(3,:,:),3);
+        sd_photon = nanstd(tmp(3,:,:),0,3);
+        sem_photon = sd_photon./sqrt(n);
+        
+        axes(hax(monkey_idx,celltype_idx));
+        TBC = TFBINCENTERS(1:length(n));
+        patch([TBC, fliplr(TBC)],[mn_photon+sem_photon, fliplr(mn_photon-sem_photon)],[0 .7 .7],'Facealpha',.5);
+        plot(TBC, mn_photon,'c-o','LineWidth',1,'MarkerEdgeColor','black','MarkerFaceColor','cyan');
+        patch([TBC, fliplr(TBC)],[mn_cone+sem_cone, fliplr(mn_cone-sem_cone)],[1 .5 .5],'Facealpha',.5);
+        plot(TBC, mn_cone,'r-o','LineWidth',1,'MarkerEdgeColor','black','MarkerFaceColor','red');
+        patch([TBC, fliplr(TBC)],[mn_lgn+sem_lgn, fliplr(mn_lgn-sem_lgn)],[.5 .5 .5],'Facealpha',.5);
+        plot(TBC, mn_lgn,'k-o','LineWidth',1,'MarkerEdgeColor','black','MarkerFaceColor','black');
+        plot([TFBINEDGES(1) TFBINEDGES(end)],[1.27 1.27],'k-')
+        set(gca,'Xscale','log','Xlim',[TFBINEDGES(1) TFBINEDGES(end)],'Ylim',[-2 30]);
+        xlabel('Frequency (Hz)');
+        ylabel('SNR');
+        title([MONKEYS{monkey_idx},' ',CELLTYPES{celltype_idx}])
+    end
+end
+set(gcf,'Renderer','painters');
+
+%%
+% Section 7
+% Looking for differences in sensitivity between ON and OFF cells
+
+conn = database('Nex_Paradigm_Sort','','','Vendor','MySql','Server','128.95.153.12');
+whitenoisedata = fetch(conn, 'SELECT fileID, rfX, rfY, neuron, spikeCode FROM WhiteNoiseLGN_forIS WHERE quality = ''1''');
+isosampdata = fetch(conn, 'SELECT fileID, rfX, rfY, neuron, cellClass FROM IsoSamp_LGN WHERE quality = ''1''');
+close(conn);
+
+uniqueWNneurons = unique([whitenoisedata{:,4}]);
+WNfilenames = {};
+IsoSampfilenames  = {};
+for neuronid = uniqueWNneurons
+    LWN =  [whitenoisedata{:,4}] == neuronid;
+    Lisosamp = [isosampdata{:,4}] == neuronid;
+    if any(Lisosamp)
+        tmp = [];
+        for i = find(LWN)       
+        	tmp = [tmp, whitenoisedata(i,1)];
+        end
+        WNfilenames{length(WNfilenames)+1} = tmp;
+        tmp = [];
+        for i = find(Lisosamp)       
+        	tmp = [tmp, isosampdata(i,1)];
+        end
+        IsoSampfilenames{length(IsoSampfilenames)+1} = tmp;
+        % Sanity checks
+        tmp=[];
+        for i = find(Lisosamp)
+            tmp=[tmp;isosampdata{i,2:4}];
+        end
+        for i = find(LWN)
+            tmp=[tmp;whitenoisedata{i,2:4}];
+        end
+        if any(std(tmp))
+            error('White noise and IsoSamp entries into database disagree');
+        end
+    end
+end
+if length(WNfilenames) ~= length(IsoSampfilenames)
+   error('different numbers of white noise and isosamp files');
+end
+
+data = [];
+for i = 1:length(WNfilenames)
+    WNstro=[];
+    for j = 1:length(WNfilenames{i})
+        WNstro = strocat(WNstro,nex2stro(findfile(WNfilenames{i}{j})));
+    end
+    neuronidx = whitenoisedata{strcmp(whitenoisedata(:,1),WNfilenames{i}(1)),4};
+    celltype = isosampdata{[isosampdata{:,4}] == neuronidx,5};
+    spikename = whitenoisedata{strcmp(whitenoisedata(:,1),WNfilenames{i}(1)),5};
+    spikeidx = find(strcmp(WNstro.sum.rasterCells(1,:),spikename));
+    nstixperside = WNstro.sum.exptParams.nstixperside;
+
+    IsoSampstro = [];
+    for j = 1:length(IsoSampfilenames{i})
+        IsoSampstro = strocat(IsoSampstro,nex2stro(findfile(IsoSampfilenames{i}{j})));
+    end
+
+    % Reconstructing the M matrix and gamma table
+    fundamentals = WNstro.sum.exptParams.fundamentals;
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+    mon_spd = WNstro.sum.exptParams.mon_spd;
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    M = fundamentals'*mon_spd;
+
+    out = getWhtnsStats(WNstro,MAXT,'STCOVmex', {nstixperside^2, 3, maxT}, spikename);
+    STA = out{1}/out{3};
+    inRF = getRFfromSTA(STA,GETRFFROMSTAMODE,GETRFFROMSTATHRESH);
+    STA = reshape(STA,[nstixperside.^2  3 MAXT]);
+    temporalSTA = squeeze(STA(logical(inRF(:)),:,:));
+    if ~ismatrix(temporalSTA)
+        temporalSTA = squeeze(mean(temporalSTA,1));
+    end
+   
+    switch(celltype)
+        case {'P'}
+            data(i,1) = 1;
+        case {'M'}
+            data(i,1) = 2;
+        case {'K'}
+            data(i,1) = 3;
+        otherwise
+            data(i,1) = 4;
+    end
+    [u,s,v] = svd(temporalSTA);
+    rgb = u(:,1);
+    temporal = v(:,1);
+    if max(abs(rgb)) == -min(rgb)
+        rgb = -rgb;
+        temporal = -temporal;
+    end
+    if max(abs(temporal)) == max(temporal)
+        data(i,2) = 1; % ON
+    else
+        data(i,2) = 0; % OFF
+    end
+    lm_ratio = temporalSTA(1,2)/temporalSTA(2,2);
+    if abs(lm_ratio-M(2,1)/M(2,2)) < abs(lm_ratio-M(1,1)/M(1,2))
+        data(i,3) = 1; % M
+    else
+        data(i,3) = 0; % L
+    end
+    [uniquestim, dprime] = IsoSampGetDPrime(IsoSampstro,DPRIMEMETHOD,spikeidx);
+    
+    Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+    Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+    data(i,4) = mean(dprime(Llum));
+end
+% Doing statistical comparisons
+L_P = data(:,1) == 1; % Parvocellular neurons
+L_M = data(:,1) == 2; % Magnocellular neurons
+L_OFF = data(:,2) == 0; % OFF neurons
+L_ON = data(:,2) == 1; % ON neurons
+L_Lcone = data(:,3) == 0; % L-cone dominated
+L_Mcone = data(:,3) == 1; % M-cone dominated
+
+[~,p_p_on_off] = ttest2(data(L_P & L_OFF,4), data(L_P & L_ON,4)) % parvo ON vs OFF
+[~,p_p_l_m] = ttest2(data(L_P & L_Lcone,4), data(L_P & L_Mcone,4)) % parvo L vs M
+
+[~,p_m_on_off] = ttest2(data(L_M & L_OFF,4), data(L_M & L_ON,4)) % magno ON vs OFF
+[~,p_m_p] = ttest2(data(L_M,4), data(L_P,4)) % magno vs parvo
+
+
+
+
+
+%%
+% Section 8
+% Microsaccade-triggered PSTHs
+
+PREOFFSET = 0.05; % How long before saccade initiation to collect spikes (s)
+POSTOFFSET = 0.2; % How long after saccade initiation to collect spikes (s)
+nbins = 30;
+bins = linspace(-PREOFFSET,POSTOFFSET,nbins);
+binwidth = bins(2)-bins(1); % s
+
+timebins = [-0.1:.05:.766];
+timebinwidth = timebins(2)-timebins(1);
+%deltaT = timebins(2)-timebins(1);
+%nyquist = 1./(2*deltaT);
+msacpsth = [];
+
+figprefs;
+hax(1,1) = axes('Position',[2 2 7 7]);
+hax(1,2) = axes('Position',[2 12 7 7]);
+hax(2,1) = axes('Position',[12 2 7 7]);
+hax(2,2) = axes('Position',[12 12 7 7]);
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        fftdata =[];
+        msacpsth = [];
+        sumspikes = zeros(1,length(bins));
+        nsacs = 0;
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        PSTHs = [];
+        for a = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{a})
+                stro{j} = nex2stro(char(findfile(filenames{a}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            ntrials = size(stro.trial,1);
+            Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+            Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+            TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+            stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+            stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+            dur = mean(stimoff_t-stimon_t);
+            
+            Llum = Lcc > 0 & Mcc > 0;
+            fpacq_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpacq_t'));
+            stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+            spiketimes = stro.ras(:,spikecds(a));
+            sacstats = getSacData(stro,1);
+            %for j = find(Llum)'
+            for j = 1:ntrials
+                L = ones(length(sacstats.starttimes{j}),1);
+                L(sacstats.starttimes{j} < fpacq_t(j)) = 0;
+                L(sacstats.starttimes{j} > stimoff_t(j)) = 0;
+                if any(L)
+                    for k = find(L')
+                        tmpspiketimes = spiketimes{j};
+                        Lspikes = tmpspiketimes > sacstats.starttimes{j}(k)-PREOFFSET & tmpspiketimes < sacstats.starttimes{j}(k)+POSTOFFSET;
+                        [tmp,~] = hist(tmpspiketimes(Lspikes)-sacstats.starttimes{j}(k), bins);
+                        sumspikes = sumspikes + tmp;
+                        nsacs = nsacs+1;
+                    end
+                end
+            end
+            PSTHs = [PSTHs; sumspikes/nsacs/binwidth];
+        end
+        axes(hax(strcmp(MONKEY,MONKEYS),strcmp(CELLTYPE,CELLTYPES)));
+        meanPSTH = mean(PSTHs);
+        sdPSTH = sqrt(var(PSTHs));
+        semPSTH = sdPSTH./sqrt(length(filenames));
+        patch([bins(2:end-1), fliplr(bins(2:end-1))],[meanPSTH(2:end-1)+semPSTH(2:end-1), fliplr(meanPSTH(2:end-1)-semPSTH(2:end-1))],[.5 .5 .5],'Facealpha',.5);
+        plot(bins(2:end-1), meanPSTH(2:end-1),'k-','LineWidth',2);
+        set(gca,'Ylim',[0 45],'Xlim',[bins(2) bins(end-1)]);
+        xlabel('Time (s)');
+        ylabel('Firing rate (spikes/s)');
+        text(0,40,[MONKEY{1},' ',CELLTYPE{1}],'FontSize',12,'FontAngle','italic');
+        plot([0 0],[0 40],'k:');
+    end
+end
+set(gcf,'Render','painters');
+
+%%
+% Section 9
+% Microsaccade frequency over time in a trial
+% Taken from IsoSampPop, Section 10.1
+
+PREOFFSET = -0.1; % How long before stimulus on to collect saccades
+POSTOFFSET = 0.1; % How long after stimulus off to collect saccades
+nbins = 20;
+bins = linspace(PREOFFSET,.666+POSTOFFSET,nbins);
+binwidth = bins(2)-bins(1);
+figprefs;
+hax = axes('Position',[2 2 7 7]);
+hax(2) = axes('Position',[2 12 7 7]);
+for MONKEY = MONKEYS
+    [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','subjID',{MONKEY{1}(1)});
+    means = nan*ones(length(filenames),nbins);
+    for i = 1:length(filenames)
+        stro = {};
+        for j = 1:length(filenames{i})
+            stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+        end
+        stro = strocat(stro);
+        ntrials = size(stro.trial,1);
+        Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+        Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+        TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+        
+        stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+        stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+        sacstats = getSacData(stro,1);
+        Lblank = Lcc == 0 & Mcc == 0 & TF == 0;
+        Llum = Lcc > 0 & Mcc > 0;
+        whichtrials = find(Llum)';
+
+        tmpdata = zeros(length(whichtrials),nbins);
+        rowcounter = 1;
+        for j = whichtrials
+            sactimes = sacstats.starttimes{j}-stimon_t(j);
+            sactimes(sactimes<0+PREOFFSET-binwidth/2) = [];
+            sactimes(sactimes>.666+POSTOFFSET+binwidth/2) = [];
+            [n,x] = hist(sactimes, bins);
+            tmpdata(rowcounter,:) = n;
+            rowcounter = rowcounter+1;
+        end
+        means(i,:) = mean(tmpdata./binwidth); 
+    end
+    axes(hax(strcmp(MONKEY, MONKEYS)));
+    sem = sqrt(var(means)./size(means,1));
+    mn = mean(means);
+    patch([bins, fliplr(bins)],[mn+sem, fliplr(mn-sem)],[.5 .5 .5],'Facealpha',.5);
+    plot(bins,mn,'k-','LineWidth',2);
+    set(gca,'Xlim',[bins(1), bins(end)],'Ylim',[0 4])
+    xlabel('Time (s)');
+    ylabel('Saccades/s');
+end
+
+
+%%
+% Section 10
+% Noise spectra
+
+timebins = [0:.005:.660];
+deltaT = timebins(2)-timebins(1);
+nyquist = 1./(2*deltaT);
+
+figprefs;
+hax(1,1) = axes('Position',[2 2 7 7]);
+hax(1,2) = axes('Position',[2 12 7 7]);
+hax(2,1) = axes('Position',[12 2 7 7]);
+hax(2,2) = axes('Position',[12 12 7 7]);
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        fftdata =[];
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        for a = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{a})
+                stro{j} = nex2stro(char(findfile(filenames{a}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            ntrials = size(stro.trial,1);
+            Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+            Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+            TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+            stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+            stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+            dur = mean(stimoff_t-stimon_t);
+            
+            Lblank = Lcc == 0 & Mcc == 0 & TF == 0;
+            tmpfftdata = [];
+            for i=find(Lblank)'
+                tmp = stro.ras{i,spikecds(a)}-stimon_t(i);
+                tmp(tmp<0) = [];
+                tmp(tmp>dur) = [];
+                n = hist(tmp,timebins);
+                tmpfftdata = [tmpfftdata; fftshift(fft(n))];
+            end
+            fftdata = [fftdata; mean(abs(tmpfftdata).^2*2/length(tmpfftdata))];
+        end
+        axes(hax(strcmp(MONKEY,MONKEYS),strcmp(CELLTYPE,CELLTYPES)));
+        
+        freqs = linspace(-nyquist,nyquist,size(fftdata,2));
+        plot(freqs,10*log10(mean(fftdata)),'k-','LineWidth',2);
+        set(gca,'Ylim',[-11 -5],'Xlim',[0 100]);
+        xlabel('Frequency (Hz)'); ylabel('Power (dB)');
+        title([MONKEY{1},' ',CELLTYPE{1}]);
+    end
+end
+
+
+%%
+% Section 10.1 
+% Periodogram estimate of noise spectra (so I can get better SNR for
+% frequencies that I care about, 1-60 Hz).
+
+
+timebins = [0:.005:.660];
+deltaT = timebins(2)-timebins(1);
+nyquist = 1./(2*deltaT);
+
+figprefs;
+hax(1,1) = axes('Position',[2 2 7 7]);
+hax(1,2) = axes('Position',[2 12 7 7]);
+hax(2,1) = axes('Position',[12 2 7 7]);
+hax(2,2) = axes('Position',[12 12 7 7]);
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        fftdata =[];
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        for a = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{a})
+                stro{j} = nex2stro(char(findfile(filenames{a}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+            ntrials = size(stro.trial,1);
+            Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+            Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+            TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+            stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+            stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+            dur = mean(stimoff_t-stimon_t);
+            
+            Lblank = Lcc == 0 & Mcc == 0 & TF == 0;
+            tmpfftdata = [];
+            for i=find(Lblank)'
+                tmp = stro.ras{i,spikecds(a)}-stimon_t(i);
+                tmp(tmp<0) = [];
+                tmp(tmp>dur) = [];
+                n = hist(tmp,timebins);
+                tmpfftdata = [tmpfftdata; fftshift(fft(n))];
+            end
+            fftdata = [fftdata; mean(abs(tmpfftdata).^2*2/length(tmpfftdata))];
+        end
+        axes(hax(strcmp(MONKEY,MONKEYS),strcmp(CELLTYPE,CELLTYPES)));
+        
+        freqs = linspace(-nyquist,nyquist,size(fftdata,2));
+        plot(freqs,10*log10(mean(fftdata)),'k-','LineWidth',2);
+        set(gca,'Ylim',[-11 -5],'Xlim',[0 60]);
+        xlabel('Frequency (Hz)'); ylabel('Power (dB)');
+        title([MONKEY{1},' ',CELLTYPE{1}]);
+    end
+end
+
+
+%%
+% Section 11
+% Psychophysical temporal integration
+
+stimtype = 'lum'; % 'lum' or 'chr'
+stimdurs = [333 666];
+tmp_tfs = logspace(log10(1),log10(20),100);
+
+figprefs;
+hax = [];
+hax(1) = axes('Position',[4 14 7 7]); hold on;
+hax(2) = axes('Position',[4 3 7 7]); hold on;
+for MONKEY = MONKEYS
+    for stimdur = stimdurs
+        conn = database('Nex_Paradigm_Sort','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+        comment = ['std inputs ',num2str(stimdur),' ',stimtype];
+        query = sprintf('SELECT fileID FROM LMTF WHERE subjID = ''%s'' AND rfX = 50 AND rfY = 0 AND quality = 1 AND notes LIKE (''%s'')',MONKEY{1}(1),comment);
+        flist = fetch(conn, query);
+        close(conn)
+        rawdata = getLMTFrawdata(flist);
+        data = [sqrt(rawdata(:,1).^2+rawdata(:,2).^2) rawdata(:,3)];
+        
+        % Loading the model
+        isosamppath = which('IsoSampOnline');
+        isosamppath(find(isosamppath==filesep,1,'last'):end) = [];
+        load ([isosamppath,filesep,'private',filesep','data',filesep,'LMTF.mat']);
+        rfx = unique(rawdata(:,5))/10;
+        rfy = unique(rawdata(:,6))/10;
+        model = LMTF_global_to_local_model(getfield(getfield(eval(MONKEY{1}(1)),'legacy'),'mode5params'), rfx, rfy, 5);
+        if strcmp(stimtype,'chr')
+            pred = @(omega)1./(model(1+6)*abs(((1i*2*pi*10^model(5+6).*omega+1).^-model(3+6))-model(2+6)*((1i*2*pi*10^(model(5+6)+model(6+6)).*omega+1).^-(model(3+6)+model(4+6)))));
+        else
+            pred = @(omega)1./(model(1)*abs(((1i*2*pi*10^model(5).*omega+1).^-model(3))-model(2)*((1i*2*pi*10^(model(5)+model(6)).*omega+1).^-(model(3)+model(4)))));
+        end
+        axes(hax(strcmp(MONKEY, MONKEYS)));
+        plot(tmp_tfs,pred(tmp_tfs),'k-');
+        plot(tmp_tfs,pred(tmp_tfs)*sqrt(2),'r-');
+        TFs = unique(data(:,2),'sorted');
+        colors = [1 0 0; 0 0 0];
+        for i = 1:length(TFs)
+            j = find(stimdur == stimdurs);
+            L = data(:,2) == TFs(i);
+            plot(TFs(i)+.02*(j-1),median(data(L,1)),'s','MarkerFaceColor',colors(j,:),'MarkerEdgeColor',colors(j,:),'MarkerSize',10);
+            plot(TFs(i)*[1 1]+.02*(j-1),[prctile(data(L,1),25) prctile(data(L,1),75)],'-','Color',colors(j,:),'Linewidth',1);
+            plot(TFs(i)*[.95 1.05]+.02*(j-1),[prctile(data(L,1),25) prctile(data(L,1),25)],'-','Color',colors(j,:),'Linewidth',1);
+            plot(TFs(i)*[.95 1.05]+.02*(j-1),[prctile(data(L,1),75) prctile(data(L,1),75)],'-','Color',colors(j,:),'Linewidth',1);
+        end
+    end
+    set(gca,'Yscale','log','Xscale','log');
+    
+    title(MONKEY);
+    set(gca,'Xlim',[TFs(1)*.9 TFs(end)*1.1]);
+    if strcmp(stimtype, 'lum')
+        set(gca,'Ylim',[.04 .24],'Ytick',[.05 .1 .2],'Xtick',[1 5 20]);
+    else
+        set(gca,'Ylim',[.02 .2]);
+    end
+    xlabel('Frequency (Hz)');
+    ylabel('Threshold (contrast)'); % Is this OK?
+end
+
+%%
+% Section 12
+% sliding window d' and firing rate analysis.
+
+nwindows = 9; % number of spike counting windows
+signaloffsets = [zeros(nwindows,1) linspace(.04,.66,nwindows)'] % stretching window
+MAXDPRIME = 10;
+MAXFR = 60;
+
+figprefs;
+hax = [];
+hax(1,1) = axes('position',[3 12 5 7]); hold on;
+hax(1,2) = axes('position',[3 3 5 7]); hold on;
+hax(2,1) = axes('position',[10 12 5 7]); hold on;
+hax(2,2) = axes('position',[10 3 5 7]); hold on;
+hax(3,1) = axes('position',[16 12 1 7],'YAxisLocation','right');
+hax(3,2) = axes('position',[16 3 1 7],'YAxisLocation','right');
+for MONKEY = MONKEYS
+    [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',{'M'},'subjID',{MONKEY{1}(1)});
+    data_dprime = nan*ones(length(TFBINCENTERS), nwindows, length(filenames)); % TF, window, cell
+    data_sp_per_s = nan*ones(length(TFBINCENTERS), nwindows, length(filenames));
+    for i = 1:length(filenames)
+        stro = {};
+        for j = 1:length(filenames{i})
+            stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+        end
+        stro = strocat(stro);
+        Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+        Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+        TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+        stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+        spikename = ['sig001',char(abs('a')+(spikecds(i)-1))];
+        spiketimes = stro.ras(:,strcmp(stro.sum.rasterCells,spikename));
+        pop_scale_fact = IsoSampGetPopulationScaleFactor(stro,ecc_to_diam_deg_M);
+        for j = 1:size(signaloffsets,1)
+            [uniquestim, dprime] = IsoSampGetDPrime(stro, DPRIMEMETHOD, spikecds(i), signaloffsets(j,:));
+            Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+            Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+            uniquestim = uniquestim(Llum,:);
+            dprime = dprime(Llum);
+            
+            for k = 1:size(uniquestim,1)
+                LTF = softEq(uniquestim(k,3),TFBINCENTERS,5);
+                if sum(LTF) ~= 1
+                    error('Trouble finding TF');
+                end
+                data_dprime(k,j,i) = dprime(LTF)*pop_scale_fact;
+                L = Lcc == uniquestim(k,1) & Mcc == uniquestim(k,2) & TF == uniquestim(k,3);
+                spt = spiketimes(L);
+                ston_t = stimon_t(L);
+                spikevect = [];
+                for l = 1:length(ston_t)
+                    spikevect = [spikevect; spt{l}-ston_t(l)];
+                end
+                nspikes = sum(spikevect>signaloffsets(j,1) & spikevect < signaloffsets(j,2));
+                data_sp_per_s(k,j,i) = nspikes./sum(L)/diff(signaloffsets(j,:));
+            end
+        end
+    end
+    Lallnan = all(all(isnan(data_dprime),2),3);
+    axes(hax(strcmp(MONKEY,MONKEYS),1));
+    tmp = nanmean(data_dprime(~Lallnan,:,:),3);
+    image(tmp*255/MAXDPRIME,'CDataMapping','direct');
+    if any(tmp(:) > MAXDPRIME)
+        error('increase MAXDPRIME');
+    end
+    contour(nanmean(data_dprime(~Lallnan,:,:),3),[1.27 1.27],'w-','LineWidth',2); title([MONKEY{1},' SNR']);
+    set(gca,'Ytick',[1:2:length(TFBINCENTERS)]','Yticklabel',num2str(TFBINCENTERS(1:2:end)',2));
+    set(gca,'Xtick',[1:2:size(signaloffsets,1)],'Xticklabel',num2str(signaloffsets(1:2:end,2),1));
+  
+    axes(hax(strcmp(MONKEY,MONKEYS),2));
+    tmp = nanmean(data_sp_per_s(~Lallnan,:,:),3);
+    image(tmp*255/MAXFR,'CDataMapping','scaled');
+    if any(tmp(:) > MAXFR)
+        error('increase MAXFR');
+    end
+    if strcmp(MONKEY,'Apollo')
+        contour(nanmean(data_sp_per_s(~Lallnan,:,:),3),[25 25],'w-','LineWidth',2);
+    else
+        contour(nanmean(data_sp_per_s(~Lallnan,:,:),3),[18 18],'w-','LineWidth',2);
+    end
+    title('Firing rate');
+    xlabel('Integration time (s)');
+    ylabel('TF (Hz)');
+    set(gca,'Ytick',[1:2:length(TFBINCENTERS)]','Yticklabel',num2str(TFBINCENTERS(1:2:end)',2));
+    set(gca,'Xtick',[1:2:size(signaloffsets,1)],'Xticklabel',num2str(signaloffsets(1:2:end,2),2));
+end
+colormap(gray(255));
+
+% making separate colorbars
+axes(hax(3,1));
+image([1:255]');
+set(gca,'Ylim',[0 255])
+yticks = 0:2:MAXDPRIME;
+set(gca,'XTick',[],'Ytick',yticks*255/MAXDPRIME,'Yticklabel',yticks);
+ylabel('Sensitivity (d'')');
+
+axes(hax(3,2));
+image([1:255]');
+set(gca,'Ylim',[0 255])
+yticks = 0:10:MAXFR;
+set(gca,'XTick',[],'Ytick',yticks*255/MAXFR,'Yticklabel',yticks);
+ylabel('Firing rate (sp/s)');
+
+%%
+% Section 13
+% Standard deviations of "normalized" Mahalanobis distances
+
+titles = {'Signal mean','Signal SD','Noise mean','Noise SD'};
+meanbins = linspace(-3, 8, 25);
+sdbins = linspace(0, 3, 25);
+for MONKEY = MONKEYS
+    for CELLTYPE = CELLTYPES
+        data = [];
+        [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',CELLTYPE,'subjID',{MONKEY{1}(1)});
+        for i = 1:length(filenames)
+            stro = {};
+            for j = 1:length(filenames{i})
+                stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+            end
+            stro = strocat(stro);
+
+            [uniquestim, dprime, signal, noise] = IsoSampGetDPrime(stro,DPRIMEMETHOD,spikecds(i));
+            Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+            Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+            for j = find(Llum)'
+                data = [data; i uniquestim(j,3) nanmean(signal{j}) nanstd(signal{j}) nanmean(noise{j}) nanstd(noise{j})];
+            end
+        end
+        figure;
+        for j = 1:4
+            subplot(2,2,j);
+            if j/2 == floor(j/2)
+                bins = sdbins;
+            else
+                bins = meanbins;
+            end
+            hist(data(:,j+2),bins);
+            title(titles{j});
+            set(gca,'Xlim',[bins(1) bins(end)]);
+        end
+        set(gcf,'Name',[char(MONKEY),' ',char(CELLTYPE)]);
+        prettycorr(data(:,2:end),{'TF','Signal mu','Signal SD','Noise mu','Noise SD'});
+        set(gcf,'Name',[char(MONKEY),' ',char(CELLTYPE)]);
+    end
+end
+
+%%
+% Section 14
+% Comparing d' for magnocellular neurons between 1 and 8 Hz
+
+data = [];
+for MONKEY = MONKEYS
+    [filenames,spikecds] = fnamesFromTxt('IsoSamp_LGN','cellClass',{'P'},'subjID',{MONKEY{1}(1)});
+    for i = 1:length(filenames)
+        stro = {};
+        for j = 1:length(filenames{i})
+            stro{j} = nex2stro(char(findfile(filenames{i}(j), fullfile(nexfilepath,'Greg',MONKEY))));
+        end
+        stro = strocat(stro);
+        [uniquestim, dprime] = IsoSampGetDPrime(stro,DPRIMEMETHOD,spikeidx);
+        Lblank = uniquestim(:,1) == 0 & uniquestim(:,2) == 0 & uniquestim(:,3) == 0;
+        Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & ~Lblank;
+        LTF_lo = uniquestim(:,3) == 1;
+        LTF_hi = uniquestim(:,3) > 7 & uniquestim(:,3) < 8;
+        
+        data = [data; find(strcmp(MONKEY,MONKEYS)) dprime(Llum&LTF_lo) dprime(Llum&LTF_hi)];
+    end
+end
+
+for i = 1:2
+    L = data(:,1) == i;
+    p = signrank(data(L,2),data(L,3))
+    disp([char(MONKEYS{i}),': mean low: ',num2str(mean(data(L,2))),' mean high: ',num2str(mean(data(L,3))),' p = ',num2str(p)]);
+end

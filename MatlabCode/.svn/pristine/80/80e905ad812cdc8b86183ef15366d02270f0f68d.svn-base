@@ -1,0 +1,719 @@
+% A script for eLife rebuttal: This is for reviewer's eyes only
+% Author - Abhishek De, 1/20
+
+close all; clearvars;
+
+%% Cell counts - Histology: didn't use this information
+% Cropped section Virusy 3, 20X
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+T_PV = readtable('C:\Users\setup\Google Drive\UW\DLX_20X_monkey\V1_V2_border_Virusy3\PVab_counts_cropped_20X.csv');
+T_ChR2 = readtable('C:\Users\setup\Google Drive\UW\DLX_20X_monkey\V1_V2_border_Virusy3\mDLX_counts_cropped_20X.csv');
+figure(plot_counter);
+plot(T_PV.X,2856-T_PV.Y,'o','MarkerFaceColor',[0 1 0],'MarkerSize',8); hold on;
+plot(T_ChR2.X,2856-T_ChR2.Y,'+','Color',[0 0 0],'MarkerSize',10);
+plot(T_ChR2.X,2856-T_ChR2.Y,'o','MarkerFaceColor',[1 0 0],'MarkerSize',4); axis equal;
+set(gca,'Xlim',[0 2211],'Ylim',[0 2856],'Tickdir','out');
+xlabel('X'), ylabel('Y'); legend('PV','ChR2'); hold off;
+plot_counter = plot_counter + 1;
+% Calculating 95 % confidence interval
+p1 = 136/164;
+err1 = 1.96*sqrt(p*(1-p)/164);
+
+
+%% How many of the units were visually driven & was there any correlation between neuronal modulation and behavior
+
+close all; clearvars;
+% Population summary of excitation and suppression
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+filename_M = {'M051318008.nex';'M051318009.nex';'M051618004.nex';'M051618005.nex';'M051618006.nex';'M051618007.nex';'M051618008.nex';'M051618010.nex';...
+    'M051618011.nex';'M051618012.nex';'M051618013.nex';'M051618014.nex';'M051818004.nex';'M051818005.nex';'M051818006.nex';'M051818007.nex';...
+    'M051818010.nex';'M051818011.nex';'M051818012.nex';'M051818013.nex';'M051818014.nex';'M052318001.nex';'M052318002.nex';'M052318003.nex';'M052318004.nex'};
+filename_A = {'A011719009.nex';'A011719010.nex';'A011719011.nex';'A011719012.nex';'A012219006.nex';'A012219009.nex';'A012219010.nex';'A012219011.nex';'A012219012.nex';...
+    'A012319004.nex';'A012319005.nex';'A012319006.nex';'A013119002.nex';'A013119003.nex';'A013119004.nex';'A013119005.nex';'A013119006.nex';'A020119004.nex';'A020119005.nex';...
+    'A020319001.nex';'A020319007.nex';'A020319008.nex';'A020319009.nex';'A020519003.nex';'A020519008.nex';'A020519009.nex';'A021519004.nex';'A021519005.nex';'A021519006.nex';...
+    'A021519007.nex';'A021519008.nex'};
+filename = [filename_M; filename_A];
+Singlevsmultiunit_M = ['M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'M'];
+Singlevsmultiunit_A = ['M';'M';'M';'M';'M';'M';'M';'M';'M';'M';'S';'S';'S';'M';'S';'S';'M';'S';'M';'M';'M';'S';'M';'M';'M';'M';'M';'S';'S';'S';'S'];
+N = numel(filename);
+L = ceil(sqrt(N));
+binwidth = .005;
+bins = -0.4:binwidth:0.6;
+baselinebins = (bins>0 & bins<0.3);
+baselineFR = [];
+laserFR = [];
+statstestresult = []; % Performing a wilcoxon rank sum test and storing the p value
+visualstimFR_stimp = [];
+visualstimbaselineFR_stimp = [];
+statstestresult_stimp = [];
+ISI = [];
+HitsL = []; MissesL = []; CRL = []; FAL = []; stimpresentL = []; stimabsentL = [];
+HitsNL = []; MissesNL = []; CRNL = []; FANL = []; stimpresentNL = []; stimabsentNL = [];
+dprimeL = []; dprimeNL = [];
+for jj = 1:N
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    analogstrtimeind = strcmp(stro.sum.rasterCells(1,:),'anlgStartTime');
+    spikeind = strcmp(stro.sum.rasterCells(1,:),'sig001a');
+    heyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD11');
+    veyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD12');
+    lasertraceind = strcmp(stro.sum.rasterCells(1,:),'AD13');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    lasertrials = logical(stro.trial(:,optstim));
+    samplerate = stro.sum.analog.storeRates{3}; % sample rate at which laser analog pulses are stored in file
+    
+    % Laser trials
+    HitsL = [HitsL; sum(stimpresent & lasertrials & correcttrials)];
+    MissesL = [MissesL; sum(stimpresent & lasertrials & ~correcttrials)];
+    CRL = [CRL; sum(~stimpresent & lasertrials & correcttrials)];
+    FAL = [FAL; sum(~stimpresent & lasertrials & ~correcttrials)];
+    stimpresentL = [stimpresentL; sum(stimpresent & lasertrials)];
+    stimabsentL = [stimabsentL; sum(~stimpresent & lasertrials)];
+    
+    % No-laser trials
+    HitsNL = [HitsNL; sum(stimpresent & ~lasertrials & correcttrials)];
+    MissesNL = [MissesNL; sum(stimpresent & ~lasertrials & ~correcttrials)];
+    CRNL = [CRNL; sum(~stimpresent & ~lasertrials & correcttrials)];
+    FANL = [FANL; sum(~stimpresent & ~lasertrials & ~correcttrials)];
+    stimpresentNL = [stimpresentNL; sum(stimpresent & ~lasertrials)];
+    stimabsentNL = [stimabsentNL; sum(~stimpresent & ~lasertrials)];
+    
+    % Calculating the dprimeL and dprimeNL
+    dprimeL = [dprimeL; calcdprime(HitsL(end),FAL(end),stimpresentL(end),stimabsentL(end))];
+    dprimeNL = [dprimeNL; calcdprime(HitsNL(end),FANL(end),stimpresentNL(end),stimabsentNL(end))];
+    
+    % Analyses of stimulus absent trials
+    idxs = find(~stimpresent);
+    count1 = 1;
+    count2 = 1;
+    PSTHlaser = zeros(1,length(bins));
+    PSTHbaseline = zeros(1,length(bins));
+    PSTHnolaser = zeros(1,length(bins));
+    tmp_baselineFR = [];
+    tmp_laserFR = [];
+    tmp_spikecountsbaseline = [];
+    tmp_spikecountslaserstimabsent = [];
+    
+    for ii = 1:numel(idxs)
+        ind = idxs(ii);
+        analogstartime = stro.ras{ind,analogstrtimeind};
+        spiketimes = stro.ras{ind,spikeind};
+        if lasertrials(ind)
+            % Pulling out the laseron and off timings from analog traces
+            t = stro.ras{ind,analogstrtimeind}+[0:1:length(stro.ras{ind,lasertraceind})-1]/samplerate;
+            laserontime = t(find(stro.ras{ind,lasertraceind}>0.1,1));
+            laserofftime = t(find(stro.ras{ind,lasertraceind}>0.1,1,'last'));
+            timedurlaser = laserofftime - laserontime;
+            PSTHlaser = PSTHlaser + (hist(spiketimes-laserontime, bins)/binwidth);
+            count1 = count1 + 1;
+            laserbins = bins>=0 & bins<=timedurlaser;
+            tmp_laserFR = [tmp_laserFR; sum(spiketimes>laserontime & spiketimes<laserofftime)/0.3];
+            ISI = [ISI; diff(spiketimes(spiketimes>laserontime & spiketimes<laserofftime))];
+            tmp_spikecountsbaseline = [tmp_spikecountsbaseline; sum(spiketimes>laserontime-0.3 & spiketimes<laserontime)];
+            tmp_spikecountslaserstimabsent = [tmp_spikecountslaserstimabsent; sum(spiketimes>laserontime & spiketimes<laserofftime)];
+        else
+            if ~stimpresent(ind)
+                stimontime = stro.trial(ind,stimonidx);
+                PSTHbaseline = PSTHbaseline + hist(spiketimes-stimontime, bins)/binwidth;
+                tmp_baselineFR = [tmp_baselineFR; sum(spiketimes>stimontime & spiketimes<stimontime+0.3)/0.3 ];
+            end
+        end
+    end
+    baselineFR = [baselineFR; mean(tmp_baselineFR)];
+    laserFR = [laserFR; mean(tmp_laserFR)];
+    statstestresult = [statstestresult; ranksum(tmp_spikecountsbaseline,tmp_spikecountslaserstimabsent)];
+    
+    % Analyses of stimulus prsent trials
+    idxs = find(stimpresent);
+    count1 = 1;
+    count2 = 1;
+    tmp_visualstimFR = [];
+    tmp_visualstimbaselineFR = [];
+    
+    
+    for ii = 1:numel(idxs)
+        ind = idxs(ii);
+        analogstartime = stro.ras{ind,analogstrtimeind};
+        spiketimes = stro.ras{ind,spikeind};
+        if ~lasertrials(ind) % looking at the no-laser trials
+            if stimpresent(ind)
+                stimontime = stro.trial(ind,stimonidx);
+                stimofftime = stro.trial(ind,stimoffidx);
+                timedur = stimofftime-stimontime;
+                tmp_visualstimFR = [tmp_visualstimFR; sum(spiketimes>stimontime & spiketimes<stimofftime)/timedur ];
+                
+            end
+        end
+    end
+    visualstimFR_stimp = [visualstimFR_stimp; mean(tmp_visualstimFR)];
+    statstestresult_stimp = [statstestresult_stimp; ranksum(tmp_visualstimFR,tmp_baselineFR)];
+end
+plot_counter = plot_counter + 1;
+firstletters_filename = char([filename]);
+Singlevsmultiunit = [Singlevsmultiunit_M; Singlevsmultiunit_A];
+Singleunitidxs = Singlevsmultiunit == 'S';
+Maui_idxs = firstletters_filename(:,1)=='M';
+Apollo_idxs = firstletters_filename(:,1)=='A';
+
+
+% Linking neural activity to behavior
+Beh = (dprimeNL-dprimeL);
+Neur = abs((laserFR-baselineFR)./(laserFR+baselineFR));
+figure(plot_counter);
+subplot(121); plot(Neur(laserFR>=baselineFR),Beh(laserFR>=baselineFR),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Neur(laserFR<baselineFR),Beh(laserFR<baselineFR),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+legend('Excited','Suppressed'); xlabel('Neuronal laser modulation');
+% ylabel('Behavioral laser modulation');
+ylabel('d prime control - laser');
+axis square; set(gca,'Tickdir','out','Xlim',[0.4 1]);
+[r,p] = corr(Neur,Beh,'type','Spearman');
+
+% Looking at the stim present trials
+visualstimFR_stimplog = visualstimFR_stimp;
+visualstimFR_stimplog(visualstimFR_stimplog==0) = 0.1;
+visualstimbaselineFR_stimp = baselineFR;
+visualstimbaselineFR_stimplog = visualstimbaselineFR_stimp;
+visualstimbaselineFR_stimplog(visualstimbaselineFR_stimplog==0) = 0.1;
+% subplot(132); plot(visualstimbaselineFR_stimplog(~Singleunitidxs & Maui_idxs & statstestresult_stimp<0.05),visualstimFR_stimplog(~Singleunitidxs & Maui_idxs & statstestresult_stimp<0.05),'s','MarkerSize',8,'LineWidth',1.0,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(Singleunitidxs & Maui_idxs & statstestresult_stimp<0.05),visualstimFR_stimplog(Singleunitidxs & Maui_idxs & statstestresult_stimp<0.05),'s','MarkerSize',8,'LineWidth',1.0,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(~Singleunitidxs & Apollo_idxs & statstestresult_stimp<0.05),visualstimFR_stimplog(~Singleunitidxs & Apollo_idxs & statstestresult_stimp<0.05),'o','MarkerSize',6,'LineWidth',1.0,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(Singleunitidxs & Apollo_idxs & statstestresult_stimp<0.05),visualstimFR_stimplog(Singleunitidxs & Apollo_idxs & statstestresult_stimp<0.05),'o','MarkerSize',6,'LineWidth',1.0,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(~Singleunitidxs & Maui_idxs & statstestresult_stimp>0.05),visualstimFR_stimplog(~Singleunitidxs & Maui_idxs & statstestresult_stimp>0.05),'s','MarkerSize',8,'LineWidth',1.0,'MarkerEdgeColor',[0 0 0],'MarkerFaceColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(Singleunitidxs & Maui_idxs & statstestresult_stimp>0.05),visualstimFR_stimplog(Singleunitidxs & Maui_idxs & statstestresult_stimp>0.05),'s','MarkerSize',8,'LineWidth',1.0,'MarkerEdgeColor',[0.5 0.5 0.5],'MarkerFaceColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(~Singleunitidxs & Apollo_idxs & statstestresult_stimp>0.05),visualstimFR_stimplog(~Singleunitidxs & Apollo_idxs & statstestresult_stimp>0.05),'o','MarkerSize',6,'LineWidth',1.0,'MarkerEdgeColor',[0 0 0],'MarkerFaceColor',[1 1 1]); hold on;
+% plot(visualstimbaselineFR_stimplog(Singleunitidxs & Apollo_idxs & statstestresult_stimp>0.05),visualstimFR_stimplog(Singleunitidxs & Apollo_idxs & statstestresult_stimp>0.05),'o','MarkerSize',6,'LineWidth',1.0,'MarkerEdgeColor',[0.5 0.5 0.5],'MarkerFaceColor',[1 1 1]); hold on;
+% axis square; xlabel('baselineFR'); ylabel('stimpresentFR: no laser'); set(gca,'Xlim',[0.1 100],'Ylim',[0.1 100],'TickDir','out','XScale','log','YScale','log'); line([0.1 100],[0.1 100],'Color','k'); legend('M:multi','A:multi','A:single'); title('Visual stim modulation'); hold off;
+subplot(122); plot(visualstimbaselineFR_stimplog(laserFR>=baselineFR & statstestresult_stimp<0.05),visualstimFR_stimplog(laserFR>=baselineFR & statstestresult_stimp<0.05),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(visualstimbaselineFR_stimplog(laserFR<baselineFR & statstestresult_stimp<0.05),visualstimFR_stimplog(laserFR<baselineFR & statstestresult_stimp<0.05),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(visualstimbaselineFR_stimplog(laserFR>=baselineFR & statstestresult_stimp>=0.05),visualstimFR_stimplog(laserFR>=baselineFR & statstestresult_stimp>=0.05),'o','MarkerEdgeColor',[0 0 0],'MarkerFaceColor',[1 1 1]); hold on;
+plot(visualstimbaselineFR_stimplog(laserFR<baselineFR & statstestresult_stimp>=0.05),visualstimFR_stimplog(laserFR<baselineFR & statstestresult_stimp>=0.05),'o','MarkerEdgeColor',[0.5 0.5 0.5],'MarkerFaceColor',[1 1 1]); hold on;
+axis square; xlabel('baselineFR'); ylabel('stimpresentFR: no laser'); set(gca,'Xlim',[0.1 100],'Ylim',[0.1 100],'TickDir','out','XScale','log','YScale','log'); line([0.1 100],[0.1 100],'Color','k'); legend('excited','suppressed'); title('Visual stim modulation'); hold off;
+plot_counter = plot_counter + 1;
+
+p1 = ranksum(baselineFR(laserFR>=baselineFR),baselineFR(laserFR<baselineFR)); % Comparing the firing rates of the excited and suppressed sites
+
+
+% Analyses of latency of suppressed units
+
+filenameS = filename(laserFR<=baselineFR); % Pulling out files with suppressed sites
+filenameE = filename(laserFR>baselineFR); % Pulling out the files with excited sites
+N = numel(filename);
+L = ceil(sqrt(N));
+binwidth = .001;
+bins = -0.3:binwidth:0.6;
+countS = 1;
+countE = 1;
+ChangeinFR_time = [];
+pFR = [];
+for jj = 1:N
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    analogstrtimeind = strcmp(stro.sum.rasterCells(1,:),'anlgStartTime');
+    spikeind = strcmp(stro.sum.rasterCells(1,:),'sig001a');
+    heyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD11');
+    veyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD12');
+    lasertraceind = strcmp(stro.sum.rasterCells(1,:),'AD13');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    lasertrials = logical(stro.trial(:,optstim));
+    samplerate = stro.sum.analog.storeRates{3}; % sample rate at which laser analog pulses are stored in file
+    
+    % Stimulus absent trials
+    idxs = find(~stimpresent);
+    firstspiketime_tmp = [];
+    count = 1;
+    PSTH = [];
+    for ii = 1:numel(idxs)
+        ind = idxs(ii);
+        analogstartime = stro.ras{ind,analogstrtimeind};
+        spiketimes = stro.ras{ind,spikeind};
+        if lasertrials(ind)
+            % Pulling out the laseron and off timings from analog traces
+            t = stro.ras{ind,analogstrtimeind}+[0:1:length(stro.ras{ind,lasertraceind})-1]/samplerate;
+            laserontime = t(find(stro.ras{ind,lasertraceind}>0.1,1));
+            laserofftime = t(find(stro.ras{ind,lasertraceind}>0.1,1,'last'));
+            timedurlaser = laserofftime-laserontime;
+            spiketodisp = spiketimes(spiketimes > laserontime-0.3 & spiketimes<laserofftime+0.3);
+            % Plotting the spikes
+            if ismember(filename(jj),filenameS)
+                figure(plot_counter); subplot(5,4,countS); plot(spiketodisp-laserontime, count*ones(size(spiketodisp)), 'k.'); hold on;
+            else
+            end
+            count = count + 1;
+            PSTH = [PSTH; hist(spiketimes-laserontime, bins)/binwidth];
+        else
+        end
+    end
+    PSTH(:,1) = 0; PSTH(:,end) = 0;
+    if ismember(filename(jj),filenameS)
+        % Suppressed sites
+        % Plotting the spikes
+        figure(plot_counter); subplot(5,4,countS);  line([0 0],[0 30]); line([timedurlaser timedurlaser],[0 30]);
+        xlabel('time'); ylabel('trials'); title(char(filename{jj}(1:10))); set(gca,'Tickdir','out','Xlim',[-0.1 0.1],'XTick',-0.1:0.05:0.1,'Ylim',[0 30],'YTick',[0 30]); axis square; hold off;
+        countS = countS + 1;
+    else
+        
+    end
+    
+    %%%%%% For calculating the time of excitation and suppression onset
+    timewindow = 0.05;
+    reference_baselinebin = bins>-1*timewindow & bins<0;
+    t = -timewindow:0.001:timewindow;
+    p = [];
+    
+    meanbaseline_spikecount = mean(sum(PSTH(:,reference_baselinebin)*binwidth,2));
+    for ii = 1:numel(t)
+        t1 = t(ii);
+        [p_tmp,h_tmp] = signrank(sum(PSTH(:,reference_baselinebin)*binwidth,2),sum(PSTH(:,bins>t1 & bins<t1+timewindow)*binwidth,2));
+        p = [p p_tmp];
+    end
+    t = t+timewindow;
+    t2 = t(find(p<0.05,1));
+    if isempty(t2)
+        t2 = t(end);
+    end
+    ChangeinFR_time = [ChangeinFR_time; t2];
+    pFR = [pFR; p]; % Storing the p-values from the sign rank test
+    
+end
+plot_counter = plot_counter + 1;
+
+% plotting the results of latency
+figure(plot_counter); set(gcf,'Name','Latency');
+subplot(121); histogram(ChangeinFR_time(ismember(filename,filenameE)),logspace(-3,-1,31),'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+histogram(ChangeinFR_time(ismember(filename,filenameS)),logspace(-3,-1,31),'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','XScale','log'); axis square; xlabel('time (s)'); ylabel('#cells'); title('Latency of FR change: Histogram'); legend('excited','suppressed'); hold off;
+subplot(122); plot(t,mean(pFR(ismember(filename,filenameE),:)',2),'Color',[0 0 0],'Linewidth',2); hold on;
+plot(t,mean(pFR(ismember(filename,filenameS),:)',2),'Color',[0.5 0.5 0.5],'Linewidth',2);
+plot(t,median(pFR(ismember(filename,filenameE),:)',2),'-.','Color',[0 0 0],'Linewidth',2);
+plot(t,median(pFR(ismember(filename,filenameS),:)',2),'-.','Color',[0.5 0.5 0.5],'Linewidth',2);
+plot(t,0.05*ones(size(t)),'Color','g','Linewidth',2);
+set(gca,'Tickdir','out','XScale','log','YScale','log'); axis square; xlabel('time (s)'); ylabel('p value'); legend('excited: mean','suppressed: mean','excited: median','suppressed: median');
+title('Latency of FR change: Population'); hold off;
+plot_counter = plot_counter + 1;
+
+%% Eye trajectories and target locations for Apollo
+% Ideally, the time window should start when the saccade starts (by some eye velocity criterion) and end when the saccade ends.
+% getSacData returns the start time and end times (relative to the "anlgStartTime", which is a column in stro.ras) of each saccade.
+% You can use this to pull out the appropriate eye position samples.
+
+close all;
+clearvars;
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM SCstimcue');
+training = fetch(conn,'SELECT training FROM SCstimcue');
+mode = fetch(conn,'SELECT mode FROM SCstimcue');
+close(conn);
+ind = find(strcmp(training,'no') & strcmp(mode,'SCstimcue'));
+L = ceil(sqrt(numel(ind)));
+k = cell2mat(filename(ind));
+monkey_ID = k(:,1);
+idx = monkey_ID == 'M';
+
+% Trying to work with getSacdata
+tmax = 1.0;
+nrows = 5;
+count = 1;
+RFloc = [];
+diffcentroidwithin = [];
+diffcentroidoutside = [];
+Saccadelatency_withinL = [];
+Saccadelatency_withinNL = [];
+Saccadelatency_outsideL = [];
+Saccadelatency_outsideNL = [];
+SaccadeAmplitudes_all = [];
+SaccadeAmplitudes_catchL = [];
+SaccadeAmplitudes_catchNL = [];
+SaccadeAmplitudes_catchL = [];
+SaccadecatchXY_L = [];
+SaccadecatchXY_NL = [];
+centroidcatchL = [];
+centroidcatchNL = [];
+RF = [];
+plotfigures = 1;
+Catchtrials_exist = [];
+Saccadelatency_catchL = []; Saccadelatency_catchNL = [];
+SaccadeAmpwithinL = []; SaccadeAmpwithinNL = [];
+SaccadeAmpoutsideL = []; SaccadeAmpoutsideNL = [];
+DistancefromtargetwithinL = []; DistancefromtargetwithinNL = [];
+DistancefromtargetoutsideL = []; DistancefromtargetoutsideNL = [];
+for ii = 1:numel(ind)
+    if ii == find(idx==0,1)
+        Saccadelatency_withinLidx = numel(Saccadelatency_withinL);
+        Saccadelatency_withinNLidx = numel(Saccadelatency_withinNL);
+        Saccadelatency_outsideLidx = numel(Saccadelatency_outsideL);
+        Saccadelatency_outsideNLidx = numel(Saccadelatency_outsideNL);
+        Saccadelatency_catchLidx = numel(Saccadelatency_catchL);
+        Saccadelatency_catchNLidx = numel(Saccadelatency_catchNL);
+        SaccadeAmplitudes_catchLidx = numel(SaccadeAmplitudes_catchL);
+        SaccadeAmplitudes_catchNLidx = numel(SaccadeAmplitudes_catchNL);
+    end
+    fileofinterest = char(filename(ind(ii),:));
+    stro = nex2stro(findfile(fileofinterest));
+    fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+    SacData = getSacData(stro,1,Inf,10);
+    targ_x = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targ_x'));
+    targ_y = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targ_y'));
+    targon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'targon_t'));
+    RFloc = [stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+    RF = [RF; RFloc];
+    Lcatchtrials = targ_x == 0 & targ_y == 0;
+    laseron_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+    laseroff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+    fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'fpoff_t'));
+    heyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD11');
+    veyetraceind = strcmp(stro.sum.rasterCells(1,:),'AD12');
+    analogstrtimeind = strcmp(stro.sum.rasterCells(1,:),'anlgStartTime');
+    [C,ia,ib] = unique(stro.trial(:,12:13),'rows');
+    SPNL = zeros(size(C,1),1);
+    SPL = zeros(size(C,1),1);
+    samplerate = stro.sum.analog.storeRates{3};
+    Llaser = ~isnan(laseron_t);
+    
+    if norm(RFloc/10)<10
+        plotlimit = 10;
+    else
+        plotlimit = 20;
+    end
+    
+    % Estimating the dc offset for horizontal and vertical eye positions
+    tmpx = []; tmpy = [];
+    for i = 1:size(stro.trial,1)
+        if size(stro.sum.rasterCells,2)==5
+            x = stro.ras{i,2}*4096/400;
+            y = stro.ras{i,3}*4096/400;
+            t = stro.ras{i,5}+[0:1:length(x)-1]/samplerate;
+        elseif size(stro.sum.rasterCells,2)==6
+            x = stro.ras{i,3}*4096/400;
+            y = stro.ras{i,4}*4096/400;
+            t = stro.ras{i,6}+[0:1:length(x)-1]/samplerate;
+        elseif size(stro.sum.rasterCells,2)==7
+            x = stro.ras{i,4}*4096/400;
+            y = stro.ras{i,5}*4096/400;
+            t = stro.ras{i,7}+[0:1:length(x)-1]/samplerate;
+        end
+        Lt = t>targon_t(i)-0.1 & t<targon_t(i);
+        tmpx = [tmpx; nanmean(x(Lt))];
+        tmpy = [tmpy; nanmean(y(Lt))];
+    end
+    x_offset = nanmean(tmpx);
+    y_offset = nanmean(tmpy);
+    
+    for jj = 1:length(SacData.amplitudes)
+        
+        fpofftime = fpoff_t(jj);
+        analogstartime = stro.ras{jj,analogstrtimeind};
+        t = stro.ras{jj,analogstrtimeind}+[0:1:length(stro.ras{jj,heyetraceind})-1]/samplerate;
+        
+        if ~isempty(find(SacData.starttimes{jj}-fpofftime>0 & SacData.starttimes{jj}-fpofftime<tmax))
+            selected_times_idxs = find(SacData.starttimes{jj}-fpofftime>0 & SacData.starttimes{jj}-fpofftime<tmax);
+            %             [~,ix] = max(SacData.amplitudes{jj}(selected_times_idxs)); % contingent on saccade amplitude
+            ix = 1; % contingent on first saccade
+            SaccadeStarttime = max(SacData.starttimes{jj}(selected_times_idxs(ix)));
+            SaccadeEndTime = max(SacData.endtimes{jj}(selected_times_idxs(ix)));
+        else
+            SaccadeStarttime = nan;
+            SaccadeEndTime = nan;
+        end
+        tinterest = t>SaccadeStarttime & t<SaccadeEndTime;
+        eyex = stro.ras{jj,heyetraceind}(tinterest)*4096/400 - x_offset;
+        eyey = stro.ras{jj,veyetraceind}(tinterest)*4096/400 - y_offset;
+        
+        if plotfigures & ~idx(ii) & ~Lcatchtrials(jj)
+            if ~Llaser(jj)
+                figure(plot_counter),subplot(5,4,count); plot(eyex,eyey,'Color',[0.5 0.5 0.5]); hold on;
+            else
+                figure(plot_counter),subplot(5,4,count); plot(eyex,eyey,'Color',[0 0.5 1.0]); hold on;
+            end
+        end
+    end
+    
+    
+    
+    if plotfigures & ~idx(ii)
+        figure(plot_counter),subplot(5,4,count); hold on;
+        plot(C(C(:,1)~=0 & C(:,2)~=0,1)/10,C(C(:,1)~=0 & C(:,2)~=0,2)/10,'o','MarkerSize',8,'MarkerEdgeColor',[0 0 0],'Linewidth',1);
+        plot(RFloc(1)/10,RFloc(2)/10,'o','MarkerSize',8,'MarkerEdgeColor',[1 0 0],'Linewidth',1);
+        title(fileofinterest); set(gca,'Tickdir','out','Xlim',[-plotlimit plotlimit],'Ylim',[-plotlimit plotlimit],'XTick',-plotlimit:plotlimit:plotlimit,'YTick',-plotlimit:plotlimit:plotlimit); axis square; hold off;
+        count = count + 1;
+    end
+end
+plot_counter = plot_counter + 2;
+
+
+
+%% Simulating changes in criterion vs. changes in sensitivity
+
+close all; clearvars;
+plot_counter = 1;
+sigma = 1;
+mu = 3.0:-0.5:0.5;
+mu_noise = 0;
+crit = 1.5; % subjective criterion
+X = linspace(-4,6,101);
+dprime = []; C = []; diff_bw_subjective_and_objective_crit = [];
+figure(plot_counter)
+subplot(121); plot(X,normpdf(X,mu_noise,sigma),'color',[0.5 0.5 0.5],'Linewidth',2); hold on;
+cgradation = linspace(0.5,1,numel(mu)+1);
+for ii = 1:numel(mu)
+    
+    H = 1-normcdf(crit,mu(ii),sigma);
+    FA = 1-normcdf(crit,mu_noise,sigma);
+    dprime = [dprime; norminv(H)-norminv(FA)];
+    C = [C; 0.5*(norminv(H)+norminv(FA))];
+    optimal_crit = mean([mu_noise mu(ii)]);
+    diff_bw_subjective_and_objective_crit = [diff_bw_subjective_and_objective_crit; optimal_crit-crit];
+    
+    subplot(121); plot(X,normpdf(X,mu(ii),sigma),'color',[0 0.5*cgradation(ii) cgradation(ii)],'Linewidth',2); hold on; plot(optimal_crit,0.45,'v','MarkerSize',8,'MarkerFaceColor',[0 0.5*cgradation(ii) cgradation(ii)],'MarkerEdgeColor',[1 1 1]);
+    subplot(122); plot(dprime(end),C(end),'o','MarkerSize',8,'MarkerFaceColor',[0 0.5*cgradation(ii) cgradation(ii)],'MarkerEdgeColor',[1 1 1]); hold on;
+    
+end
+subplot(121); plot([crit crit],[0 0.5],'k','Linewidth',2); xlabel('decision variable'); ylabel('Prob'); set(gca,'Tickdir','out','Xlim',[-4 6],'XTick',-4:2:6,'Ylim',[0 0.5],'YTick',0:0.25:0.50); axis square; hold off;
+
+subplot(122); plot(dprime,diff_bw_subjective_and_objective_crit,'k','Linewidth',2); xlabel('d prime'); ylabel('Crit'); set(gca,'Tickdir','out','Xlim',[0.5 3],'XTick',0.5:0.5:3,'Ylim',[-1.25 0],'YTick',-1.25:0.25:0); axis square; hold off;
+plot_counter = plot_counter + 1;
+
+
+%% Calculating the range of laser power used in the DToneloc experiment
+laserdial = [];
+load laserdialoptoM.mat
+laserdial = [laserdial; laserdialopto];
+load laserdialoptoA.mat
+laserdial = [laserdial; laserdialopto];
+load laserdetails.mat
+laserpower = spline(laserdetails.dial,laserdetails.laserpower,laserdial);
+
+%% Calcuiating the deviances of the psychometric fits
+
+close all; clearvars;
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load('T_vos1978_Y');
+Vlambda = T_vos1978_Y';
+ratio_controloverlaser = [];
+timeperblock = [];
+trialsperblock = [];
+filename = [];
+load filenameoptoM.mat
+filename = [filename; filenameopto];
+load filenameoptoA.mat
+filename = [filename; filenameopto];
+DevianceL = []; DevianceNL = [];
+HitL = []; HitNL = [];
+MissL = []; MissNL = [];
+CRL = []; CRNL = [];
+numdivisionsperfile = 3;
+CRearlylateL = []; % for storing the number of CRs in first half and second half of the block of experiment (laser trials)
+CRearlylateNL = [];% for storing the number of CRs in first half and second half of the block of experiment (no-laser trials)
+FAL = []; FANL = [];
+stimdur = [];
+laserdur = [];
+h_hit = []; p_hit = [];
+h_FA = []; p_FA = [];
+TPRNL = []; TPRL = [];
+FPRNL = []; FPRL = [];
+alpha = 0.05;
+RF = [];
+stimabsentL = []; stimabsentNL = [];
+stimpresentL = []; stimpresentNL = [];
+newfilename = [];
+newRWmultiplier = [];
+newstimsize = [];
+newlaserdial = [];
+prop_correctatGAMUTL = [];
+prop_correctatGAMUTNL = [];
+DetectThreshL = [];
+oogvals = [];
+count = 1;
+
+for jj = 1:size(filename,1)
+    disp(jj);
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    anlgStartTime = strcmp(stro.sum.rasterCells,'anlgStartTime');
+    timeperblock = [timeperblock; stro.ras{end,anlgStartTime}-stro.ras{1,anlgStartTime}];
+    trialsperblock = [trialsperblock; size(stro.ras,1)]; 
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    lasertrials = logical(stro.trial(:,optstim));
+    if isnan(unique(stro.trial(:,21:22)))
+        stimlocations = [stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+        RF = [RF; stimlocations];
+        newfilename = [newfilename; filename(jj)];
+        ib = ones(size(lasertrials));
+        newstimsize = [newstimsize; stro.sum.exptParams.sigma];
+    else
+        [stimlocations,~,ib] = unique(stro.trial(:,21:22),'rows');
+        RF = [RF; stimlocations];
+        L = size(stimlocations,1);
+        newfilename = [newfilename; repmat(filename(jj),[L 1])];    
+        newstimsize = [newstimsize; repmat(stro.sum.exptParams.sigma,[L 1])];
+    end
+    
+    for ii = 1:numel(unique(ib))
+        ind1 = logical(ib==ii);
+        lasertrialidxs = logical(stro.trial(ind1,optstim));
+        colordirchoiceidxs = correcttrials(ind1);
+        colorstimpresent = logical(stimpresent(ind1));
+        percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+        percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+        
+        % Laser trials
+        Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+        Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+        CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+        CRlasertrialidxs = find(lasertrialidxs & ~colorstimpresent); L1 = numel(CRlasertrialidxs);
+        
+        % Non-Laser trials
+        Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+        Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+        CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+        CRnonlasertrialidxs = find(~lasertrialidxs & ~colorstimpresent); L2 = numel(CRnonlasertrialidxs);
+        
+        stimabsentL = [stimabsentL; sum(CRlasertrial) + sum(FAlasertrial)];
+        stimabsentNL = [stimabsentNL; sum(CRnonlasertrial) + sum(FAnonlasertrial)];
+        stimpresentL = [stimpresentL; sum(Hitlasertrial) + sum(Misslasertrial)];
+        stimpresentNL = [stimpresentNL; sum(Hitnonlasertrial) + sum(Missnonlasertrial)];
+        
+        % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+        HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+        MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+        CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+        FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+        TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+        FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+        TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+        FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial
+        
+        fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+        fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+        mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+        mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+        mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+        M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+        Lb = M*stro.sum.exptParams.bkgndrgb;
+        % Converting all the contrasts to Luminance contrast
+        Bkgnd_luminance = stro.sum.exptParams.bkgndrgb'*mon_spd*Vlambda;
+        Peak_luminance = (inv(M)*((1+LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+        Trough_luminance = (inv(M)*((1-LMStriplet).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda;
+        Contrast_luminance = (Peak_luminance - Trough_luminance)./(Peak_luminance + Trough_luminance);
+        %             Contrast_luminance = ((inv(M)*((LMStriplet+1).*(repmat(Lb',[size(LMStriplet,1) 1])))')'*mon_spd*Vlambda-Bkgnd_luminance)/Bkgnd_luminance; % Same as Michelson contrast
+        LMScontrastfileNL = Contrast_luminance(colorstimpresent & ~lasertrialidxs,:);
+        LMScontrastfileL = Contrast_luminance(colorstimpresent & lasertrialidxs,:);
+        % calculating gamut edge luminance contrast
+        t = min(((1./stro.sum.exptParams.bkgndrgb)-1));
+        OOG_luminance = (stro.sum.exptParams.bkgndrgb*(1+t))' * mon_spd*Vlambda;
+        putativeoogcontrast =  (OOG_luminance - Bkgnd_luminance)/Bkgnd_luminance;
+        oogvals = [oogvals; putativeoogcontrast];
+        
+        % Calculating psychophysical detection threshold for non-laser trials        
+        answersL = colordirchoiceidxs(lasertrialidxs);
+        answersNL = colordirchoiceidxs(~lasertrialidxs);
+        tmplasercontrast = reshape(LMScontrastfileL,[],1); % converting array to a vector
+        tmpcontrolcontrast = reshape(LMScontrastfileNL,[],1);
+        answerlaser = reshape(answersL,[],1);
+        answercontrol = reshape(answersNL,[],1);
+        correctanswersL = []; incorrectanswersL = []; contrastL = [];
+        correctanswersNL = []; incorrectanswersNL = []; contrastNL = [];
+        [val,ind] = unique(tmplasercontrast);
+        for jj = 1:numel(val)
+            contrastL = [contrastL; val(jj)];
+            correctanswersL = [correctanswersL; sum(answerlaser(tmplasercontrast==val(jj)))];
+            incorrectanswersL = [incorrectanswersL; numel(answerlaser(tmplasercontrast==val(jj))) - sum(answerlaser(tmplasercontrast==val(jj)))];
+        end
+        [aL,bL,gL,~,~,likelihoodL] = weibullFitforDToneloc(contrastL,[correctanswersL incorrectanswersL],'mle');
+        DevianceL = [DevianceL; -2*likelihoodL];
+        
+        [val,ind] = unique(tmpcontrolcontrast);
+        for jj = 1:numel(val)
+            contrastNL = [contrastNL; val(jj)];
+            correctanswersNL = [correctanswersNL; sum(answercontrol(tmpcontrolcontrast==val(jj)))];
+            incorrectanswersNL = [incorrectanswersNL; numel(answercontrol(tmpcontrolcontrast==val(jj))) - sum(answerlaser(tmpcontrolcontrast==val(jj)))];
+        end
+        [aNL,bNL,gNL] = weibullFitforDToneloc(contrastNL,[correctanswersNL incorrectanswersNL],'mle');
+        contrastlattice = logspace(log10(0.03),log10(1.0),51);
+        fitL = gL*(1-exp(-((contrastlattice./aL).^bL)));
+        fitNL = gNL*(1-exp(-((contrastlattice./aNL).^bNL))); 
+        [aNL,bNL,gNL,~,~,likelihoodNL] = weibullFitforDToneloc(contrastNL,[correctanswersNL incorrectanswersNL],'mle');
+        
+        DevianceNL = [DevianceNL; -2*likelihoodNL];   
+    end
+end
+save DevianceNL DevianceNL
+save DevianceL DevianceL
+
+p = signrank(DevianceNL,DevianceL);

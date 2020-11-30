@@ -1,0 +1,79 @@
+% Usage:
+% Put this script somewhere in the default MATLAB path.
+% On Windows, put this in a location that all users have access to, and then
+% modify the "Start In" field of Matlab's shortcut to point there (make sure to
+% modify the shortcut that every user has access to).
+
+% The purpose of this script is to rebuild the path every time MATLAB runs. This
+% is helpful because in a multi-user environment, the folder structure for each
+% user is slightly different. Before this script, we had many issues traced back
+% to the MATLAB path containing other user's paths.
+
+if ispc
+    ptb_root = 'C:\toolbox\Psychtoolbox\';
+    [ignored,user_dir] = system('echo %userprofile%');
+    user_dir = user_dir(1:end-1);
+    path_to_add = [genpath([user_dir '\Desktop\MatlabCode']) ...
+        genpath([user_dir '\Desktop\Matlab Code'])];
+    
+    if ~isempty(strfind(evalc('ver'), 'Windows XP'))
+        docs_name = 'My Documents';
+    else
+        docs_name = 'Documents';
+    end
+    
+    docs_path = fullfile(user_dir, docs_name, 'MATLAB');
+    success = mkdir(docs_path);
+    if success % created directory or it exists
+        cd(docs_path);
+    else
+        error('Couldn''t make the "%s" path. Permissions problem?', docs_path);
+    end
+    
+    if isempty(path_to_add)
+        warning('You need to edit startup.m to point to your correct MatlabCode working copy\n');
+    end
+    path_to_add = [path_to_add ptb_root 'PsychBasic\MatlabWindowsFilesR2007a\;' genpath(ptb_root)];
+else
+    docs_path = '~/Documents/MATLAB';
+    success = mkdir(docs_path);
+    if success % created directory or it exists
+        cd(docs_path);
+    else
+        error('Couldn''t make the "%s" path. Permissions problem?', docs_path);
+    end
+    
+    if ismac
+        ptb_root = '/Applications/Psychtoolbox';
+    else
+        if exist('/usr/share/psychtoolbox-3', 'dir')
+            % found the NeuroDebian version of PTB-3
+            ptb_root = '/usr/share/psychtoolbox-3';
+        else
+            ptb_root = '~/toolbox/Psychtoolbox';
+        end
+    end
+    path_to_add = [genpath('~/Desktop/MatlabCode') genpath('~/Desktop/Matlab Code') ...
+        genpath('~/Desktop/SlaveCode') genpath('~/Desktop/Slave Code')];
+    if isempty(path_to_add)
+        warning('You need to edit startup.m to point to a Matlab/SlaveCode working copy.');
+    end
+    path_to_add = [path_to_add genpath(ptb_root)];
+end
+
+bad_path_pattern = ...
+    ['\' filesep '([a-zA-Z]\w*\.bundle|\.svn|\.git)(\' filesep '|\' pathsep ')'];
+cmdirs = regexp(path_to_add, ['.[^' pathsep ']*' pathsep], 'match')';
+goodpaths = cmdirs(cellfun(@isempty, regexp(cmdirs, bad_path_pattern)));
+warning('OFF', 'MATLAB:dispatcher:pathWarning');
+addpath([userpath goodpaths{:}]);
+warning('ON', 'MATLAB:dispatcher:pathWarning');
+
+if exist('PsychStartup.m', 'file'), PsychStartup; end
+clear();
+clc();
+
+% run the user's startup (technically this runs first startup.m in the path)
+if exist('startup.m', 'file') && ~strcmp([mfilename('fullpath') '.m'], which('startup.m'))
+    startup
+end

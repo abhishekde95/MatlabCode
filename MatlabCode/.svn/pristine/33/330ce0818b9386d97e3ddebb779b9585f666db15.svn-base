@@ -1,0 +1,320 @@
+% In this script I am trying to fit the cells to a modified DOG model
+% called the Crescent shaped model 
+% Author - Abhishek De, 1/19
+close all; clearvars;
+load Output_ListWN.mat
+num_rows = 10; % Number of cells in a figure
+C = 5;
+kk = 1;
+[filename_Lum, spikeIdx_Lum] = fnamesFromTxt2('Lum.txt');
+[filename_LvsM, spikeIdx_LvsM] = fnamesFromTxt2('LvsM.txt');
+[filename_ColorOpponent, spikeIdx_ColorOpponent] = fnamesFromTxt2('ColorOpponent.txt');
+[filename_BY, spikeIdx_BY] = fnamesFromTxt2('BYcandidates.txt');
+cellIds = [repmat({'Lum'},size(filename_Lum)); repmat({'LvsM'},size(filename_LvsM)); repmat({'ColorOpponent'},size(filename_ColorOpponent)); repmat({'BY'},size(filename_BY))];
+LumIds = strcmp(cellIds,'Lum');
+LvsMIds = strcmp(cellIds,'LvsM');
+ColorOpponentIds = strcmp(cellIds,'ColorOpponent');
+BYIds = strcmp(cellIds,'BY');
+
+N = 100;
+bins = -100:10:300;
+numcrescentparams = 8;
+numgaborparams = 8;
+numDOGparams = 6;
+Crescenterror = [];
+Gaborerror = [];
+DOGerror = [];
+% After storing the parameters, I can use it to classify single-opponent vs non-single opponent neurons
+numcells = size(Output_List,1);
+Gaborparams = cell(numcells,1);
+DOGparams = cell(numcells,1);
+Crescentparams = cell(numcells,1);
+
+for ii = 1:numcells
+    
+    
+    [out2,fittedGabor] = gaborfit_AD(Output_List{ii,4}); % fitting Gabor
+    [out3,fittedDOG] = DOGfit(Output_List{ii,4});
+    
+    [tmp_out1,fittedCrescent1] = Crescentfit_AD(Output_List{ii,4},out3); % Fitting the crescent shaped model, takes input from the DOG model
+    [tmp_out2,fittedCrescent2] = Crescentfit_AD(Output_List{ii,4},[]);
+    if tmp_out1.fval < tmp_out2.fval
+        fittedCrescent = fittedCrescent1;
+        out1 = tmp_out1;
+    else
+        fittedCrescent = fittedCrescent2;
+        out1 = tmp_out2;
+    end
+    Crescenterror = [Crescenterror; out1.fval];
+    Gaborerror = [Gaborerror; out2.fval];
+    DOGerror = [DOGerror; out3.fval];
+    tmpCrescentBIC = N*log(Crescenterror(end)/N) + numcrescentparams*log(N);
+    tmpGaborBIC = N*log(Gaborerror(end)/N) + numgaborparams*log(N);
+    tmpDOGBIC = N*log(DOGerror(end)/N) + numDOGparams*log(N);
+    [~,minidx] = min([tmpCrescentBIC tmpGaborBIC tmpDOGBIC]);
+    
+    % Storing the model parameters
+    Crescentparams{ii} = out1;
+    Gaborparams{ii} = out2;
+    DOGparams{ii} = out3;
+   
+    figure(kk); colormap('gray');
+    % STA
+    tmp_vec_gun = Output_List{ii,2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+1); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('STA');
+    end
+    
+    % Peak Frame
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+2); imagesc(Output_List{ii,4}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('RF');
+    end
+    
+    % Crescent fit to the RF
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+3); imagesc(fittedCrescent); set(gca,'XTick',[],'YTick',[]); axis square;
+    if minidx == 1
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    if mod(ii,num_rows) ==1 
+        title('Crescent');
+    end
+    
+    % Gabor fit to the RF
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+4); imagesc(fittedGabor); set(gca,'XTick',[],'YTick',[]); axis square;
+    if minidx == 2
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    if mod(ii,num_rows) ==1 
+        title('Gabor');
+    end
+    
+    % DOG fit to the RF
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+5); imagesc(fittedDOG); set(gca,'XTick',[],'YTick',[]); axis square;
+    if minidx == 3
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    if mod(ii,num_rows) ==1 
+        title('DOG');
+    end
+    
+    if mod(ii,num_rows) == 0
+        kk = kk + 1;
+    end
+end
+plot_counter = kk + 1;
+
+CrescentBIC = N*log(Crescenterror/N) + numcrescentparams*log(N);
+GaborBIC = N*log(Gaborerror/N) + numgaborparams*log(N);
+DOGBIC = N*log(DOGerror/N) + numDOGparams*log(N);
+plot_counter = kk+1;
+N_lum = sum(LumIds);
+N_LvsM = sum(LvsMIds);
+N_CO = sum(ColorOpponentIds);
+N_BY = sum(BYIds);
+
+[minval,I] = min([CrescentBIC GaborBIC DOGBIC],[],2);
+figure(plot_counter); set(gcf,'Name','Crescent vs Gabor vs DOG');
+subplot(321); bar([numel(find(I==1)) numel(find(I==2)) numel(find(I==3))]); set(gca,'xticklabel',{'Crescent','Gabor','DOG'}); ylabel('No. of cells');
+subplot(322); bar([numel(find(I==1))/numel(I) numel(find(I==2))/numel(I) numel(find(I==3))/numel(I)]); set(gca,'xticklabel',{'Crescent','Gabor','DOG'}); ylabel('Proportion of cells');
+subplot(323); bar([sum(LumIds & I==1) sum(LvsMIds & I==1) sum(ColorOpponentIds & I==1) sum(BYIds & I==1); sum(LumIds & I==2) sum(LvsMIds & I==2) sum(ColorOpponentIds & I==2) sum(BYIds & I==2);  sum(LumIds & I==3) sum(LvsMIds & I==3) sum(ColorOpponentIds & I==3) sum(BYIds & I==3)]);  
+set(gca,'xticklabel',{'Crescent','Gabor','DOG'}); legend('Lum','LvsM','Color Opp','BY'); ylabel('No. of cells');
+subplot(324); bar([sum(LumIds & I==1)/N_lum sum(LvsMIds & I==1)/N_LvsM sum(ColorOpponentIds & I==1)/N_CO sum(BYIds & I==1)/N_BY; sum(LumIds & I==2)/N_lum sum(LvsMIds & I==2)/N_LvsM sum(ColorOpponentIds & I==2)/N_CO sum(BYIds & I==2)/N_BY;  sum(LumIds & I==3)/N_lum sum(LvsMIds & I==3)/N_LvsM sum(ColorOpponentIds & I==3)/N_CO sum(BYIds & I==3)/N_BY]);  
+set(gca,'xticklabel',{'Crescent','Gabor','DOG'}); legend('Lum','LvsM','Color Opp','BY'); ylabel('Proportion of cells');
+% Another way of looking the data
+subplot(325); bar([sum(LumIds & I==1) sum(LumIds & I==2) sum(LumIds & I==3); sum(LvsMIds & I==1) sum(LvsMIds & I==2) sum(LvsMIds & I==3); sum(ColorOpponentIds & I==1) sum(ColorOpponentIds & I==2) sum(ColorOpponentIds & I==3); sum(BYIds & I==1) sum(BYIds & I==2) sum(BYIds & I==3)]);  
+set(gca,'xticklabel',{'Lum','LvsM','CO','BY'}); legend('Crescent','Gabor','DOG'); ylabel('No. of cells');
+subplot(326); bar([sum(LumIds & I==1)/N_lum sum(LumIds & I==2)/N_lum sum(LumIds & I==3)/N_lum; sum(LvsMIds & I==1)/N_LvsM sum(LvsMIds & I==2)/N_LvsM sum(LvsMIds & I==3)/N_LvsM; sum(ColorOpponentIds & I==1)/N_CO sum(ColorOpponentIds & I==2)/N_CO sum(ColorOpponentIds & I==3)/N_CO; sum(BYIds & I==1)/N_BY sum(BYIds & I==2)/N_BY sum(BYIds & I==3)/N_BY]);  
+set(gca,'xticklabel',{'Lum','LvsM','CO','BY'}); legend('Crescent','Gabor','DOG'); ylabel('No. of cells');
+plot_counter = plot_counter + 1;
+
+% It makes sense to compare the Gabor vs Crescent because of following
+% reasons:
+% 1) They have the same number of parameters 
+% 2) Crescent is a modified DOG and therefore would be a better contender compared to the Gabor 
+deltaBIC = CrescentBIC - GaborBIC;
+bins = -100:10:300;
+figure(plot_counter); set(gcf,'Name','Crescent vs Gabor');
+subplot(231); plot(Crescenterror,Gaborerror,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('Crescent error'); ylabel('Gabor Error'); title('All cells'); hold off;
+subplot(232); plot(CrescentBIC,GaborBIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]); xlabel('Crescent BIC'); ylabel('Gabor BIC'); title('All cells'); hold off;
+subplot(233); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LumIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LumIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('lum'); set(gca,'TickDir','out'); legend('All cells','lum'); hold off;
+subplot(234); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LvsMIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LvsMIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('LvsM'); set(gca,'TickDir','out'); legend('All cells','LvsM'); hold off;
+subplot(235); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(ColorOpponentIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(ColorOpponentIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('Color Opponent'); set(gca,'TickDir','out'); legend('All cells','CO');hold off;
+subplot(236); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(BYIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(BYIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('BY'); set(gca,'TickDir','out'); legend('All cells','BY');hold off;
+plot_counter = plot_counter + 1;
+
+% Now comparing Gabor and DOG BIC
+deltaBIC = DOGBIC - GaborBIC;
+bins = -100:10:300;
+figure(plot_counter); set(gcf,'Name','DOG vs Gabor');
+subplot(231); plot(DOGerror,Gaborerror,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('DOG error'); ylabel('Gabor Error'); title('All cells'); hold off;
+subplot(232); plot(DOGBIC,GaborBIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]); xlabel('DOG BIC'); ylabel('Gabor BIC'); title('All cells'); hold off;
+subplot(233); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LumIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LumIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('lum'); set(gca,'TickDir','out'); legend('All cells','lum'); hold off;
+subplot(234); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LvsMIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LvsMIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('LvsM'); set(gca,'TickDir','out'); legend('All cells','LvsM'); hold off;
+subplot(235); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(ColorOpponentIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(ColorOpponentIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('Color Opponent'); set(gca,'TickDir','out'); legend('All cells','CO');hold off;
+subplot(236); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(BYIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(BYIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('BY'); set(gca,'TickDir','out'); legend('All cells','BY');hold off;
+plot_counter = plot_counter + 1;
+
+% Now comparing Crescent and DOG BIC
+deltaBIC = DOGBIC - CrescentBIC;
+bins = -100:10:300;
+figure(plot_counter); set(gcf,'Name','DOG vs Crescent');
+subplot(231); plot(DOGerror,Crescenterror,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[0 10],'Ylim',[0 10],'TickDir','out'); line([0 10],[0 10]);xlabel('DOG error'); ylabel('Crescent Error'); title('All cells'); hold off;
+subplot(232); plot(DOGBIC,CrescentBIC,'o','MarkerSize',6,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[1 1 1]); hold on; axis square;
+set(gca,'Xlim',[-1000 -100],'Ylim',[-1000 -100],'TickDir','out'); line([-1000 -100],[-1000 -100]); xlabel('DOG BIC'); ylabel('Crescent BIC'); title('All cells'); hold off;
+subplot(233); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LumIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LumIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('lum'); set(gca,'TickDir','out'); legend('All cells','lum'); hold off;
+subplot(234); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(LvsMIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(LvsMIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('LvsM'); set(gca,'TickDir','out'); legend('All cells','LvsM'); hold off;
+subplot(235); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(ColorOpponentIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(ColorOpponentIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('Color Opponent'); set(gca,'TickDir','out'); legend('All cells','CO');hold off;
+subplot(236); histogram(deltaBIC,bins); hold on; histogram(deltaBIC(BYIds),bins); plot(median(deltaBIC),0,'kv','Markerfacecolor',[0 0 1]); plot(median(deltaBIC(BYIds)),0,'kv','Markerfacecolor',[1 0 0]); axis square; xlabel('delta BIC'); ylabel('count'); title('BY'); set(gca,'TickDir','out'); legend('All cells','BY');hold off;
+plot_counter = plot_counter + 1;
+
+%% In this section, I will be performing head to head comparison of Gabor and Crescent models
+% Now I want to look at the 10 cells which are best fit by Crescent, 10
+% which are best fit by DOG and 10 which are best fit by a DOG.
+% ---- Don't think that this section is working
+numcells = 20;
+deltaBIC = CrescentBIC - GaborBIC;
+[sorteddeltaBIC,idx] = sort(deltaBIC);
+num_rows = 10;
+C = 4;
+Crescentind = idx(1:numcells);
+Gaborind = idx(end-numcells:end);
+kk = 1;
+ 
+for ii = 1:numcells
+    figure(plot_counter+(kk-1));
+    % Crescent STA
+    tmp_vec_gun = Output_List{Crescentind(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im1 = normfactor*tmp_vec_gun + 0.5;
+    im1 = reshape(im1,[10 10 3]);
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+1); image(im1); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Crescent STA');
+    end
+    
+    % Best fit by Crescent
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+2); imagesc(Output_List{Crescentind(ii),4}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Crescent RF');
+    end
+    
+    % Gabor STA 
+    tmp_vec_gun = Output_List{Gaborind(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im2 = normfactor*tmp_vec_gun + 0.5;
+    im2 = reshape(im2,[10 10 3]);
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+3); image(im2); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gabor STA');
+    end
+    
+    % Best fit by Gabor
+    subplot(num_rows,C,((ii-(kk-1)*num_rows)-1)*C+4); imagesc(Output_List{Gaborind(ii),4}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if mod(ii,num_rows) ==1 
+        title('Gabor');
+    end
+    
+    if mod(ii,num_rows) == 0
+        kk = kk + 1;
+    end
+    
+end
+plot_counter = plot_counter + kk + 1;
+
+% Now checking if the latencies of the Gabor fit and Crescent fit cells differ
+ColorcellIds = LvsMIds | ColorOpponentIds | BYIds;
+bins = 0:10:150;
+latencies = cell2mat(Output_List(:,6)); 
+[p1,h1] = ranksum(latencies(deltaBIC<0),latencies(deltaBIC>0));
+[p2,h2] = ranksum(latencies(LumIds),latencies(ColorcellIds));
+figure(plot_counter); set(gcf,'Name','Compare latencies');
+subplot(121); histogram(latencies(deltaBIC<0),bins); hold on; histogram(latencies(deltaBIC>0),bins); plot(median(latencies(deltaBIC<0)),0,'kv','Markerfacecolor',[0 0 1]); plot(median(latencies(deltaBIC>0)),0,'kv','Markerfacecolor',[1 0 0]);  xlabel('latencies'); legend('Crescent','Gabor'); title(strcat('p=',num2str(p1,3)));
+subplot(122); histogram(latencies(LumIds),bins); hold on; histogram(latencies(ColorcellIds),bins); plot(median(latencies(LumIds)),0,'kv','Markerfacecolor',[0 0 1]); plot(median(latencies(ColorcellIds)),0,'kv','Markerfacecolor',[1 0 0]);  xlabel('latencies'); legend('Lum','Color'); title(strcat('p=',num2str(p2,3)));
+plot_counter = plot_counter + 1;
+
+% Checking out the if there is any correlation between color tuning and spatial structure fits
+figure(plot_counter); 
+subplot(121); cdfplot(find(LumIds(idx))); hold on; cdfplot(find(ColorcellIds(idx))); legend('lum','color'); xlabel('deltaBIC'); axis square; 
+subplot(122); cdfplot(find(LumIds(idx))); hold on; cdfplot(find(LvsMIds(idx))); cdfplot(find(ColorcellIds(idx))); xlabel('deltaBIC'); cdfplot(find(BYIds(idx))); legend('lum','LvsM','CO','BY'); axis square;
+plot_counter = plot_counter + 1;
+
+% Select cells from LumIds and ColorOpponentIds files where "Crescent" fit was superior
+idx = find(deltaBIC<0 & (ColorOpponentIds | LumIds));
+figure(plot_counter); set(gcf,'Name','Cells better fit by Crescent model');
+figure(plot_counter+1); set(gcf,'Name','SVD derived spatial RF ');
+numsubplots = ceil(sqrt(numel(idx)));
+CSgain_ratio = zeros(numel(idx),1);
+single_opponent_Crescent = zeros(numel(idx),1);
+for ii = 1:numel(idx)
+    tmp_vec_gun = Output_List{idx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+    ft = fft2(im);
+    if max(abs(ft(:)))== abs(ft(1))
+        single_opponent_Crescent(ii) = 1;
+    else
+        single_opponent_Crescent(ii) = 0;
+    end
+        
+    figure(plot_counter); subplot(numsubplots,numsubplots,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    if single_opponent_Crescent(ii)
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    figure(plot_counter+1); subplot(numsubplots,numsubplots,ii); imagesc(Output_List{idx(ii),4}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if single_opponent_Crescent(ii)
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    figure(plot_counter+2); subplot(numsubplots,numsubplots,ii); imagesc(Output_List{idx(ii),3}); set(gca,'XTick',[],'YTick',[]); axis square;
+    
+    CSgain_ratio(ii) = Crescentparams{idx(ii)}.gaincenter/Crescentparams{idx(ii)}.gainsurround;
+    
+end
+figure(plot_counter+1); hold on; colormap('gray'); hold off;
+figure(plot_counter+2); hold on; colormap('gray'); hold off;
+plot_counter = plot_counter + 3;
+
+% Select cells from LumIds and ColorOpponentIds files where "Gabor" fit was superior
+idx = find(deltaBIC>0 & (ColorOpponentIds | LumIds));
+figure(plot_counter); set(gcf,'Name','cells better fit by Gabor model');
+figure(plot_counter+1); set(gcf,'Name','SVD derived spatial RF ');
+numsubplots = ceil(sqrt(numel(idx)));
+single_opponent_Gabor = zeros(numel(idx),1);
+for ii = 1:numel(idx)
+    tmp_vec_gun = Output_List{idx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+    ft = fft2(im);
+    if max(abs(ft(:)))== abs(ft(1))
+        single_opponent_Gabor(ii) = 1;
+    else
+        single_opponent_Gabor(ii) = 0;
+    end
+    figure(plot_counter); subplot(numsubplots,numsubplots,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+    if single_opponent_Gabor(ii)
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    figure(plot_counter+1); subplot(numsubplots,numsubplots,ii); imagesc(Output_List{idx(ii),4}); set(gca,'XTick',[],'YTick',[]); axis square;
+    if single_opponent_Gabor(ii)
+        set(gca,'XColor',[1 0 0],'YColor',[1 0 0]); 
+    end
+    figure(plot_counter+2); subplot(numsubplots,numsubplots,ii); imagesc(Output_List{idx(ii),3}); set(gca,'XTick',[],'YTick',[]); axis square;
+end
+figure(plot_counter+1); hold on; colormap('gray'); hold off;
+figure(plot_counter+2); hold on; colormap('gray'); hold off;
+plot_counter = plot_counter + 3;
+
+
+% Next step would be to compare the center and surround gain for those
+% cells which have negative deltaBIC

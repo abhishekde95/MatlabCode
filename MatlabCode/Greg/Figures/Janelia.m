@@ -1,0 +1,634 @@
+% CONTENTS
+%
+%
+%
+
+% Figures for Janelia Talk
+%load Vlambda_star;
+load T_cones_ss10;
+wls = S_cones_ss10(1):S_cones_ss10(2):(S_cones_ss10(1)+S_cones_ss10(3)-1)
+T_cones_ss10(:,[350:end]) = [];
+wls([350:end]) = [];
+
+figure;
+%plot(Vlambda_star(:,1), Vlambda_star(:,2),'k-','LineWidth',2);
+
+figure; axes; hold on;
+plot(wls,T_cones_ss10(1,:),'r-','LineWidth',2);
+plot(wls,T_cones_ss10(2,:),'g-','LineWidth',2);
+plot(wls,T_cones_ss10(3,:),'b-','LineWidth',2);
+set(gca,'Xlim',[wls(1) wls(end)],'Ylim',[0 3]);
+
+figure; axes; hold on;
+plot(wls,1.98*T_cones_ss10(1,:),'r-','LineWidth',2);
+plot(wls,T_cones_ss10(2,:),'g-','LineWidth',2);
+plot(wls,[1.98, 1]*T_cones_ss10([1 2],:),'k-','LineWidth',2);
+set(gca,'Xlim',[wls(1) wls(end)],'Ylim',[0 3]);
+
+
+%%
+% Getting B/G in luminance contrast units for eccentricities > 5°
+
+if (ispc)
+    filelistpath = 'C:\NO BACKUP\NexFiles\nexfilelists\Greg\DTEM';
+else
+    filelistpath = '/Volumes/NO BACKUP/NexFiles/nexfilelists/Greg/DTEM';
+end
+
+load T_cones_ss2;
+Vlambda_tmp = [1.98, 1]*T_cones_ss2([1 2],:);
+wls = S_cones_ss2(1):S_cones_ss2(2):(S_cones_ss2(1)+S_cones_ss2(3)-1);
+
+%load T_cones_ss10;
+%Vlambda_tmp = [1.98, 1]*T_cones_ss2([1 2],:);
+%wls = S_cones_ss10(1):S_cones_ss10(2):(S_cones_ss10(1)+S_cones_ss10(3)-1);
+Vlambda = interp1(wls, Vlambda_tmp, [380:5:780],'linear',0);
+
+bgdata = [];
+for HUMANS = 0:1
+    if (HUMANS)
+        listnames = {'GregMacPig.txt','ZackMacPig.txt','LeahMacPig.txt'};
+    else
+        listnames = {'ApolloMacPig.txt','FreyaMacPig.txt','SednaMacPig.txt','KaliMacPig.txt','NutMacPig.txt',};
+    end
+    
+    h = [];
+    for i = 1:length(listnames)
+        filenames = fnamesFromTxt2([filelistpath,filesep,char(listnames{i})]);
+        
+        data = [];
+        for fileidx = 1:size(filenames,1)
+            stro = nex2stro(findfile(char(filenames{fileidx,:})));
+            [thresh, colorDirs, sfs] = DTquestUnpack(stro, 'mode'); close(gcf);
+            normcolordirs = colorDirs./repmat(sqrt(sum(colorDirs.^2,2)),1,3);
+            guns = reshape(stro.sum.exptParams.mon_spect,81,3);
+            bkgndrgb = [stro.sum.exptParams.bkgnd_r stro.sum.exptParams.bkgnd_g stro.sum.exptParams.bkgnd_b];
+            M = reshape(stro.sum.exptParams.m_mtx,3,3);
+            bkgndlms = M*bkgndrgb';
+            bkgndlum = bkgndrgb*guns'*Vlambda';
+            threshrgb = inv(M)*(repmat(bkgndlms',2,1).*(1+repmat(thresh/100,[1 3]).*normcolordirs([1 2],:)))';
+            deltagun = threshrgb-repmat(bkgndrgb',1,2);
+            % Quantifying thresholds in 2 deg luminance contrast units
+            thresholds = [nan; nan];
+            for j = 1:size(deltagun,2)
+                thresholds(j) =  (guns*deltagun(:,j))'*Vlambda';
+                thresholds(j) =   thresholds(j)./bkgndlum;
+            end
+            ecc = stro.sum.exptParams.rf_x;
+            data = [data; ecc/10 thresholds'];
+        end
+        
+        
+        % Collecting data for stats
+       bg = data(data(:,1) >=5 ,[2 3]);
+      %  bg = data(:,[2 3]);
+        bgdata = [bgdata; HUMANS i mean(log10(bg(:,2)./bg(:,1))) std(log10(bg(:,2)./bg(:,1))) size(bg,1)]
+    end % Blue to green threshold ratio
+end
+
+figure; axes; hold on;
+errorbar(bgdata(:,3),1.96*bgdata(:,4)./sqrt(bgdata(:,5)));
+set(gca,'Ytick',log10([.6 .8 1]));
+set(gca,'YtickLabel',[.6 .8 1])
+plot([1 9],[0 0])
+
+%%
+% L, M, S-cone weights of V1 complex cells
+% data from Horwitz, Chichilnisky and Albright (2007) captured by Skyler
+% Mendoza
+
+LM_plusS = [0.0651558	0.807365
+0.150142	0.719547
+0.161473	0.74221
+0.201133	0.728045
+0.226629	0.736544
+0.226629	0.750708
+0.229462	0.614731
+0.233239	0.480642
+0.254013	0.601511
+0.267233	0.684608
+0.280453	0.548631
+0.278565	0.618508
+0.293673	0.624174
+0.293673	0.678942
+0.305005	0.678942
+0.348442	0.588291
+0.359773	0.629839
+0.357885	0.556185
+0.369216	0.541076
+0.395656	0.548631
+0.378659	0.525968
+0.391879	0.467422
+0.408876	0.507082
+0.425873	0.522191
+0.439093	0.525968
+0.446648	0.508971
+0.433428	0.433428
+0.447592	0.419263
+0.495751	0.422096
+0.507082	0.476865
+0.535411	0.325779
+0.552408	0.378659
+0.593957	0.369216
+0.582625	0.278565
+0.597734	0.184136
+0.624174	0.333333
+0.654391	0.246459
+0.816808	0.131256
+0.915014	0.0651558]
+
+LM_minusS = [0.0368272	0.912181
+0.249292	0.68272
+0.498584	0.450425
+0.699717	0.263456];
+
+S = [1-(sum(LM_plusS,2)); (sum(LM_minusS,2))-1]
+absS = abs(S);
+LMS = sortrows([[LM_plusS; LM_minusS] absS],1);
+
+figure('units','inches','position',[1 1 5 5.5]);
+axes('units','inches','position',[0 0  4.7917 5.0556]); hold on;
+for i = 1:size(S,1)
+    plot(LMS(i,1),i,'ro','MarkerSize',8,'MarkerFaceColor','red');
+    plot(LMS(i,2),i,'go','MarkerSize',8,'MarkerFaceColor','green');
+    plot(LMS(i,3),i,'bo','MarkerSize',8,'MarkerFaceColor','blue');
+end
+set(gca,'Xtick',0:.2:1,'Xlim',[-.01 1]);
+set(gca,'Ytick',0:10:length(S));
+
+%%
+% here's some data captured from
+% Field, Greg D., et al. "Functional connectivity in the retina at the 
+% resolution of photoreceptors." Nature 467.7316 (2010): 673-677.
+% Figure 4H
+
+LM = [0.00588087	0.981433
+0.0528839	0.935085
+0.0881251	0.904969
+0.113988	0.874831
+0.182148	0.805303
+0.217411	0.765896
+0.292599	0.698706
+0.351353	0.64077
+0.412451	0.58284
+0.433597	0.564306
+0.501768	0.490132
+0.544065	0.450741
+0.576956	0.422943
+0.605169	0.390488
+0.649817	0.348779
+0.877781	0.123988
+0.901272	0.10546
+0.0694064	0.888665
+0.116431	0.833025
+0.210415	0.749619
+0.278603	0.668476
+0.299787	0.633682
+0.429155	0.459766
+0.480677	0.485437
+0.586451	0.374184
+0.605263	0.350999
+0.680511	0.258258
+0.856723	0.105356];
+
+S = 1-(sum(LM,2));
+LMS = sortrows([LM S],1);
+
+figure('units','inches','position',[1 1 5 5.5]);
+axes('units','inches','position',[0 0  4.7917 5.0556]); hold on;
+for i = 1:size(S,1)
+    plot(LMS(i,1),i,'ro','MarkerSize',8,'MarkerFaceColor','red');
+    plot(LMS(i,2),i,'go','MarkerSize',8,'MarkerFaceColor','green');
+    plot(LMS(i,3),i,'bo','MarkerSize',8,'MarkerFaceColor','blue');
+end
+set(gca,'Xtick',0:.2:1,'Xlim',[-.01 1]);
+set(gca,'Ytick',0:10:length(S));
+
+
+%%
+% A movie of a detection trial
+
+MAKEMOVIE = 1;
+nframespercycle = 3;
+ncycles = 20;
+bkgndrgb = [.5 .5 .5];
+gaborrgb = [0 0 .5];  % deltas
+gaborrgb = [0 .2 0];  % deltas
+
+phis = linspace(0,2*pi*ncycles,nframespercycle*ncycles+1);
+phis(end) = [];
+figure('units','inches','position',[1 1 4 3]);
+axes('units','inches','position',[0 0 4 3],'Visible','off','color',[.5 .5 .5])
+
+envelope = [linspace(0,1,round(length(phis)/4)) ones(1,round(length(phis)/2))];
+envelope = [envelope, linspace(1,0,length(phis)-length(envelope))];
+
+
+if (MAKEMOVIE)
+    clear M;
+end
+for i = 1:length(phis)
+    im = DrawGaborEdge(bkgndrgb, gaborrgb, [0 0 0], pi, 5, 2, 1, phis(i), 0, 0, 0, 0, .999, 5);
+    
+    image((im-.5)*envelope(i)+.5);
+
+    set(gca,'XTick',[],'YTick',[],'visible','off');
+    axis square;
+    drawnow;
+    M(i) = getframe(gcf);
+
+end
+
+if (MAKEMOVIE)
+    repeat = 1;     %default = 1
+    pSearch = 2;    %default = 0 trying 2
+    bSearch = 1;    %default = 1
+    reference = 1;  %default = 0
+    pixRange = 20;  %default = 10
+    iFrame = 8;     %default = 8
+    pFrame = 10;    %default = 10
+    bFrame = 25;    %default = 25
+    options = [repeat, pSearch, bSearch, reference, pixRange, iFrame, pFrame, bFrame];
+    mpgwrite(M, gray, 'gabor.mpg', options);
+end
+
+
+%%
+% Lens adjustments to fundamentals
+
+load den_lens_ss
+load T_cones_myss10;
+xlims = [380 720];
+
+figure; 
+subplot(2,1,1); hold on;
+plot([380:5:780],den_lens_ss,'k-','LineWidth',3);
+set(gca,'XLim',xlims,'Ylim',[0 6]);
+subplot(2,1,2); hold on;
+plot([380:5:780],T_cones_ss10(:,1),'r-','LineWidth',3);
+plot([380:5:780],T_cones_ss10(:,2),'g-','LineWidth',3);
+plot([380:5:780],T_cones_ss10(:,3),'b-','LineWidth',3);
+set(gca,'XLim',xlims);
+
+T_nolens = T_cones_ss10./repmat(10.^-den_lens_ss,[1,3]);
+
+figure; % Extra thin lens
+subplot(2,1,1); hold on;
+lens = den_lens_ss./den_lens_ss(5);
+plot([380:5:780],lens,'k-','LineWidth',3);
+set(gca,'XLim',xlims,'Ylim',[0 6]);
+subplot(2,1,2); hold on;
+funds = T_nolens.*repmat(10.^-lens,[1,3]);
+funds = funds./repmat(max(funds),size(funds,1),1);
+plot([380:5:780],funds(:,1),'r-','LineWidth',3);
+plot([380:5:780],funds(:,2),'g-','LineWidth',3);
+plot([380:5:780],funds(:,3),'b-','LineWidth',3);
+set(gca,'XLim',xlims);
+
+figure; % Extra thick lens
+subplot(2,1,1); hold on;
+lens = den_lens_ss.*1.5;
+plot([380:5:780],lens,'k-','LineWidth',3);
+set(gca,'XLim',xlims,'Ylim',[0 6]);
+subplot(2,1,2); hold on;
+funds = T_nolens.*repmat(10.^-lens,[1,3]);
+funds = funds./repmat(max(funds),size(funds,1),1);
+plot([380:5:780],funds(:,1),'r-','LineWidth',3);
+plot([380:5:780],funds(:,2),'g-','LineWidth',3);
+plot([380:5:780],funds(:,3),'b-','LineWidth',3);
+set(gca,'XLim',xlims);
+
+
+%%
+% Spinning movie of L+M (+S) cell
+% K082109009 is a good choice.
+
+filename = 'K082109009.nex';  % planar luminance cell looks good
+load ('den_lens_ss');
+lensat400nm = den_lens_ss(5);
+lensat400nm = 1;
+plotlims = [.1 .1 1];
+PLOTPLANES = 1;
+MAKEMOVIE = 1;
+
+% Getting data ready
+stro = nex2stro(findfile(filename));
+lmsidxs = [find(strcmp(stro.sum.trialFields(1,:),'lcont'))...
+    find(strcmp(stro.sum.trialFields(1,:),'mcont'))...
+    find(strcmp(stro.sum.trialFields(1,:),'scont'))];
+% -------------------------------
+% Converting cone contrasts in nex file to 10 deg fundmentals.
+% Must go through excitations first - can't just transform contrasts.
+% -------------------------------
+% fundamentals = stro.sum.exptParams.fundamentals;
+% fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+% lenstransmittance = 1./(10.^(den_lens_ss));
+% fundnopig = fundamentals./repmat(lenstransmittance,1,3);
+% fundnopig = fundnopig./repmat(max(fundnopig),81,1);
+
+
+load ('T_cones_myss10');
+load ('den_lens_ss');
+lenstransmittance = 1./(10.^(den_lens_ss));
+fundnopig = T_cones_ss10./repmat(lenstransmittance,1,3);
+fundnopig = fundnopig./repmat(max(fundnopig),size(fundnopig,1),1);
+
+% load('den_mac_ss');
+% macpigtransmittance = 1./(10.^(den_mac_ss./max(den_mac_ss)*0.095));
+% lenstransmittance = 1./(10.^(den_lens_ss));
+% fundnopig = fundamentals./repmat(macpigtransmittance,1,3)./repmat(lenstransmittance,1,3);
+% fundnopig = fundnopig./repmat(max(fundnopig),81,1);
+
+mon_spd = stro.sum.exptParams.mon_spd;
+mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+fundamentals =  reshape(stro.sum.exptParams.fundamentals,81,3);
+Moriginal = fundamentals'*mon_spd;
+bkgndrgb = stro.sum.exptParams.bkgndrgb;
+out = NTpreprocess(stro,0,Inf);
+scaled = out(:,[2 3 4]).*repmat(out(:,5),1,3);
+Loog = logical(out(:,7));
+wls = [380:5:780];
+
+% making new fundamentals
+lenstransmittance = 1./10.^(den_lens_ss./den_lens_ss(5)*lensat400nm);
+tmpfunds = fundnopig.*repmat(lenstransmittance,1,3);
+tmpfunds = tmpfunds./repmat(max(tmpfunds),81,1);
+Mnew = tmpfunds'*mon_spd;
+tmpscaled = ConvertConeContrastBasis(Moriginal, Mnew, bkgndrgb, scaled);
+[planeparams, planeSSE, quadparams, quadSSE, xformmat] = NTsurfacefit(tmpscaled, Loog);
+coneweights = (xformmat*planeparams)';
+if (sign(coneweights(1)) == -1)
+    coneweights = -coneweights;
+end
+normconeweights = coneweights./sum(abs(coneweights))
+
+figure; axes; hold on;
+set(gcf,'Position',[131   537   430   430]);
+set(gca,'XTick',[],'YTick',[],'ZTick',[],'Visible','off');
+set(gca,'CameraViewAngleMode','manual')
+
+
+plot3(tmpscaled(~Loog,1),tmpscaled(~Loog,2),tmpscaled(~Loog,3),'ko','MarkerSize',5,'MarkerFaceColor','black')
+plot3(-tmpscaled(~Loog,1),-tmpscaled(~Loog,2),-tmpscaled(~Loog,3),'ko','MarkerSize',5,'MarkerFaceColor','black')
+h = plot3([zeros(sum(Loog),1) tmpscaled(Loog,1)]',[zeros(sum(Loog),1) tmpscaled(Loog,2)]',[zeros(sum(Loog),1) tmpscaled(Loog,3)]','-');
+set(h,'Color',[.8 .8 .8]);
+h = plot3([zeros(sum(Loog),1) -tmpscaled(Loog,1)]',[zeros(sum(Loog),1) -tmpscaled(Loog,2)]',[zeros(sum(Loog),1) -tmpscaled(Loog,3)]','-');
+set(h,'Color',[.8 .8 .8]);
+set(gca,'View',[-138 22]);
+set(gca,'Xlim',[-.1 .1],'Ylim',[-.1 .1],'Zlim',[-1 1])
+%axis vis3d
+
+
+if (PLOTPLANES)
+    % Plotting plane fits
+    [x,y,z] = meshgrid(linspace(-plotlims(1),plotlims(1),50),linspace(-plotlims(2),plotlims(2),50),linspace(-plotlims(3),plotlims(3),50));
+    v = abs(x.*coneweights(1)+y.*coneweights(2)+z.*coneweights(3));
+    fv = isosurface(x,y,z,v,1);
+    
+    % added by zack
+    vertCounts = hist(fv.faces(:), length(fv.vertices)); % vertex count
+    edgeVerts = [find(vertCounts==1) find(vertCounts==2) find(vertCounts==3)]; % get vertices that were only used 1-3 times
+    
+    % separate the vertices by plane
+    p1 = []; p2 = [];
+    for j = 1:length(edgeVerts)
+        if coneweights*fv.vertices(edgeVerts(j),:)' > 0 % the LHS will be ±1
+            p1 = [p1; edgeVerts(j)];
+        else
+            p2 = [p2; edgeVerts(j)];
+        end
+    end
+    % get the center point of both planes
+    center1 = mean(fv.vertices(p1,:));
+    center2 = mean(fv.vertices(p2,:));
+    
+    % thetas for each edge point about the center (per plane)
+    theta1 = atan2(fv.vertices(p1,2)-center1(2),fv.vertices(p1,1)-center1(1));
+    theta2 = atan2(fv.vertices(p2,2)-center2(2),fv.vertices(p2,1)-center2(1));
+    
+    % sort 'em
+    [~,sortorder1] = sort(theta1);
+    [~,sortorder2] = sort(theta2);
+    
+    ppoints1 = fv.vertices(p1(sortorder1),:);
+    ppoints2 = fv.vertices(p2(sortorder2),:);
+    
+    % plot 'em
+    h = patch(ppoints1(:,1),ppoints1(:,2),ppoints1(:,3),[0 1 0]);
+    set(h,'FaceAlpha',0.5,'EdgeAlpha',0,'EdgeColor','none','LineWidth',1);
+    h = patch(ppoints2(:,1),ppoints2(:,2),ppoints2(:,3),[0 1 0]);
+    set(h,'FaceAlpha',0.5,'EdgeAlpha',0,'EdgeColor','none','LineWidth',1);
+end
+
+set(gca,'View',[52 2])
+
+if (MAKEMOVIE)
+    clear M;
+end
+% views = [linspace(52,360,20); linspace(4,88,20)];
+% for i = 1:size(views,2)
+%     set(gca,'View',views(:,i));
+%     M(i) = getframe(gcf);
+% end
+% 
+% if (MAKEMOVIE)
+%     repeat = 1;     %default = 1
+%     pSearch = 1;    %default = 0 trying 2
+%     bSearch = 1;    %default = 1
+%     reference = 1;  %default = 0
+%     pixRange = 20;  %default = 10
+%     iFrame = 8;     %default = 8
+%     pFrame = 10;    %default = 10
+%     bFrame = 25;    %default = 25
+%     options = [repeat, pSearch, bSearch, reference, pixRange, iFrame, pFrame, bFrame];
+%     mpgwrite(M, gray, 'spinningsurface1.mpg', options);
+% end
+
+
+set(gca,'Xlim',[-.2 1.2],'Ylim',[-.2 1.2],'Zlim',[-.2 1.2])
+set(gcf,'Position',[131   537   430   430]);
+set(gca,'XTick',[],'YTick',[],'ZTick',[],'Visible','off');
+set(gca,'CameraViewAngleMode','manual')
+%axis equal
+set(gca,'View',[35 22])
+viewangles = [0:3:520]+35;
+viewangles(end) = [];
+
+clear M;
+for i = 1:length(viewangles)
+    set(gca,'View',[viewangles(i) 22])
+    M(i) = getframe(gcf);
+end
+repeat = 1;     %default = 1
+pSearch = 1;    %default = 0
+bSearch = 1;    %default = 1
+reference = 1;  %default = 0
+pixRange = 10;  %default = 10
+iFrame = 8;     %default = 8
+pFrame = 10;    %default = 10
+bFrame = 25;    %default = 25
+options = [repeat, pSearch, bSearch, reference, pixRange, iFrame, pFrame, bFrame];
+mpgwrite(M, gray, 'rotcube.mpg', options);
+%%
+%% Above, stuff for presentation in 2014
+%% Below, stuff for presentation in 2019
+%%
+% Rasters for an L+M only complex cell and a color-complex cell (L+M and
+% L-M sensitive). See Word document 
+filename1 = 'S020310001.nex'; % Luminance only
+filename2 = 'S090310001.nex'; % Pancolor
+
+filename = filename2;
+stro = nex2stro(findfile(filename));
+protocols = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'protocol'));
+stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_on'));
+stimoff_t= stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_off'));
+spikeidx = find(strncmp(stro.sum.rasterCells,'sig',3));
+spikenames = stro.sum.rasterCells(spikeidx);
+Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'lcont'));
+Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'mcont'));
+Scc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'scont'));
+
+Lprotocol = protocols == 4;
+colordirections = [Lcc Mcc Scc];
+uniquecolordirs = unique(colordirections(Lprotocol,:),'rows');
+Llum1 = (uniquecolordirs(:,1) == uniquecolordirs(:,2)) & (uniquecolordirs(:,3) == 0);
+Llum = Lcc == uniquecolordirs(Llum1,1) & Mcc == uniquecolordirs(Llum1,2) & Scc == uniquecolordirs(Llum1,3);
+
+Lrg1 = (uniquecolordirs(:,1) == -1*uniquecolordirs(:,2)) & (uniquecolordirs(:,3) == 0);
+Lrg = Lcc == uniquecolordirs(Lrg1,1) & Mcc == uniquecolordirs(Lrg1,2) & Scc == uniquecolordirs(Lrg1,3);
+
+% Doing the plotting
+figure('position',[847 185 400 612]);
+for i = 1:2 % two color directions
+    if i == 1
+        L = Llum;
+    else
+        L = Lrg;
+    end
+    axes('position',[.13 .11+.2*(i-1) .775 .1]); hold on;
+    counter = 0;
+    for k = 1:sum(L)
+        trlidx = find(L,k);
+        trlidx = trlidx(end);
+        sp = stro.ras{trlidx,spikeidx}-stimon_t(trlidx);
+        sp(sp < -0.2) = [];
+        plot([sp sp]',[counter*ones(length(sp),1) counter*ones(length(sp),1)+.5]','k-','LineWidth',2);
+        %plot([stimoff_t(trlidx)-stimon_t(trlidx) stimoff_t(trlidx)-stimon_t(trlidx)],[counter counter+1],'m-','Linewidth',1);
+        %plot([0 0],[counter counter+1],'m-','Linewidth',1);
+        counter = counter+1;
+    end
+    set(gca,'Xlim',[-.2 1.2],'Ylim',[0 counter],'Ytick',[],'tickdir','out');
+    title(filename);
+end
+set(gcf,'renderer','painters');
+
+%%
+%  GWN white noise stimulus
+
+MAKEMOVIE = 1;
+moviefilename = 'GWN_stimulus';
+figure; axes('units','normalized','position',[0 0 .7 1]);
+nframes = 100;
+
+mat = normrnd(.5, .1, 10, 10, 3);
+mat(mat>1) = 1;
+mat(mat<0) = 0;
+h = image(mat);
+set(h, 'CDataMapping','scaled');
+
+set(gca,'Xtick',[],'Ytick',[],'Ztick',[],'Box','off');
+drawnow;
+set(gca,'Projection','Perspective')
+set(gca,'View',[-50 40],'Color',[.5 .5 .5])
+if (MAKEMOVIE)
+    writerObj = VideoWriter(moviefilename);
+    open(writerObj);
+    for i = 1:nframes
+        
+        mat = normrnd(.5, .15, 10, 10, 3);
+        mat(mat>1) = 1;
+        mat(mat<0) = 0;
+        h = image(mat);
+        set(h, 'CDataMapping','scaled');
+        
+        set(gca,'View',[-76.8000   68.8000],'Visible','off')
+        set(gca,'Color',[.5 .5 .5])
+        set(gcf,'Color',[.5 .5 .5])
+        set(gca,'Xtick',[],'Ytick',[],'Ztick',[],'Box','off');
+        drawnow;
+        frame = getframe(gcf);
+        writeVideo(writerObj,frame);
+    end
+    close(writerObj);
+end
+
+%%
+% Subunit white noise movie
+MAKEMOVIE = 1;
+moviefilename = 'GWN_subunit';
+figure; axes('units','normalized','position',[0 0 .7 1]);
+nframes = 100;
+
+stro = nex2stro(findfile('M090817001.nex')); % linear BY cell
+mask_vect = stro.ras{end,9};
+mask = reshape(mask_vect,sqrt(length(mask_vect)),sqrt(length(mask_vect)))+1;
+
+h = image(mask);
+set(h, 'CDataMapping','direct');
+
+set(gca,'Xtick',[],'Ytick',[],'Ztick',[],'Box','off');
+drawnow;
+set(gca,'Projection','Perspective')
+set(gca,'View',[-50 40],'Color',[.5 .5 .5])
+if (MAKEMOVIE)
+    writerObj = VideoWriter(moviefilename);
+    open(writerObj);
+    for i = 1:nframes
+        cmap = [.5 .5 .5; normrnd(.5,.1,2,3)];
+        cmap(cmap < 0) = 0;
+        cmap(cmap > 1) = 1;
+        colormap(cmap);
+        set(gca,'View',[-76.8000   68.8000],'Visible','off')
+        set(gca,'Color',[.5 .5 .5])
+        set(gcf,'Color',[.5 .5 .5])
+        set(gca,'Xtick',[],'Ytick',[],'Ztick',[],'Box','off');
+        drawnow;
+        frame = getframe(gcf);
+        writeVideo(writerObj,frame);
+    end
+    close(writerObj);
+end
+
+
+%%
+% A few stimuli that were on or near the isoresponse contour
+
+stro = nex2stro(findfile('M090817001.nex')); % linear BY cell
+
+
+%%
+% L+M and L-M gratings. Sample stimuli.
+
+colordir = [.07 -.07 0];
+colordir = [.5 .5 0];
+
+
+M = [0.0761    0.1524    0.0218;
+    0.0275    0.1582    0.0321;
+    0.0024    0.0118    0.1220];  % Something standard; I think this is Dell 4
+bkgndrgb = [.5 .5 .5];
+bkgndlms = M*bkgndrgb';
+gaborrgb = inv(M)*(bkgndlms.*(1+colordir'));
+gaborrgb_delta = gaborrgb-bkgndrgb;
+
+x= 1:100;
+grating = repmat(sin(x/3),length(x),1);
+gratingvol = repmat(grating,1,1,3);
+for i = 1:3
+    gratingvol(:,:,i) = gratingvol(:,:,i)*gaborrgb_delta(i)+bkgndrgb(i);
+end
+image(gratingvol);
+axis square;
+set(gca,'Visible','off');

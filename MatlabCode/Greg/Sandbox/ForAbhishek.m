@@ -1,0 +1,1254 @@
+
+% Stuff for Abhishek
+% Contents
+% Section 0) Not sure what this was supposed to do
+% Section 1) Hacking around with the Monier and Shevell model
+%
+% Section 2) Simulating  single pair of Munsell chips under different illuminants. Assuming
+% a single mean adaptation state. Seeing how the "subunit activations" to a
+% simulated double-opponent cell change with changes in daylight spectra.
+%
+% Section 3) Similar to section 2 but now using many random pairs of
+% surfaces (under the Judd daylight model). Comparing the trajectories of a
+% simulated blue-orange double oppponent cell (L-M-S) and simulated
+% lime-magenta double opponent cell (L-M+S). This might be useful.
+%
+% Section 4) Looking at how well a double-opponent cell that takes a
+% linear combination of quantities like cone contrast (cone contrast is a
+% special case) could discount the illuminant. L-M only. Based on the
+% observation that the response of the simulated DO neuron should be a
+% linear function of two quantities, which are differences in cone
+% excitation. For surface pairs of similar brightness (cone excitation)
+% daylight illumination changes affect these quantities linearly. This
+% breaks down when one surface is much brighter than the other.
+%
+% Section 5) Simulating Munsell chips under daylight illumination.
+% Projecting cone contrast trajectories onto an LMS weight vector and
+% calculating an "F" statistic: how much does the response of a simulated
+% a double-opponent cell change across illuminations (within variance) and
+% across Munsell chip pairs (between variance).
+%
+% Section 6) Simulating and trying to fit lines in log(r), theta
+%
+% Section 7) FFT analysis of spatial STA to identify single opponent cells.
+%
+% Section 8) Zscoring STAs and using a chi-squared significance test.
+%
+% Section 9) Trying iSTAC on time/color STA.
+%
+% Section 10) Getting the background luminance from a whitenoise data file
+%
+% Section 11) Which frequency bands end up in the lowest bin when we do an 
+% FFT on the STA (or spatial weighting function).
+%
+% Section 12) Taking RGB values from STAs and binning them into octant bins
+% (e.g. R+, G+, B+). Finding the bin with the maximal count and looking at
+% the bin opposite. For a DO cell, this bin should contain more pixels than
+% expected by chance.
+%
+% Section 13) How much variability in STA RGB projections do we pick up with a
+% single eigenvector? How about sets of two half-wave rectfied projections?
+%
+%%
+% Section 0
+% Looking at pairs of lights that would activate a double-opponent cell
+% identically but are perceptually different. We're going to assume that
+% what the double opponent cell does is to compute cone contrast relative
+% to the gray background for L- and M-cones, take the difference (within a
+% subunit) and then add excitatons (one is negative) between subunits.
+stro = nex2stro(findfile('K032608005.nex')); % lum DS
+
+spds = reshape(stro.sum.exptParams.mon_spd,length(stro.sum.exptParams.mon_spd)/3,3);
+spds = SplineSpd([380:4:780]',spds,[380:5:780]');
+funds = reshape(stro.sum.exptParams.fundamentals,length(stro.sum.exptParams.fundamentals)/3,3);
+M = funds'*spds;
+gammaTable = stro.sum.exptParams.gamma_table;
+gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+gammaTable1 = interp1(linspace(0,255,256),gammaTable,linspace(0,255,65536), 'spline');
+invgamma = InvertGamma(gammaTable, 0);
+
+bkgndidxs = strncmp('bkgnd',stro.sum.trialFields(1,:),5);
+bkgndRGB = unique(stro.trial(:,bkgndidxs),'rows');
+bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+bkgndrgb = [.5 .5 .5]'; % for ease of visualization
+bkgndlms = M*bkgndrgb;
+
+%weights = mkbasis([1 -1 0; -1 1 0 ]'); % first column is left subunit (L-M), second column is right subunit, (M-L)
+weights = mkbasis([0 0 1; 0 0 -1 ]'); % first column is left subunit (L-M), second column is right subunit, (M-L)
+
+s1 = .3; % Representing the stimulus as a scalar multiple of the weights, since that's how WNSubunit works.
+s2 = -.1;
+stim_cc = weights*diag([s1; s2]); % two column vectors now. This is the stimulus is cone contrast units.
+
+% Now calculating response
+response  = sum(sum(stim_cc.*weights));
+% and rendering the image
+s1_rgb = inv(M)*bkgndlms.*(1+stim_cc(:,1));
+s2_rgb = inv(M)*bkgndlms.*(1+stim_cc(:,2));
+if any(s1_rgb>1) || any(s1_rgb<0) || any(s2_rgb>1) || any(s2_rgb<0)
+   disp('out of gamut')
+else
+    figure; axes; hold on;
+    im = repmat(permute(bkgndrgb,[3 2 1]),11, 11);
+    im(3:5,3:8,:) = repmat(permute(s1_rgb,[3 2 1]),3,6);
+    im(6:8,3:8,:) = repmat(permute(s2_rgb,[3 2 1]),3,6);
+    image(im);
+    axis image;
+    title(['Response is ',num2str(response)]);
+end
+
+%%
+% Section 1
+% Hacking around with the Monnier and Shevell 2004 model
+
+pixperhalfcycle = 10;
+pixmargin = 50;
+ncycles = 5;
+sigma_c = 12;
+sigma_s = 2*sigma_c;
+
+figure;
+% Patterned background #1
+x = [1 -1];
+x = repmat(x, pixperhalfcycle, ncycles);
+x = x(:);
+x = [zeros(pixmargin,1); x; zeros(pixmargin,1)];
+x(91:100) = 0;
+
+y = normpdf([-3*sigma_s:1:3*sigma_s],0,sigma_c)-...
+            normpdf([-3*sigma_s:1:3*sigma_s],0,sigma_s)
+subplot(2,2,4); hold on;
+plot(x,'b-')
+plot(conv(x,y,'same'),'k-');
+title('Patterned background #1')
+
+% Now a uniform lime background
+xx = x;
+xx(pixmargin+1:91) = -1;
+xx(110:end-pixmargin) = -1;
+subplot(2,2,2); hold on;
+plot(xx,'b-');
+plot(conv(xx,y,'same'),'k-');
+title('Lime background');
+
+% Now a uniform purple background
+xx = x;
+xx(pixmargin+1:91) = 1;
+xx(100:end-pixmargin) = 1;
+subplot(2,2,1); hold on;
+plot(xx,'b-')
+plot(conv(xx,y,'same'),'k-')
+title('Purple background');
+
+% Patterned background #2
+x = [-1 1];
+x = repmat(x, pixperhalfcycle, ncycles);
+x = x(:);
+x = [zeros(pixmargin,1); x; zeros(pixmargin,1)];
+x(91:100) = 0;
+
+subplot(2,2,3); hold on;
+plot(x,'b-')
+plot(conv(x,y,'same'),'k-')
+title('Patterned background #2')
+
+
+% Now getting rid of the test ring
+figure;
+% Now a uniform lime background
+xx = x;
+xx(pixmargin+1:end-pixmargin) = -1;
+subplot(2,2,2); hold on;
+plot(xx,'b-');
+plot(conv(xx,y,'same'),'k-');
+title('Lime background');
+
+% Now a uniform purple background
+xx = x;
+xx(pixmargin+1:end-pixmargin) = 1;
+subplot(2,2,1); hold on;
+plot(xx,'b-')
+plot(conv(xx,y,'same'),'k-')
+title('Purple background');
+
+% Now a delta function just so we can see what 'y' looks like
+xx = zeros(size(x));
+xx(round(length(xx)/2)) = 1;
+subplot(2,2,3); hold on;
+plot(conv(xx,y,'same'),'k-')
+title('Weighting function');
+
+%%
+% Section 2
+% Playing around with Munsell chip reflectance spectra and daylight
+% illumination spectra. These illumination spectra differ a lot in overall
+% intensity. In this simulation, the denominator changes across illuminants
+% meaing that the adaptation level of the system changes between stimulus
+% presentations (unlike in Abhishek's experiment). Consequently, the
+% stimulation of the two subunits is nearly fixed across illuminants.
+%
+% Model double-opponent cell responds to differences in cone contrast
+
+% daylight.mat and munsell380_800_1.mat should be in Documents/MATLAB
+sky = load('sky.asc');
+baSO4 = load('baSO4.asc');
+load T_cones_smj10
+load munsell380_800_1.mat
+munsell = SplineSpd([380:800]',munsell,[380:5:780]');
+sky = SplineSpd([390:4:1070]',sky',[380:5:780]');
+spectrallights = eye(81);
+randomlights = max(0,normrnd(mean(sky(:)),std(sky(:)),size(sky)));
+whichchips = unidrnd(size(munsell,2),2,1);
+whichchips = [525 1236]'; % A good example pair
+
+illuminants = sky./repmat(max(sky),size(sky,1),1); % normalized amplitude
+reflectance1 = munsell(:,whichchips(1))./max(munsell(:,whichchips(1)));
+reflectance2 = munsell(:,whichchips(2))./max(munsell(:,whichchips(2)));
+figure; axes; hold on;
+plot([380:5:780],reflectance1);
+plot([380:5:780],reflectance2);
+
+coneexcitations = [];
+for i = 1:size(illuminants,2) % there's 22 of these
+	light1 = illuminants(:,i).*reflectance1;
+    light2 = illuminants(:,i).*reflectance2;
+    light0 = illuminants(:,i)./mean([reflectance1; reflectance2]); % "background" changes with each illuminant
+
+    coneexcitations = cat(3, coneexcitations, T_cones_smj10*[light1 light2 light0]);
+end
+
+figure; axes; hold on;
+
+for i = 1:size(illuminants,2)
+    l = squeeze(coneexcitations(1,:,i));
+    m = squeeze(coneexcitations(2,:,i));
+    s = squeeze(coneexcitations(3,:,i));
+    l_norm = (l-l(3))./l(3);
+    m_norm = (m-m(3))./m(3);
+    s_norm = (s-s(3))./s(3);
+    
+   %plot(l_norm(1), l_norm(2),'r.');
+   % plot(m_norm(1), m_norm(2),'g.');
+    % plot(l_norm(1)-m_norm(1), m_norm(2)-l_norm(2),'b.');
+     plot(10*(m_norm(1)-l_norm(1)), 10*(l_norm(2)-m_norm(2)),'ko'); 
+   %  plot(m(1)-l(1), l(2)-m(2),'ro')
+    % plot(max(0,m_norm(1)-l_norm(1)), max(0,l_norm(2)-m_norm(2)),'b.');
+     %plot(-1*max(0,l_norm(1)-m_norm(1)), -1*max(0,m_norm(2)-l_norm(2)),'r.');
+
+
+     plot(s_norm(1)-(l_norm(1)+m_norm(1)), s_norm(2)-(l_norm(2)+m_norm(2)),'bo');
+
+    % plot((l_norm(1)-m_norm(1))/(l_norm(1)+m_norm(1)), (l_norm(2)-m_norm(2))/(l_norm(2)+m_norm(2)),'k.');
+end
+plot(0,0,'k*')
+xlabel('Activation of subunit 1');
+ylabel('Activation of subunit 2');
+
+%%
+% Section 3
+% Many surfaces under daylight illuminants. Using Judd daylight model.
+% In this simulation there is only one "background light" aross all
+% illuminants, so the adaptation state stays constant, like in Abhishek's
+% experiment.
+% daylight.mat and munsell380_800_1.mat should be in Documents/MATLAB
+load T_cones_smj10
+load sur_nickerson.mat
+load B_cieday
+munsell = sur_nickerson;
+wls = [380:5:780];
+SCRAMBLEILLUM = false; % randomize power across wavelengths and illuminants
+SCRAMBLEREFLECTANCES = false; % randomize reflectance across wavelengths
+
+% Coefficients for the daylight spectra
+% (from Judd et al. 1964 table 3)
+daylight_coefficients = [-1.14 .677; 
+    -0.784 -0.195;
+    -0.293 -0.698;
+    0.145 -0.752;
+    1.005 -0.378];
+nillums =30;
+coeffs = linspace(daylight_coefficients(1,1),daylight_coefficients(end,1),nillums);
+daylight_coefficients_interp = [coeffs', interp1(daylight_coefficients(:,1),...
+    daylight_coefficients(:,2),...
+    coeffs,'spline')'];
+% Sanity checking
+%figure; axes; hold on;
+%plot(daylight_coefficients(:,1),daylight_coefficients(:,2),'m*');
+%plot(daylight_coefficients_interp(:,1),daylight_coefficients_interp(:,2),'b.');
+
+illuminants = repmat(B_cieday(:,1),1,nillums)+B_cieday(:,[2 3])*daylight_coefficients_interp';
+if SCRAMBLEILLUM
+    illuminants = reshape(illuminants(randperm(numel(illuminants))),size(illuminants));
+end
+niter = 100;
+figure; subplot(2,1,1); hold on;
+unitvectors_l = []; unitvectors_s = []; 
+eigenvalues_l = []; eigenvalues_s = [];
+whichchips = []; variances = [];
+for iter = 1:niter
+    whichchips(iter,:) = [1 1];
+    while whichchips(iter,1) == whichchips(iter,2) % Avoiding same chip on boths sides
+        whichchips(iter,:) = unidrnd(size(munsell,2),2,1)';
+    end
+    reflectance1 = munsell(:,whichchips(iter,1));
+    reflectance2 = munsell(:,whichchips(iter,2));
+    if SCRAMBLEREFLECTANCES
+        reflectance1 = reflectance1(randperm(length(reflectance1)));
+        reflectance2 = reflectance2(randperm(length(reflectance2)));
+    end
+    coneexcitations = [];
+    light1 = illuminants.*reflectance1;
+    light2 = illuminants.*reflectance2;
+    % Different possibilities for "background light"
+    % Think about an eye movement bringing the stimulus onto the RF
+    % To compare against Abhishek's data we want the adaptation state to be
+    % constant (?) We don't want to simulate a change in adaptation that
+    % takes a day to evolve. The thing in the denominator should stay
+    % constant (?)
+    light0 = illuminants.*mean([reflectance1; reflectance2]); % A family of illuminants
+    %light0 = (light1+light2)/2; % trivially straight lines
+    % Cone-specific adaptation should not involve any spatial integration
+    light0 = repmat(mean(illuminants,2),1,nillums); % a single mean illuminant
+    
+    lms_1 = T_cones_smj10*light1;
+    lms_2 = T_cones_smj10*light2;
+    lms_0 = T_cones_smj10*light0;
+    
+    coneexcitations = cat(3, lms_1',lms_2',lms_0'); % rows = illums, cols = LMS, planes = light1, light2, adaptating light
+    coneexcitations = permute(coneexcitations,[2 3 1]); % now each plane is a different illumination, The third column is LMS at the adaptated state
+    
+   % LMsignals=[]; Ssignals=[]; LandMsignals=[];
+    blue_orange_signals = []; lime_magenta_signals = [];
+    for i = 1:size(illuminants,2)
+        l = squeeze(coneexcitations(1,:,i));
+        m = squeeze(coneexcitations(2,:,i));
+        s = squeeze(coneexcitations(3,:,i));
+        l_norm = (l-l(3))./l(3);
+        m_norm = (m-m(3))./m(3);
+        s_norm = (s-s(3))./s(3);
+        
+        % If I normalize to the net cone excitation produced by the two
+        % surfaces (l(1)+l(2)) then there's only 1 df: the cone contrast in subunit 1 is
+        % -1*the cone contrast in subunit 2. Dividing by something else is
+        % critical.
+        %l_norm = (l-(l(1)+l(2)))./l(3);
+        %m_norm = (m-(m(1)+m(2)))./m(3);
+        %s_norm = (s-(s(1)+s(2)))./s(3);
+        
+       % LMsignals = [LMsignals; l_norm(1)-m_norm(1) l_norm(2)-m_norm(2)];
+        %LMsignals = [LMsignals; l_norm(1)+m_norm(1) l_norm(2)+m_norm(2)];
+        %Ssignals = [Ssignals;s_norm(1)-(l_norm(1)+m_norm(1))/2 s_norm(2)-(l_norm(2)+m_norm(2))/2]; 
+        blue_orange_signals = [blue_orange_signals;(s_norm(1)+m_norm(1))/2-l_norm(1) (s_norm(2)+m_norm(2))/2-l_norm(2)];
+        lime_magenta_signals = [lime_magenta_signals;(s_norm(1)+l_norm(1))/2-m_norm(1) (s_norm(2)+l_norm(2))/2-m_norm(2)];
+       % LandMsignals = [LandMsignals; l_norm(1)-l_norm(2) m_norm(2)-m_norm(1)];
+    end
+    % For blue-orange, as signal increases on one side of the edge, it also
+    % increases on the other side of the edge. This is less true for
+    % lime-magenta.
+    plot(blue_orange_signals(:,1),blue_orange_signals(:,2),'b.-');
+    plot(lime_magenta_signals(:,1),lime_magenta_signals(:,2),'m.-');
+    [v_l,d_l] = eig(cov(blue_orange_signals));
+    unitvectors_l = [unitvectors_l; v_l(:,2)'];
+    eigenvalues_l = [eigenvalues_l; d_l(2,2) d_l(1,1)];
+    
+    [v_s,d_s] = eig(cov(lime_magenta_signals));
+    unitvectors_s = [unitvectors_s; v_s(:,2)']; % switching default order: now largest to smallest
+    eigenvalues_s = [eigenvalues_s; d_s(2,2) d_s(1,1)];
+    
+    % It is not quite the case that an illuminant change increases the L-M-S 
+    % (where L, M, and S represent cone excitation difference from background) 
+    % in one subunit by a fixed amount and decreases this quantity by the
+    % same fixed amount in the other subunit, but it comes close.
+    % Quantifying this difference for L-M-S and L-M+S.
+    % First taking each "trajectory" and centering it so that we can
+    % project it on to vectors [1 1] and [1 -1] to see how true it is that
+    % the signal strength increases symmetrically on both sides of the
+    % edge.
+    centered_blue_orange = blue_orange_signals-repmat(mean(blue_orange_signals),size(blue_orange_signals,1),1);
+    centered_lime_magenta = lime_magenta_signals-repmat(mean(lime_magenta_signals),size(lime_magenta_signals,1),1);
+    blue_orange_var_inline = var(centered_blue_orange*[1/sqrt(2); 1/sqrt(2)]);
+    blue_orange_var_orth = var(centered_blue_orange*[1/sqrt(2); -1/sqrt(2)]);
+    lime_magenta_var_inline = var(centered_lime_magenta*[1/sqrt(2); 1/sqrt(2)]);
+    lime_magenta_var_orth = var(centered_lime_magenta*[1/sqrt(2); -1/sqrt(2)]);
+    variances = [variances; blue_orange_var_inline blue_orange_var_orth lime_magenta_var_inline lime_magenta_var_orth];
+end
+plot(0,0,'k*')
+axis equal
+axis square
+xlabel('surface 1')
+ylabel('surface 2')
+set(gca,'xlim',[-.4 .3],'ylim',[-.4 .3]);
+
+%figure; 
+%subplot(2,2,1);
+%[th,r] = rose(atan(unitvectors_l(:,2)./unitvectors_l(:,1)),100); % direction of largest eigenvector
+%h = polar(th,r,'b-');
+%subplot(2,2,2);
+%[th,r] = rose(atan(unitvectors_s(:,2)./unitvectors_s(:,1)),100);
+%h = polar(th,r,'m-');
+
+% figure; axes('Units','inches','Position',[1 1 4 4]); hold on;
+% diffs=(eigenvalues_l(:,1)./sum(eigenvalues_l,2))-(eigenvalues_s(:,1)./sum(eigenvalues_s,2));
+% p = signrank(diffs);
+% loglog(eigenvalues_l(:,1)./sum(eigenvalues_l,2),eigenvalues_s(:,1)./sum(eigenvalues_s,2),'.')
+% axis equal;
+% xlabel('orange-cyan straightness')
+% ylabel('lime-magenta straightness')
+% title(['med(x-y):',num2str(median(diffs)),' p=',num2str(p)]);
+% x = get(gca,'xlim');
+% y = get(gca,'ylim');
+% set(gca,'xlim',[min(x(1),y(1)) 1])
+% set(gca,'ylim',[min(x(1),y(1)) 1])
+% plot([min(x(1),y(1)) 1],[min(x(1),y(1)) 1],'k:');
+
+% ----------------
+% How well described are these trajectories by a line of slope -1?
+subplot(2,1,2); hold on;
+ratio1 = log10(variances(:,2))-log10(variances(:,1));
+ratio2 = log10(variances(:,4))-log10(variances(:,3));
+bins = linspace(min([ratio1; ratio2]),max([ratio1; ratio2]),20);
+[n1,x] = hist(ratio1,bins);
+[n2,x] = hist(ratio2,bins);
+h = bar(x,[n1;n2]');
+set(h(1),'FaceColor','blue');
+set(h(2),'FaceColor','magenta');
+xlabel('log variance ratio'); ylabel('count');
+legend({'blue-orange','lime-magenta'},'location','northwest')
+
+% Trying to find an extreme example
+% "l" is orange-cyan and "s" is lime-magenta
+idx = find(eigenvalues_s(:,2)./sum(eigenvalues_s,2) == max(eigenvalues_s(:,2)./sum(eigenvalues_s,2)));
+F = variances(:,4)./variances(:,3);
+idx = find(F == max(F));
+reflectance1 = munsell(:,whichchips(idx,1));
+reflectance2 = munsell(:,whichchips(idx,2));
+figure; subplot(1,2,1); hold on;
+plot(wls,reflectance1);
+plot(wls,reflectance2);
+set(gca,'Xlim', [wls(find(reflectance1>0,1)) wls(find(reflectance1>0,1,'last'))])
+xlabel('wavelength (nm)');
+ylabel('reflectance')
+
+subplot(1,2,2); hold on;
+light1 = illuminants.*reflectance1;
+light2 = illuminants.*reflectance2;
+lms_1 = T_cones_smj10*light1;
+lms_2 = T_cones_smj10*light2;
+lms_0 = T_cones_smj10*light0;
+coneexcitations = cat(3, lms_1',lms_2',lms_0'); % rows = illums, cols = LMS, planes = light1, light2, adaptating light
+coneexcitations = permute(coneexcitations,[2 3 1]);
+blue_orange_signals = []; lime_magenta_signals = [];
+for i = 1:size(illuminants,2)
+    l = squeeze(coneexcitations(1,:,i));
+    m = squeeze(coneexcitations(2,:,i));
+    s = squeeze(coneexcitations(3,:,i));
+    l_norm = (l-l(3))./l(3);
+    m_norm = (m-m(3))./m(3);
+    s_norm = (s-s(3))./s(3);
+    
+    blue_orange_signals = [blue_orange_signals;(s_norm(1)+m_norm(1))/2-l_norm(1) (s_norm(2)+m_norm(2))/2-l_norm(2)];
+    lime_magenta_signals = [lime_magenta_signals;(s_norm(1)+l_norm(1))/2-m_norm(1) (s_norm(2)+l_norm(2))/2-m_norm(2)];
+end
+plot(blue_orange_signals(:,1),-blue_orange_signals(:,2),'b.-');
+plot(lime_magenta_signals(:,1),-lime_magenta_signals(:,2),'m.-');
+axis equal;
+legend({'blue-orange','lime-magenta'},'location','northeast');
+xlabel('Activation of subunit 1');
+ylabel('Activation of subunit 2');
+
+% looking at a 3D plot
+dat3d = [];
+for i = 1:size(illuminants,2)
+    l = squeeze(coneexcitations(1,:,i));
+    m = squeeze(coneexcitations(2,:,i));
+    s = squeeze(coneexcitations(3,:,i));
+    l_norm = (l-l(3))./l(3);
+    m_norm = (m-m(3))./m(3);
+    s_norm = (s-s(3))./s(3);
+    dat3d = [dat3d; l_norm(1) m_norm(1) s_norm(1) l_norm(2) m_norm(2) s_norm(2)]; 
+end
+figure; axes; hold on;
+plot3(dat3d(:,1),dat3d(:,2),dat3d(:,3),'ko','MarkerFaceColor','black');
+plot3(dat3d(:,4),dat3d(:,5),dat3d(:,6),'ko','MarkerFaceColor','black');
+axis square;
+xlabel('L'); ylabel('M'); zlabel('S');
+
+%%
+% Section 4.
+% Looking at terms in a sum that should be constant for any reasonble,
+% linear DO neuron.
+%
+% The model is:
+% resp = f([(L1-a)/a - (M1-b)/b)] - [(L2-a)/a - (M2-b)/b)])
+% So the assumption is that the L and M cones are in the same adaptation
+% state, but we're not specifying what that adaptation state is.
+% This simplifies to:
+% resp = f((L1-L2)/a + (M2-M1)/b)
+% So we can plot (L1-L2) vs (M2-M1) and see the contours. If they fall on
+% a line, then our DO cell can respond identically to the edge irrespective
+% of the illuminant. If they curve, then it cannot.
+% The x and y axis scales are arbitrary because they depend on the unknowns
+% "a" and "b" which represent the adaptation state.
+
+load T_cones_smj10
+load sur_nickerson.mat
+load B_cieday
+munsell = sur_nickerson;
+
+% Coefficients for the daylight spectra
+% (from Judd et al. 1964 table 3)
+daylight_coefficients = [-1.14 .677; 
+    -0.784 -0.195;
+    -0.293 -0.698;
+    0.145 -0.752;
+    1.005 -0.378];
+nillums =30;
+coeffs = linspace(daylight_coefficients(1,1),daylight_coefficients(end,1),nillums);
+daylight_coefficients_interp = [coeffs', interp1(daylight_coefficients(:,1),...
+    daylight_coefficients(:,2),...
+    coeffs,'spline')'];
+illuminants = repmat(B_cieday(:,1),1,nillums)+B_cieday(:,[2 3])*daylight_coefficients_interp';
+niter = 100;
+figure; axes; hold on;
+for iter = 1:niter
+    whichchips = unidrnd(size(munsell,2),2,1);
+    
+    reflectance1 = munsell(:,whichchips(1));
+    reflectance2 = munsell(:,whichchips(2));
+    light1 = illuminants.*reflectance1;
+    light2 = illuminants.*reflectance2;
+ 
+    lms_1 = T_cones_smj10*light1;
+    lms_2 = T_cones_smj10*light2;
+    
+    Lsignal_diff = lms_1(1,:)-lms_2(1,:);
+    Msignal_diff = lms_1(2,:)-lms_2(2,:);
+    Ssignal_diff = lms_1(3,:)-lms_2(3,:);
+        
+   % plot(Lsignal_diff,Msignal_diff);
+   plot3(Lsignal_diff,Msignal_diff,Ssignal_diff);
+end
+xlabel('L1-L2');
+ylabel('M1-M2');
+zlabel('S1-S2');
+%%
+% Section 5
+% Illuminating a munsell chip edge with an illuminant and 
+% projecting onto a single LMS vector. This is a step towards finding an
+% LMS filter that will signal material edges as well as possible without
+% being affected much by the illumination.
+
+% This shows that L-M+S does a better job at giving differential responses
+% to different material edges + discounting the illuminant than L-M-S does.
+
+load T_cones_smj10
+load sur_nickerson.mat
+load B_cieday
+munsell = sur_nickerson;
+
+% Coefficients for the daylight spectra
+% (from Judd et al. 1964 table 3)
+daylight_coefficients = [-1.14 .677; 
+    -0.784 -0.195;
+    -0.293 -0.698;
+    0.145 -0.752;
+    1.005 -0.378];
+nillums =10;
+coeffs = linspace(daylight_coefficients(1,1),daylight_coefficients(end,1),nillums);
+daylight_coefficients_interp = [coeffs', interp1(daylight_coefficients(:,1),...
+    daylight_coefficients(:,2),...
+    coeffs,'spline')'];
+illuminants = repmat(B_cieday(:,1),1,nillums)+B_cieday(:,[2 3])*daylight_coefficients_interp';
+niter = 30;
+data = [];
+for iter = 1:niter
+    whichchips = unidrnd(size(munsell,2),2,1);
+    
+    reflectance1 = munsell(:,whichchips(1));
+    reflectance2 = munsell(:,whichchips(2));
+    light1 = illuminants.*reflectance1;
+    light2 = illuminants.*reflectance2;
+ 
+    lms_1 = T_cones_smj10*light1;
+    lms_2 = T_cones_smj10*light2;
+    data = cat(4,data,cat(3,lms_1,lms_2)); % cones, illuminant, side, chip     
+end
+
+
+newdata = [];
+weights = [-1 1 -.3];
+weights = weights./norm(weights);
+for iter = 1:niter
+   % tmp1 = data(:,:,1,iter)./(data(:,:,1,iter)+data(:,:,2,iter)); % cone excitations normalized by pooled signals within RF
+   % tmp2 = data(:,:,2,iter)./(data(:,:,1,iter)+data(:,:,2,iter));
+    % assuming a background that's somewhere in the middle of the range of
+    % cone excitations
+    bkgndlms = mean(mean(mean(data,2),3),4);
+    subunit1 = weights*(data(:,:,1,iter)-repmat(bkgndlms,1,size(data,2)));
+    subunit2 = weights*(data(:,:,2,iter)-repmat(bkgndlms,1,size(data,2)));
+    resp = subunit1-subunit2;
+
+    newdata = [newdata, resp'];
+end
+plot(newdata)
+mean(var(newdata));
+var(mean(newdata));
+F = var(mean(newdata))./mean(var(newdata))
+
+
+
+%%
+% Section 6
+% Trying to simulate (and then fit) Abhishek, neurothresh-type data 
+% First generating fake data
+weights = [2 2];
+GAMUTEDGE = 20; 
+thetas = linspace(-pi/4, 3*pi/4,20);
+error_var = 2;
+dotprods = weights*[cos(thetas); sin(thetas)];
+staircase_terminations_mn = 1./dotprods;
+% Sanity check: Once I scale these unit vectors by
+% "staircase_terminations_mn" they should all have the same dot product
+% onto "weights". staircase_terminations_mn is the expected termination 
+% distance for each of the adaptive searches.
+weights*(repmat(staircase_terminations_mn,2,1).*[cos(thetas); sin(thetas)]);
+
+% Some searches go out of gamut
+L =staircase_terminations_mn > GAMUTEDGE | staircase_terminations_mn < 0;
+LOOG = false(length(thetas),1);
+LOOG(L) = true;
+% adding some (log-normal) error
+mu = log(staircase_terminations_mn(~LOOG).^2./sqrt(error_var+staircase_terminations_mn(~LOOG).^2));
+sigma = sqrt(log(error_var./staircase_terminations_mn(~LOOG).^2 + 1));
+staircase_terminations = zeros(length(thetas),1);
+staircase_terminations(LOOG) = GAMUTEDGE;
+staircase_terminations(~LOOG) = lognrnd(mu,sigma);
+
+% At this point "staircase_terminations" is the distance of each of the
+% searches (each in a direction theta)
+
+% Here's some plotting stuff that I commented out that plots the fake data
+% in cartisian and polar coordinates.
+
+% figure; subplot(2,1,1); hold on; axis square;
+% [x,y] = pol2cart(thetas', staircase_terminations);
+% plot(x(~LOOG),y(~LOOG),'ko');
+% plot(x(LOOG),y(LOOG),'ro');
+% 
+% subplot(2,1,2); hold on; axis square;
+% plot(thetas(~LOOG),log10(staircase_terminations(~LOOG)),'ko');
+% plot(thetas(LOOG),log10(staircase_terminations(LOOG)),'ro');
+
+% Calculating a goodness of fit for a set of model parameters (grid search)
+v = linspace(-10,10,100);
+data = zeros(length(v),length(v));
+for i = 1:length(v)
+    for j = 1:length(v)
+        modelparams = [v(i) v(j)];
+        pred_staircase_terminations = 1./(modelparams*[cos(thetas); sin(thetas)])';
+        L = pred_staircase_terminations > GAMUTEDGE | pred_staircase_terminations < 0;
+        pred_staircase_terminations(L) = GAMUTEDGE;
+        % Ignoring OOG points in the calculation of error for now.
+        if sum(L)./length(L) > 0.5 % if > 0.5 of the seaches go out of gamut, this is probably not a good fit (e.g. weights are too small)
+            err = nan;
+        else
+            err = mean((log(pred_staircase_terminations(~L))-log(staircase_terminations(~L))).^2);
+        end
+        data(i,j) = err;
+    end
+end
+figure; 
+surf(data);
+[tmp_i, tmp_j] = ind2sub([length(v) length(v)],find(data==min(min(data))));
+bestparams = [v(tmp_i) v(tmp_j)];
+
+figure; subplot(2,1,1); hold on; axis square;
+[x,y] = pol2cart(thetas', staircase_terminations);
+plot(x(~LOOG),y(~LOOG),'ko');
+plot(x(LOOG),y(LOOG),'ro');
+allthetas = linspace(-pi,pi,100);
+preds = 1./(bestparams*[cos(allthetas); sin(allthetas)]);
+LOOGtmp= preds>GAMUTEDGE|preds<0;
+[x,y] = pol2cart(allthetas(~LOOGtmp)', preds(~LOOGtmp)');
+plot(x,y,'b-');
+plot(0,0,'m*');
+
+subplot(2,1,2); hold on; axis square;
+plot(thetas(~LOOG),log10(staircase_terminations(~LOOG)),'ko');
+plot(thetas(LOOG),log10(staircase_terminations(LOOG)),'ro');
+plot(allthetas(~LOOGtmp)', log10(preds(~LOOGtmp)'),'b-');
+weights
+bestparams
+% Hmmm... seems to be working OK, but bestparams is definitely biased.
+
+%%
+% Comparing isoresponse contour predictions from two 
+% models: (1) cone contrast is defined based on the stimulus in the RF.
+% (2) cone contrast is defined relative to the background. 
+% Both models predict linear isoresponse contours but one predicts that the
+% slope should change with firing rate (net cone excitation to both
+% subunits)
+%
+% Model 1
+% How can you compare signals from a single cone type across space?
+% (L1-(L1+L2))/(L1+L2) - (L2-(L1+L2))/(L1+L2)
+% = (L1-L2)/(L1+L2)
+%
+% Model 2
+% You can think of 'l' and 'm' as being signals from the same cone type on
+% two sides of the RF.
+
+[l,m] = meshgrid(10:.1:20,10:.1:20);
+figure; 
+subplot(2,1,1);
+%surface((l-m)./(l+m));
+hold on;
+contour((l-m)./((l+m)/2));
+subplot(2,1,2);
+%surface((l-m)./mean(l(:)));
+hold on;
+contour((l-m)./mean(l(:)));
+
+%%
+% Can I make a neuron that combines L, M and S cones nonlinearly within a
+% subunit, combines signals linearly between subunits, and has a nonlinear
+% isoresponse contour?
+
+[a,b] = meshgrid(linspace(0,1,20),linspace(0,1,20)); % Stimuli
+%aprime = a(:,randperm(size(b,2)));
+%bprime = b(randperm(size(b,1)),:);
+aprime = a.^2;
+bprime = b.^2;
+contour(aprime+bprime,a,b)
+
+% ------------
+% Doing it another way
+% ------------
+
+intensity = linspace(0,1,20)';
+intensity = linspace(0,1,20)';
+s1 = sum(lm1.^2,2); % l and m cone signals are squared before summing
+
+lm2 = repmat(intensity,1,2);
+s2 = sum(lm2,2); % l and m cone signals are just summed
+
+data = [];
+for i = 1:length(intensity) % subunit 1
+    for j = 1:length(intensity) % subunit 2
+        data(i,j) = s1(i)+s2(j);
+    end
+end
+
+%%
+% Section 7
+% FFT-based analysis to discriminate single- from double-opponent cells.
+% Based on CellScreen.m, section 3
+
+[filenames, spikenums] = fnamesFromTxt2;
+nrows = ceil(sqrt(size(filenames,1)));
+maxT = 9;
+single_oppponent = [];
+figure;
+for i = 1:size(filenames,1)
+    stro = {};
+    for f = 1:size(filenames{i},1)
+        tmpstro = nex2stro(findfile(char(filenames{i}(f))));
+        if (isempty(stro))
+            stro = tmpstro;
+        else
+            stro = strocat(stro, tmpstro);
+        end
+    end
+    noisetypeidx = find(strcmp(stro.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',stro.sum.trialFields(1,:));
+    muidxs = strmatch('mu',stro.sum.trialFields(1,:));
+    spikeidx = find(strcmp(stro.sum.rasterCells(1,:),'sig001a'));
+    nstixperside = stro.sum.exptParams.nstixperside;
+    
+    L = stro.trial(:,noisetypeidx) == 1;  % Gun noise only.    
+    stro.ras(~L,:) = [];
+    stro.trial(~L,:) = [];
+    out = getWhtnsStats(stro,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, ['sig001',abs('a')+spikenums(i)-1]);
+    STSs = out{1};
+    STCs = out{2};
+    nspikes = out{3};
+    peakframe = find((sum(STSs.^2)== max(sum(STSs.^2))));
+    if peakframe == 1 | peakframe == maxT
+        error('peakframe is at an extreme. Cannot take a frame on either side.');
+    end
+    STA = STSs./nspikes;
+    STAweights = sqrt(sum(STA(:,peakframe+[-1 0 1]).^2));
+    STAweights = STAweights./sum(STAweights);
+    weightedSTA = STA(:,peakframe+[-1 0 1])*STAweights';
+    [u,s,v] = svd(reshape(weightedSTA,[nstixperside^2,  3]));
+
+    im = reshape(u(:,1),[nstixperside nstixperside]);
+    ft = fft2(im);
+    hax = subplot(nrows,nrows,i); hold on;
+    image(255*(im./(2*max(abs(im(:))))+.5));
+    set(gca,'Xlim',[0 nstixperside],'Ylim',[0 nstixperside],'XTick',[],'YTick',[]); axis image;
+    colormap(gray(255))
+    
+    if max(abs(ft(:)))== abs(ft(1))
+        single_opponent(i) = 1;
+    else
+        single_opponent(i) = 0;
+    end
+    if single_opponent(i)
+    	plot([0 0 nstixperside nstixperside 0]+.5, [0 nstixperside nstixperside 0 0]+.5,'r-')
+    end
+end
+
+
+%% 
+% Section 8
+% Troubleshooting chi-squared test for STA values
+%[filenames, spikenums] = fnamesFromTxt2;
+maxT = 9;
+for i = 1:size(filenames,1)
+    stro = {};
+    for f = 1:size(filenames{i},1)
+        tmpstro = nex2stro(findfile(char(filenames{i}(f))));
+        if (isempty(stro))
+            stro = tmpstro;
+        else
+            stro = strocat(stro, tmpstro);
+        end
+    end
+    noisetypeidx = find(strcmp(stro.sum.trialFields(1,:),'noise_type'));
+    nstixperside = stro.sum.exptParams.nstixperside;
+    
+    L = stro.trial(:,noisetypeidx)==1;
+    sigma = unique(stro.trial(L,strcmp(stro.sum.trialFields(1,:),'sigma1')))/1000;
+    gausslims = [stro.sum.exptParams.gauss_locut stro.sum.exptParams.gauss_hicut]/1000;
+    out = getWhtnsStats(stro,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, getSpikenum(stro));
+    STSs = out{1};
+    STCs = out{2};
+    nspikes = out{3};
+      
+    %zscoresum = STSs./(sigma*sqrt(nspikes));
+    
+    %figure; axes; hold on;
+    %plot(sum(zscoresum.^2),'b-')
+    %plot([1 maxT], [1 1]*chi2inv(.95,300),'k-');
+    %plot([1 maxT], [300 300],'k-');
+    
+    %NPOINTS = 65536;
+    %x = linspace(gausslims(1),gausslims(2),NPOINTS);
+    %Fx = norminv(x)*sigma;
+    %sigmacorrectionfactor = std(Fx)./sigmavect(1);
+    
+    %plot(sum((STSs./(std(Fx)*sqrt(nspikes))).^2),'r-')
+    
+%     % Null hypothesis simulation
+%     tmpSTS = zeros(size(STSs));
+%     for s = 1:nspikes
+%         tmpSTS = tmpSTS+normrnd(0,sigma,size(STSs));
+%     end
+%     plot(sum((tmpSTS./(sigma*sqrt(nspikes))).^2),'k--');
+%     
+    v = STSs.^2; % squared approximately normal with mean 0 and variance ?
+    ndims = size(v,1);
+    a = mean(v(:,1)); % an estimate of the variance of the individual gaussians
+    figure; axes; hold on;
+    plot(sum(v),'r-'); % the sum of ndims squared gaussians with mean 0 and variance (approx.) 'a'
+    plot([1 maxT], [1 1]*mean(v(:,1))*chi2inv(.99,ndims),'k--');
+    plot([1 maxT], mean(v(:,1))*[ndims ndims],'k-');
+    plot([1 maxT], [1 1]*mean(v(:,1))*chi2inv(.01,ndims),'k--');
+end
+
+%%
+% Section 9
+% Trying Jonathan's iSTAC thing (and my "non-linearity index") on data
+% collected at UW.
+
+addpath('/Users/greghorwitz/Documents/MATLAB/iSTAC-master');
+[fnames, spikeIdx] = fnamesFromTxt2(fullfile(nexfilepath,'nexfilelists','Greg','WhiteNoise','Lum.txt'));
+[fnames, spikeIdx] = fnamesFromTxt2(fullfile(nexfilepath,'nexfilelists','Greg','WhiteNoise','tmp.txt'));
+nExpts = size(fnames, 1);
+maxT = 9;
+for a = 1:nExpts
+    fnames{a}
+    stro = {};
+    for i = 1:size(fnames{a},2)
+        tmpstro = nex2stro(findfile(char(fnames{a}(i))));
+        if (isempty(stro))
+            stro = tmpstro;
+        else
+            stro = strocat(stro, tmpstro);
+        end
+    end
+    noisetypeidx = find(strcmp(stro.sum.trialFields(1,:),'noise_type'));
+    nstixperside = stro.sum.exptParams.nstixperside; 
+    L = stro.trial(:,noisetypeidx) == 1;
+    stro.ras(~L,:) = [];
+    stro.trial(~L,:) = [];
+    
+    out = getWhtnsStats(stro,maxT,'STCOVfull', {nstixperside^2, 3, 1, maxT}, stro.sum.rasterCells{spikeIdx(a)});
+    nspikes = out{3};
+    STA = out{1}/nspikes;
+    STC = out{2}/nspikes-(STA*STA');
+    
+    % Getting all stim
+    out_all = getWhtnsStats(stro,maxT,'STCOVfull', {nstixperside^2, 3, 1, maxT}, stro.sum.rasterCells{spikeIdx(a)},[],1);
+    nspikes_all = out_all{3};
+    STA_all = out_all{1}/nspikes_all;
+    STC_all = out_all{2}/nspikes_all-(STA_all*STA_all');
+    
+    reshapedSTA = reshape(STA,[nstixperside nstixperside 3 maxT]);
+    energy_xy = squeeze(sum(sum(reshapedSTA.^2,4),3));
+    whichpix = find(energy_xy(:) == max(energy_xy(:)));
+    [whichpix_y,whichpix_x] = ind2sub(size(energy_xy),whichpix);
+    
+    energy_t = squeeze(sum(sum(sum(reshapedSTA.^2,1),2),3));
+    whichframe = find(energy_t(:) == max(energy_t(:)));
+    
+    NPLOTS = 4;
+    figure('position', [180 668 1120 127]);
+    plottingSTA = reshapedSTA./(2*max(abs(reshapedSTA(:))))+.5;
+    subplot(2,NPLOTS,1);
+    image(plottingSTA(:,:,:,whichframe));
+    axis image; axis ij;
+    set(gca,'Xtick',[],'Ytick',[]);
+    subplot(2,NPLOTS,2); hold on;
+    imagesc(energy_xy);
+    axis image; axis ij;
+    set(gca,'Xtick',[],'Ytick',[]);
+    plot(whichpix_x,whichpix_y,'ko')
+    
+    subSTA = squeeze(reshapedSTA(whichpix_y,whichpix_x,:,:));
+    tmp = reshape([1:size(STC,1)],nstixperside, nstixperside,3,maxT);
+    STCidxs = squeeze(tmp(whichpix_y,whichpix_x,:,:));
+    subSTC = STC(STCidxs(:),STCidxs(:));
+    
+    subplot(2,NPLOTS,3);
+    set(gca,'colororder',[1 0 0; 0 .5 0; 0 0 1],'NextPlot', 'replacechildren','Xtick',[]','Ytick',[]);
+    plot(subSTA');
+    axis square;
+    [v,d]= eig(subSTC);
+    
+    subplot(2,NPLOTS,4);
+    set(gca,'colororder',[1 0 0; 0 .5 0; 0 0 1],'NextPlot', 'replacechildren','Xtick',[]','Ytick',[]);
+    plot(reshape(v(:,end),3,maxT)');
+    axis square;
+    
+    [filts, infovals, GaussParams,nullBasis] = compiSTAC(subSTA(:),subSTC,STA_all(STCidxs(:)),STC_all(STCidxs(:),STCidxs(:)),2);
+    for i = 1:2
+        subplot(2,NPLOTS,4+i);
+        set(gca,'colororder',[1 0 0; 0 .5 0; 0 0 1],'NextPlot', 'replacechildren','Xtick',[]','Ytick',[]);
+        plot(reshape(filts(:,i),3,maxT)');
+        axis square;
+    end
+    
+    % Now spatial
+    subSTA = squeeze(reshapedSTA(:,:,:,whichframe));
+    tmp = reshape([1:size(STC,1)],nstixperside, nstixperside,3,maxT);
+    STCidxs = squeeze(tmp(:,:,:,whichframe));
+    subSTC = STC(STCidxs(:),STCidxs(:));
+    if rank(subSTC) == size(subSTC,1)
+        [filts, infovals, GaussParams,nullBasis] = compiSTAC(subSTA(:),subSTC,STA_all(STCidxs(:)),STC_all(STCidxs(:),STCidxs(:)),2);
+        for i = 1:2
+            subplot(2,NPLOTS,6+i);
+            image(reshape(filts(:,i),size(subSTA))+.5)
+            axis square;
+            set(gca,'Xtick',[],'Ytick',[]);
+        end
+    end
+end
+
+%%
+% Section 10)
+% Getting montor background from white noise data file
+load('T_xyz1931'); vlambda = T_xyz1931(2,:);
+
+WN = nex2stro([nexfilepath,filesep,'Greg',filesep,'Kali',filesep,'2008/K041008001.nex']);
+
+gammaTable = WN.sum.exptParams.gamma_table;
+gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+
+% Getting the background rgb
+ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+
+tmp_spd = reshape(WN.sum.exptParams.mon_spd,101,3);
+mon_spd = SplineSpd([380:4:780]',tmp_spd, [380:5:780]');
+bkgnd_spd = mon_spd*bkgndrgb;
+lum = 683*vlambda*bkgnd_spd
+
+%%
+% Section 11
+% Which frequencies fall in which bin of FFT?
+totalDVA = .2*10;
+x = linspace(0,totalDVA,11);
+x(end) = []; % center location of each stixel
+delta_x = x(2)-x(1);
+o = linspace(0,1/(2*delta_x),6);
+
+o = linspace(0,1/(2*delta_x),50);
+% 2.5 cycles per degree is maximum
+[xx, omega] = meshgrid(x,o,100); 
+y = cos(2.*pi.*omega.*xx); % Every row is a cosine of a different frequency
+imagesc(y);
+H = abs(fft(y'))';
+
+figure; axes; hold on;
+for i = 1:size(H,1)
+    plot(H(i,:),'o-')
+end
+plot(H(11,:),'*-','Linewidth',2);
+
+
+% Looks like we have power in the DC bin all the way up to the 11th
+% frequency (plus more because of the square window = sinc function).
+% DC bin contains power from 0 to 0.5 cpd
+
+1/o(end) % Maximum SF = 2.5 cpd (one period in 0.4 deg)
+
+%% 
+% Section 12
+% Counting the number of significant pixels that fall into opposite octants
+% in RGB space. For a true double-opponent cell, there should be a surfeit
+% of points in pairs of bins that are opposite the origin
+%
+% This analysis shows that our best "double-opponent" cells are not really
+% double-opponent by this analysis.
+
+filenames = {'K040708003.nex','M121417002.nex','K110408003.nex','M082217003.nex','K052308001.nex','S071510004.nex'};
+
+for fileidx = 1:length(filenames)
+    if filenames{fileidx}(1) == 'K'
+        minipath = ['Greg',filesep,'Kali',filesep,'2008'];
+    elseif filenames{fileidx}(1) == 'S'
+        minipath = ['Greg',filesep,'Sedna',filesep,'2010'];
+    elseif filenames{fileidx}(1) == 'M'
+        minipath = ['Abhishek',filesep,'Maui'];
+    else
+        minipath = [];
+    end
+    WN=nex2stro([nexfilepath,filesep,minipath,filesep,filenames{fileidx}]);
+    
+    maxT = 9;
+    spikename = 'sig001a'; % A hack. Might not be correct for all cells.
+    framerate = WN.sum.exptParams.framerate;
+    nstixperside = WN.sum.exptParams.nstixperside;
+    ntrials = length(WN.sum.absTrialNum);
+    stimonidx = find(strcmp(WN.sum.trialFields(1,:),'stim_on'));
+    stimoffidx = find(strcmp(WN.sum.trialFields(1,:),'all_off'));
+    nframesidx = find(strcmp(WN.sum.trialFields(1,:),'num_frames'));
+    noisetypeidx = find(strcmp(WN.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',WN.sum.trialFields(1,:));
+    
+    gammaTable = WN.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    
+    % Reconstructing the M matrix
+    fundamentals = WN.sum.exptParams.fundamentals;
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+    mon_spd = WN.sum.exptParams.mon_spd;
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    M = fundamentals'*mon_spd;
+    
+    % Getting the background rgb/lms
+    ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+    L = WN.trial(:,noisetypeidx) == 1; % gun noise only
+    WN.ras(~L,:) = [];
+    WN.trial(~L,:) = [];
+    out = getWhtnsStats(WN,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, spikename);
+    
+    figure;
+    for DEBUG = [false]
+        STAs = out{1}./out{3};
+        if DEBUG % scrambling pixel values within color channel, within frame
+            for i = 1:size(STAs,2)
+                idxs = [randperm(nstixperside.^2)' randperm(nstixperside.^2)' randperm(nstixperside.^2)'];
+                idxs = idxs+repmat([0 nstixperside.^2 2*nstixperside.^2],nstixperside.^2,1);
+                STAs(:,i) = STAs(idxs,i);
+            end
+            disp('DEBUG ON');
+        else
+            disp('DEBUG OFF');
+        end
+        
+        sqrtenergy = sqrt(sum(STAs.^2));
+        peakframe = find(sqrtenergy == max(sqrtenergy),1,'first');
+        whichframes = peakframe-1:peakframe+1;
+        weightingcoefs = sqrtenergy(whichframes);
+        weightingcoefs = weightingcoefs./norm(weightingcoefs);
+        %weightingcoefs = [0 1 0]; % Just pulling out peak frame
+        
+        weightedSTA = STAs(:,whichframes)*weightingcoefs';
+        reshapedweightedSTA = reshape(weightedSTA,[nstixperside.^2 3]);
+        
+        subplot(2,3,1+(DEBUG*3));
+        plot(reshapedweightedSTA);
+        subplot(2,3,2+(DEBUG*3)); hold on;
+        %plot(reshapedweightedSTA);
+        energy = sum(reshapedweightedSTA.^2,2);
+        
+        frame1energy = sum(reshape(STAs(:,1),nstixperside.^2,3).^2,2);
+        threshold = max(frame1energy); % maximum energy in frame 1
+        %threshold = mean(frame1energy)+2*std(frame1energy);
+        %threshold = 0;
+        %threshold = prctile(energy,80);
+        plot(energy);
+        plot([0 100],[threshold threshold]);
+        L = energy>=threshold;
+        RGBs = reshapedweightedSTA(L,:);
+        template = sign(fullfact([2 2 2])-1.5);
+        octantcount = [];
+        for i=1:size(template,1)
+            octantcount(i) = sum(all(sign(RGBs) == repmat(template(i,:),size(RGBs,1),1),2));
+        end
+        [template octantcount']
+        modalsigns = template(octantcount == max(octantcount),:)
+        if size(modalsigns,1) > 1
+            disp('Got a tie. Flipping a coin.');
+            modalsigns = modalsigns(unidrnd(size(modalsigns,1)),:);
+        end
+        n_modalpixels = sum(all(sign(RGBs) == repmat(modalsigns,size(RGBs,1),1),2));
+        n_antipixels = sum(all(sign(RGBs) == repmat(-1*modalsigns,size(RGBs,1),1),2));
+        M = sum(octantcount)-n_modalpixels;
+        p = 1-binocdf(n_antipixels, M, 1/7)+binopdf(n_antipixels, M, 1/7)
+
+%         r = corrcoef(RGBs');
+%         corrcoefs = r + triu(nan(size(r)));
+         subplot(2,3,3+(DEBUG*3)); hold on;
+%         hist(corrcoefs(:),20)
+        bar(octantcount);
+        set(gcf,'Name',WN.sum.fileName(find(WN.sum.fileName == filesep,1,'last')+1:end));
+        %set(gca,'Xlim',[-1 1]);
+    end
+    drawnow;
+end
+
+%%
+% Section 13
+% How much variance in STA RGBs do we capture with a single line through
+% RGB space versus two vectors (not necesarily 180° apart) that meet at 
+% the origin? 
+
+DEBUG = false;
+filenames = {'K040708003.nex','M121417002.nex','K110408003.nex','M082217003.nex','K052308001.nex','S071510004.nex'};
+
+for fileidx = 1:length(filenames)
+    if filenames{fileidx}(1) == 'K'
+        minipath = ['Greg',filesep,'Kali',filesep,'2008'];
+    elseif filenames{fileidx}(1) == 'S'
+        minipath = ['Greg',filesep,'Sedna',filesep,'2010'];
+    elseif filenames{fileidx}(1) == 'M'
+        minipath = ['Abhishek',filesep,'Maui'];
+    else
+        minipath = [];
+    end
+    WN=nex2stro([nexfilepath,filesep,minipath,filesep,filenames{fileidx}]);
+    
+    maxT = 9;
+    spikename = 'sig001a'; % A hack. Might not be correct for all cells.
+    framerate = WN.sum.exptParams.framerate;
+    nstixperside = WN.sum.exptParams.nstixperside;
+    ntrials = length(WN.sum.absTrialNum);
+    stimonidx = find(strcmp(WN.sum.trialFields(1,:),'stim_on'));
+    stimoffidx = find(strcmp(WN.sum.trialFields(1,:),'all_off'));
+    nframesidx = find(strcmp(WN.sum.trialFields(1,:),'num_frames'));
+    noisetypeidx = find(strcmp(WN.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',WN.sum.trialFields(1,:));
+    
+    gammaTable = WN.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    
+    % Reconstructing the M matrix
+    fundamentals = WN.sum.exptParams.fundamentals;
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+    mon_spd = WN.sum.exptParams.mon_spd;
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    M = fundamentals'*mon_spd;
+    
+    % Getting the background rgb/lms
+    ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+    L = WN.trial(:,noisetypeidx) == 1; % gun noise only
+    WN.ras(~L,:) = [];
+    WN.trial(~L,:) = [];
+    out = getWhtnsStats(WN,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, spikename);
+    STAs = out{1}./out{3};
+    sqrtenergy = sqrt(sum(STAs.^2));
+    
+    % Just for debugging
+    if DEBUG
+        for i = 1:size(STAs,2)
+            idxs = [randperm(nstixperside.^2)' randperm(nstixperside.^2)' randperm(nstixperside.^2)'];
+            idxs = idxs+repmat([0 nstixperside.^2 2*nstixperside.^2],nstixperside.^2,1);
+            STAs(:,i) = STAs(idxs,i);
+        end
+    end
+    
+    
+    peakframe = find(sqrtenergy == max(sqrtenergy),1,'first');
+    whichframes = peakframe-1:peakframe+1;
+    weightingcoefs = sqrtenergy(whichframes);
+    weightingcoefs = weightingcoefs./norm(weightingcoefs);
+    %weightingcoefs = [0 1 0]; % Just pulling out peak frame
+    
+    weightedSTA = STAs(:,whichframes)*weightingcoefs';
+    reshapedweightedSTA = reshape(weightedSTA,[nstixperside.^2 3]);
+    
+    figure; axes; hold on;
+    title(filenames{fileidx});
+    plot3(reshapedweightedSTA(:,1),reshapedweightedSTA(:,2),reshapedweightedSTA(:,3),'ko');
+    plot3(0,0,0,'m*');
+    coef = pca(reshapedweightedSTA); 
+    plotscalefactor = max(sqrt(sum(reshapedweightedSTA.^2,2))); % give PC1 a reasonable length for plotting
+    plot3([-1 1]*coef(1,1)*plotscalefactor,[-1 1]*coef(2,1)*plotscalefactor,[-1 1]*coef(3,1)*plotscalefactor,'k-');
+    
+    v1 = coef(:,1);
+    v2 = -coef(:,1);
+    
+    myvariance(reshapedweightedSTA,[v1 v2]); % The mean squared projection onto the PC1
+    f = @(x)-1*myvariance(reshapedweightedSTA, x); % Setting up anonymous function for fmincon
+    [vs,fval] = fmincon(f,[v1 v2],[],[],[],[],[],[],@unitnormcon);
+     
+    plot3([0 1]*vs(1,1)*plotscalefactor,[0 1]*vs(2,1)*plotscalefactor,[-0 1]*vs(3,1)*plotscalefactor,'r-');
+    plot3([0 1]*vs(1,2)*plotscalefactor,[0 1]*vs(2,2)*plotscalefactor,[-0 1]*vs(3,2)*plotscalefactor,'r-');
+    axis equal;
+    
+    drawnow;
+
+    disp(['Original variance: ',num2str(myvariance(reshapedweightedSTA,[v1 v2]))])
+    disp(['New variance: ',num2str(-fval)])
+    disp(['Ratio of variances: ',num2str(-fval/myvariance(reshapedweightedSTA,[v1 v2]))]);
+   
+    angles = min(real(acos(vs'*[v1 v2]))*180/pi);
+    disp(['angles between PC1 and new vectors (°): ',num2str(angles)]);
+    disp(' '); % Skipping a line
+    keyboard
+end
+
+% Note: this function does not subtract the mean from the data, which makes
+% sense in this context, so the "variance" it returns is slightly different 
+% from the variance of projections onto the PC1, even when "basis" = [PC1
+% -PC1].
+function v = myvariance(data, basis)
+projs = data*basis;
+projs(projs<0) = 0;
+projs = max(projs,[],2);
+v = mean(projs.^2);
+end
+
+function [c,ceq] = unitnormcon(x)
+c = [];
+ceq = sum(x.^2)-1;
+end

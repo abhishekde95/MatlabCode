@@ -1,0 +1,40 @@
+function V = regularizeSTA(cum_rgbs, cum_n, maxframes, guess)
+% Author - Abhishek De, 9/20 
+% Finding a regularized STA
+
+options.MaxIter = 10;
+options.MaxFunEvals = 10;
+options.TolFun = 1e-6;
+options.TolX = 1e-6;
+
+lambda = 0.0; % Regularization parameter
+
+lb = -1*ones(size(guess(:)));
+ub = 1*ones(size(guess(:)));
+
+[V, fval, success] = fmincon(@(x)err_reg(x), guess(:),[],[],[],[],lb,ub,[], options);
+
+    function cost = err_reg(x)
+%         keyboard;
+        initargs = {x, 0, size(cum_rgbs,2), [100 3 maxframes]};
+        STPROJmod('init',initargs);
+        STPROJmod(cum_rgbs(:),cum_n);
+        out = STPROJmod('return');
+        projs = out{1};
+        Lspike = out{2};
+        clear STPROJmod;
+        clear out;
+   
+%         cost = (1-rocN(projs(logical(Lspike)),projs(~logical(Lspike)))) + lambda * norm(input(:),1); % similar to MID approach 
+
+%         cost = norm(projs-Lspike,2);
+%          cost = (1-rocN(projs(logical(Lspike)),projs(~logical(Lspike))));
+ cost  = norm(x-guess(:),2) + norm(x,2);
+%         keyboard;
+        disp(cost);
+       
+
+    end
+
+end
+

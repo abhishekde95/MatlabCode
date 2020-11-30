@@ -1,0 +1,213 @@
+% CSHL figures 2018
+% Section 1: Cone fundamentals
+% Section 2: Light emission spectra, reflectance spectra, their pointwise
+% products
+% Section 3: STAs
+%%
+% Section 1
+% Cone fundamentals
+load('T_cones_smj10.mat')
+wls = 380:5:780;
+L = wls >= 380 & wls <= 700;
+figure; axes('position',[0.1 0.1 .8 .5]);
+h = plot(wls(L),T_cones_smj10(:,L),'LineWidth',4);
+set(h(1),'Color','red');
+set(h(2),'Color',[40 190 2]/255);
+set(h(3),'Color','blue');
+set(gca,'xlim',[380 700],'ytick',[0 .5 1],'xtick',[400 500 600 700]);
+
+set(gca,'tickDir','out','FontName','Helevetica','FontAngle','italic','FontSize',16);
+
+%%
+% Section 2
+% Light emission spectra, reflectance spectra, pointwise multiplication
+sunlight = [0.005108325	0.6030583
+0.042213395	0.63621485
+0.10405518	0.6914758
+0.15861793	0.7373795
+0.20661569	0.76370317
+0.24661821	0.78918874
+0.2829955	0.82149476
+0.3143183	0.88021487
+0.3521343	0.9005934
+0.38629645	0.90479416
+0.4422282	0.8825523
+0.483643	0.8748157
+0.5468728	0.8772633
+0.60138273	0.8805776
+0.65296984	0.87112004
+0.73721176	0.82242453
+0.7742408	0.7942524
+0.83667725	0.74303865
+0.8925752	0.6935397
+0.9404874	0.65086854
+1.0000085	0.5928455]
+
+blueberries = [0.00448321	0.09308841
+0.1141142	0.11051673
+0.16425826	0.17753285
+0.2503975	0.2947999
+0.3368364	0.2995669
+0.38449422	0.33114845
+0.41275313	0.37926224
+0.4511791	0.48578107
+0.49486053	0.55691904
+0.5308446	0.61133665
+0.61852944	0.6327793
+0.639263	0.5995893
+0.6676995	0.58103645
+0.6910692	0.52703106
+0.71576244	0.46053466
+0.74289757	0.44613948
+0.759566	0.4858393
+0.7865402	0.5318608
+0.81762946	0.48624253
+0.8384241	0.4301359
+0.8785454	0.38458034
+0.914757	0.35358125
+0.9611911	0.36015382
+0.9814974	0.48738053
+1.0018036	0.6146072
+]
+
+tungsten = [0.0018662672	0.12468993
+0.117744155	0.18445621
+0.21183369	0.25771958
+0.34632587	0.41424242
+0.44816285	0.57998455
+0.5688581	0.74409425
+0.6918698	0.85138327
+0.91929984	0.9607229
+0.9946678	0.9804869
+]
+
+LED = [0.002173913	0.007874016
+0.04057971	0.040494937
+0.09710145	0.13948256
+0.13550724	0.30821148
+0.17608696	0.5984252
+0.20434782	0.8132734
+0.21449275	0.8425197
+0.23115942	0.84139484
+0.24275362	0.81889766
+0.28768116	0.59167606
+0.3210145	0.43644544
+0.3311594	0.40494937
+0.34492755	0.3959505
+0.3615942	0.4071991
+0.42536232	0.47806525
+0.46014494	0.52755904
+0.4963768	0.60292464
+0.51666665	0.6310461
+0.54275364	0.632171
+0.56594205	0.6197975
+0.62391305	0.62204725
+0.67536235	0.62767154
+0.6992754	0.57255346
+0.7463768	0.4488189
+0.76449275	0.44544432
+0.8586956	0.32170978
+0.8847826	0.25309336
+0.92391306	0.18222722
+0.965942	0.13048369
+0.9992754	0.10348707
+]
+
+x = linspace(0,1,100);
+sunlight_splined = interp1(sunlight(:,1),sunlight(:,2),x,'spline');
+tungsten_splined = interp1(tungsten(:,1),tungsten(:,2),x,'spline');
+blueberries_splined = interp1(blueberries(:,1),blueberries(:,2),x,'spline');
+LED_splined = interp1(LED(:,1)./max(LED(:,1)),LED(:,2),x,'spline');
+
+figure; subplot(3,1,1);
+plot(x, blueberries_splined);
+subplot(3,1,2);
+plot(x, sunlight_splined);
+subplot(3,1,3);
+plot(x, sunlight_splined.*blueberries_splined);
+title('sunlight')
+
+figure; subplot(3,1,1);
+plot(x, blueberries_splined);
+subplot(3,1,2);
+plot(x, LED_splined);
+subplot(3,1,3);
+plot(x, LED_splined.*blueberries_splined);
+title('LED');
+
+figure; subplot(3,1,1);
+plot(x, blueberries_splined);
+subplot(3,1,2);
+plot(x, tungsten_splined);
+subplot(3,1,3);
+plot(x, tungsten_splined.*blueberries_splined);
+title('tungsten');
+
+%%
+% Section 3
+% STAs
+stro = nex2stro(findfile('K040708003.nex')); % Excellent lum example frames [2 3 4]
+maxT = 6;
+
+framerate = stro.sum.exptParams.framerate;
+nstixperside = stro.sum.exptParams.nstixperside;
+ntrials = length(stro.sum.absTrialNum);
+stimonidx = find(strcmp(stro.sum.trialFields(1,:),'stim_on'));
+stimoffidx = find(strcmp(stro.sum.trialFields(1,:),'all_off'));
+nframesidx = find(strcmp(stro.sum.trialFields(1,:),'num_frames'));
+noisetypeidx = find(strcmp(stro.sum.trialFields(1,:),'noise_type'));
+sigmaidxs = strmatch('sigma',stro.sum.trialFields(1,:));
+
+spds = reshape(stro.sum.exptParams.mon_spd,length(stro.sum.exptParams.mon_spd)/3,3);
+spds = SplineSpd([380:4:780]',spds,[380:5:780]');
+funds = reshape(stro.sum.exptParams.fundamentals,length(stro.sum.exptParams.fundamentals)/3,3);
+M = funds'*spds;
+
+% gun noise
+tmpstro = stro;
+L = tmpstro.trial(:,noisetypeidx) == 1;
+tmpstro.ras(~L,:) = [];
+tmpstro.trial(~L,:) = [];
+
+out = getWhtnsStats(tmpstro,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, tmpstro.sum.rasterCells{1});
+STAs = out{1}./out{3};
+normSTAs = .5*STAs./max(abs(STAs(:)))+.5;
+for whichframe = 1:maxT
+    % Plotting
+    subplot(1,maxT,whichframe);
+    STA = normSTAs(:,whichframe);
+    nstixperside = sqrt(length(STA)/3);
+    STA = reshape(STA,[nstixperside nstixperside 3]);
+    image(STA);
+    set(gca,'XTick',[],'YTick',[]); axis square;
+    drawnow;
+end
+
+% cone noise
+tmpstro = stro;
+L = tmpstro.trial(:,noisetypeidx) == 2;
+tmpstro.ras(~L,:) = [];
+tmpstro.trial(~L,:) = [];
+
+out = getWhtnsStats(tmpstro,maxT,'STCOVmex', {nstixperside^2, 3, maxT}, tmpstro.sum.rasterCells{1});
+STAs = out{1}./out{3};
+
+% First getting normfactor
+normfactor = 1;
+for whichframe = 1:maxT
+    STAconemat = reshape(STAs(:,whichframe), nstixperside^2, 3)';
+    STA_cone_RGB = (inv(M)*STAconemat)'; % "STA_cone_RGB" is in RGBs
+    normfactor = min(normfactor,.5/max(max(abs(STA_cone_RGB))));
+end
+% now plotting
+for whichframe = 1:maxT
+    STAconemat = reshape(STAs(:,whichframe), nstixperside^2, 3)';
+    STA_cone_RGB = (inv(M)*STAconemat)'; % "STA_cone_RGB" is in RGBs
+    subplot(1,maxT,whichframe);
+    image(reshape(STA_cone_RGB.*normfactor+.5,[nstixperside nstixperside 3]));
+    if max(max(STA_cone_RGB.*normfactor+.5)) > 1
+        keyboard
+    end
+    set(gca,'XTick',[],'YTick',[]); axis square;
+    drawnow;
+end

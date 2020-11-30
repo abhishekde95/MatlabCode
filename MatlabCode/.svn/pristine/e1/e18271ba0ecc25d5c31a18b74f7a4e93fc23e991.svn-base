@@ -1,0 +1,19 @@
+% figures for OPTO paper
+clearvars; close all;
+% Creating the gabor
+figure(1);
+L = 1001; W = 1001;
+theta = 0; sigma = 0.2; ggamma = 1; sf = 2.0 ; phase = pi/2; nsigmas = 1; 
+for jj = 1:numel(sf)
+    [x,y] = meshgrid(linspace(-1,1,L), linspace(-1,1,W));
+    X = x*cos(-theta) + y*sin(-theta);
+    Y =-x*sin(-theta) + y*cos(-theta);
+    expterm = exp(-(X.^2 + ggamma^2*Y.^2)/2/sigma^2);
+    costerm = cos(2*pi*Y*sf(jj) + phase);
+    template = costerm.*expterm;
+    RGB = [1 1 1];
+    im = cat(3,RGB(1)*template,RGB(2)*template,RGB(3)*template);
+    normfactor = 1.01*max(abs(im(:)));
+    im = (0.5*im/(normfactor)) + 0.5;
+    image(im), drawnow, set(gca,'Xtick',[],'Ytick',[]); axis square;
+end

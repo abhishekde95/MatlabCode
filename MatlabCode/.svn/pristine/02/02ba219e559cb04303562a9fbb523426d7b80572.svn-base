@@ -1,0 +1,196 @@
+% A dedicated script for selecting example LUM, DO and HTC cells 
+% Author - Abhishek De, 3/20
+close all; clearvars;
+plot_counter = 1;
+
+load conewts_svd.mat
+load vals.mat
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+
+% Classifying cells 
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
+% Load the integration within the subunit data
+load AUROClinS1_CV.mat
+load AUROCquadS1_CV.mat
+load AUROClinS2_CV.mat
+load AUROCquadS2_CV.mat
+
+% Calculating the median of differences/ratios
+RSSEisoresp_medianofratios = [];
+Withinsubunits_medianofdifferences = [];
+
+for ii = 1:numel(RSSE_linearmodel)   
+    % computation for calculating median of differences/ratios
+    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})]; 
+    Withinsubunits_medianofdifferences = [Withinsubunits_medianofdifferences; median([median(AUROCquad1{ii}-AUROClin1{ii}) median(AUROCquad2{ii}-AUROClin2{ii})])];   
+
+end
+
+
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM WNthresh');
+NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+close(conn);
+filename = filename(strcmp(string(NTmode),"subunit"));
+NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+% Load some important variables that will be useful for plotting 
+load subunitbasisvec.mat
+load linear_modelparams.mat
+load quad_modelparams.mat
+load RHO_all.mat
+load THETA_all.mat
+load not_oog_idx_all.mat
+load oog_idx_all.mat
+LUMsubplots = ceil(sqrt(numel(LUMidx)));
+DOsubplots = ceil(sqrt(numel(DOidx)));
+HTCsubplots = ceil(sqrt(numel(hardtoclassifyidx)));
+countLUM = 1; countDO = 1; countHTC = 1;
+for ii = 1:numel(filename)
+    ind = ii;
+    THETA = THETA_all{1,ind};
+    THETA = THETA * pi/180; % converting to radians
+    if any(THETA>(135*pi/180))
+        allthetas = linspace(-pi,pi,100);
+        newtheta = linspace(-pi,pi,101);
+    else
+        allthetas = linspace(-pi/4,3*pi/4,100);
+        newtheta = linspace(-pi/4,3*pi/4,101);
+    end
+    RHO = RHO_all{1,ind};
+    oog_idx = oog_idx_all{1,ind};
+    not_oog_idx = not_oog_idx_all{1,ind};
+    outofgamut = zeros(size(THETA));
+    outofgamut(oog_idx) = 1;
+    outofgamut = logical(outofgamut);
+    [x_orig, y_orig] = pol2cart(THETA,RHO);
+    
+    % Linear model predictions
+    rho1 = 1./(linear_modelparams(ii,:)*[cos(allthetas); sin(allthetas)]);
+    LOOGtmp1= rho1<0;
+    [x_lin,y_lin] = pol2cart(allthetas(~LOOGtmp1),rho1(~LOOGtmp1));
+    
+    % Quadratic model predictions
+    [x_quad,y_quad,rho3] = calc_xyvalues(allthetas, quad_modelparams(ii,:));
+    L = rho3>0 & rho3==real(rho3);
+    [x_quad2,y_quad2] = pol2cart(newtheta(L),rho3(L)');          
+    
+    %Plotting the figures
+    if ismember(ii,LUMidx)
+        % Plotting the isoresponse curves: LUM cells
+        figure(plot_counter), subplot(LUMsubplots,LUMsubplots,countLUM), plot(x_lin,y_lin,'g','Linewidth',2); hold on; plot(x_quad2,y_quad2,'r','Linewidth',2); 
+        plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[1 1 1]); hold on;
+        if ~isempty(x_orig(oog_idx))
+            plot(upsample(x_orig(oog_idx),2), upsample(y_orig(oog_idx),2),'k');
+        end
+        set(gca,'XLim',[-2 2],'YLim',[-2 2]); drawnow; axis square; title(num2str(RSSEisoresp_medianofratios(ii),2)); grid on; hold off; drawnow;
+        
+        % Plotting the basisvec 
+        figure(plot_counter+1), subplot(LUMsubplots,LUMsubplots,countLUM), image(subunitbasisvec{ii}); set(gca,'XTick',[],'YTick',[]);axis square; title(num2str(ii));
+        countLUM = countLUM + 1;
+        
+    elseif ismember(ii,DOidx)
+        % Plotting the isoresponse curves: DO cells
+        figure(plot_counter+2), subplot(DOsubplots,DOsubplots,countDO), plot(x_lin,y_lin,'g','Linewidth',2); hold on; plot(x_quad2,y_quad2,'r','Linewidth',2); 
+        plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[1 1 1]); hold on;
+        if ~isempty(x_orig(oog_idx))
+            plot(upsample(x_orig(oog_idx),2), upsample(y_orig(oog_idx),2),'k');
+        end
+        set(gca,'XLim',[-2 2],'YLim',[-2 2]); drawnow; axis square; title(num2str(RSSEisoresp_medianofratios(ii),2)); grid on; hold off; drawnow;
+        
+        % Plotting the basisvec
+        figure(plot_counter+3), subplot(DOsubplots,DOsubplots,countDO), image(subunitbasisvec{ii}); set(gca,'XTick',[],'YTick',[]);axis square; title(num2str(ii))
+        countDO = countDO + 1;
+        
+    elseif ismember(ii,hardtoclassifyidx)
+        % Plotting the isoresponse curves: HTC cells
+        figure(plot_counter+4), subplot(HTCsubplots,HTCsubplots,countHTC), plot(x_lin,y_lin,'g','Linewidth',2); hold on; plot(x_quad2,y_quad2,'r','Linewidth',2); 
+        plot(x_orig(not_oog_idx), y_orig(not_oog_idx),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 0 1],'PickableParts','none','MarkerEdgeColor',[1 1 1]); hold on;
+        if ~isempty(x_orig(oog_idx))
+            plot(upsample(x_orig(oog_idx),2), upsample(y_orig(oog_idx),2),'k');
+        end
+        set(gca,'XLim',[-2 2],'YLim',[-2 2]); drawnow; axis square; title(strcat(num2str(RSSEisoresp_medianofratios(ii),2),',',num2str(100*Withinsubunits_medianofdifferences(ii),2))); grid on; hold off; drawnow;
+        
+        % Plotting the basisvec
+        figure(plot_counter+5), subplot(HTCsubplots,HTCsubplots,countHTC), image(subunitbasisvec{ii}); set(gca,'XTick',[],'YTick',[]);axis square; title(num2str(ii))
+        countHTC = countHTC + 1;
+    end      
+        
+end
+plot_counter = plot_counter + 6;
+
+%% Classifying RF structures as either center-surround or adjacent
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load subunitbasisvec.mat
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+filename = fetch(conn,'SELECT filename FROM WNthresh');
+NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+close(conn);
+filename = filename(strcmp(string(NTmode),"subunit"));
+NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+numsubplots = ceil(sqrt(numel(filename)));
+
+for ii = 1:numel(filename)
+    % Plotting the basisvectors
+    figure(plot_counter), subplot(numsubplots,numsubplots,ii),image(subunitbasisvec{ii}); set(gca,'XTick',[],'YTick',[]);axis square;
+end
+plot_counter = plot_counter + 1;
+
+% Classifying the spatial structure as 1 (center-surround) or 2 (adjacent) based on selection of subunits
+
+RFstructure = [2 1 2 1 2 2 1 2 1 1 2,...
+               2 2 1 2 2 2 2 2 2 1 1,...
+               2 2 2 2 2 2 2 2 2 1 2,...
+               2 1 2 2 2 2 1 2 2 1 2,...
+               2 1 2 1 1 1 1 2 2 2 2,...
+               2 2 2 1 1 2 1 2 2 2 1,...
+               1 1 1 2 2 2 1 2 2 2 2,...
+               2 2 2 1 1 1 1 1 2 2 2,...
+               1 1 2 2 1 2 2 2 2 2 2,...
+               2 2 2 1 2 1 2 2 1 2 2,...
+               2 2 1 2 2 2];
+           
+% Loading the CV errors from Gabor and DoG fits 
+load IsoresponseRF_Peraccuracy.mat
+load IsoresponseRF_SSE.mat
+load IsoresponseRF_Deviation.mat
+meanperaccuracy = zeros(size(Peraccuracy));
+meanSSE = zeros(size(SSE));
+meanR = zeros(size(SSE));
+for ii = 1:size(Peraccuracy,1)
+    for jj = 1:size(Peraccuracy,2)
+        meanperaccuracy(ii,jj) = mean(Peraccuracy{ii,jj});
+        meanSSE(ii,jj) = mean(SSE{ii,jj});
+        meanR(ii,jj) = mean(cos(Deviation{ii,jj}*pi/180));
+    end
+end
+
+diffGaborDoG = meanR(:,2)-meanR(:,3); % Difference between Pearson's r (Gabor-DoG)
+
+% [center-surround & Gabor   center-surround & DoG;...
+%  Adjacent & Gabor          Adjacent & DoG]
+X = [sum(RFstructure'==1 & diffGaborDoG>=0) sum(RFstructure'==1 & diffGaborDoG<0);...
+    sum(RFstructure'==2 & diffGaborDoG>=0) sum(RFstructure'==2 & diffGaborDoG<0)];
+
+[h,p] = fishertest(X);

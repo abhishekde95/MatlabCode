@@ -1,0 +1,109 @@
+% These are cells that, by eye, have a *chance* of being
+% color-opponent (blue-yellow) cells with luminance gain
+% Looking at spatial STA and PC1 at peak frame
+
+K031308004.nex   1
+K032708002.nex   1
+K032808001.nex   1
+K040108003.nex   1
+K040708001.nex   1
+K040708002.nex   1
+K041008001.nex   1
+K041208004.nex   1
+K043008002.nex   1
+K050108002.nex   1
+K052008003.nex   1
+K052308001.nex   1
+K052708001.nex   1
+K053008003.nex   1
+K090108001.nex   1
+K111208001.nex   1
+K110608004.nex   2
+K010309002.nex   2
+K010809004.nex   1
+K011309002.nex   1
+K011309005.nex   1
+K020209002.nex   1
+K021409005.nex   1
+K050809003.nex   1
+K052009001.nex   1
+K052009005.nex   1
+K052009007.nex   2
+K061609002.nex   1
+K061609005.nex   1
+K061809006.nex   1
+K061909002.nex   1
+K071709009.nex   1
+K072209001.nex   1
+K072909001.nex   1
+K072909002.nex   1
+K082409008.nex   1
+K090909009.nex   1
+
+%% Descriptions
+%K031308004.nex 
+%	BY double opponent. Large RF. No obvious PC1.
+%K032708002.nex
+%	Could be a complex cell. Pale blue STA.
+%K032808001.nex
+%	Big yellow STA! No clear PC
+%K040108003.nex
+%	Double opponent BY. no clear PC1. (Orange STA in spike 2)
+%K040708001&2.nex
+%	Small blue RF. no clear PC1.
+%*** K041008001.nex
+%	Figure cell (yellow). I've made slides of this one.
+%K041208004.nex
+%	STA dark blue with green halo. No PC1
+%K043008002.nex
+%	Bright red STA. No PC1.
+%K050108002.nex
+%	DO BY. No PC1.
+%K052008003.nex
+%	Purple STA. no PC1
+%* K052308001.nex
+%	Yellow STA. Lots of data. PC1?
+%*** K052708001.nex
+%	Blue figure cell.
+%K053008003.nex
+%	Red STA. No PC1.
+%K090108001.nex
+%	Blue STA. No PC1.
+%K111208001
+%	Pale blue. Looks like complex cell.
+%* K110608004 (2)
+%	Pale blue. PC1. Potential.
+%K010309002 (2)
+%	BY DO. No PC1.
+%** K010809004
+%	Small blue STA. Lum PC1.
+%K011309002.nex
+%	Little data.
+%K020209002.nex
+%	Magenta STA. Complex cell? "Missing link" cell?
+%K021409005.nex
+%	Blue/Cyan STA. No PC1.
+%* K050809003
+%	Sky blue STA. Maybe 1 pixel PC?
+%K052009001.nex
+%	Noisy.
+%K052009005.nex
+%	Yellow STA. No PC1.
+%* K052009007.nex
+%	Blue/Cyan STA (very like K021409005!) LUM PC1
+%K061609002&5.nex
+%	Blue STA. no PC1.
+%* K061809006.nex
+%	Orange STA. Lum PC1? Missing link?
+%K061909002
+%	BY double opponent. Large RF. No PC1.
+%K071709009.nex
+%	Red STA. No PC1.
+%K072209001.nex
+%	Blue STA. No PC1.
+%K072909002.nex
+%	Magenta STA. Complex cell? "Missing link" cell?
+%K082409008.nex
+%	BY double opponent cell. No PC1.
+%K090909009.nex
+%	Yellow/Green STA. No PC1.

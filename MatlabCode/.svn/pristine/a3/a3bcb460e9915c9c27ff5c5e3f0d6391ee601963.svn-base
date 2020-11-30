@@ -1,0 +1,319 @@
+% Figures for a second IsoSamp paper (about chromatic temporal contrast sensitivity)
+% Contents
+%
+% Section 0) Just setting stuff up. Should be identical to section 0 of
+% IsoSampPaperStuff.m except for the identities of the example neurons.
+%
+% Section 1) Cone weights
+%
+% Section 2) Example rasters and PSTHs for an example P and M cell. Taken
+% largely from IsoSampPaperStuff.m section 4.
+%
+% Section 3) Amplitude spectra of FFTs of spike trains
+%
+ 
+%%
+% Section 0)
+% Constants that should be shared across cells in this script so that I
+% don't accidentally switch formulas here and there.
+MMPERDEG = 0.223; % mm/deg (Perry and Cowey 1985)
+DEGPERMM = 1/MMPERDEG; % deg/mm
+DPRIMEMETHOD = 1;
+MONKEYS={'Apollo','Utu'};
+CELLTYPES = {'M','P'};
+TEMPORONASALSCALEFACTOR = .8;
+% DEBUGGING
+%TEMPORONASALSCALEFACTOR = 1;
+
+ONOFFCORRELATION = 0.05;
+
+RFTRUNCATIONINSD = 2;
+HUMAN2MONKPSCALEFACTOR = .80; % From Dacey and Petersen. reasonable range: [.77 .81];
+
+TFBINCENTERS = logspace(log10(1), log10(60), 15); % Native bins
+binwidth = log10(TFBINCENTERS(2))-log10(TFBINCENTERS(1));
+TFBINEDGES = 10.^(linspace(log10(TFBINCENTERS(1))-binwidth/2,log10(TFBINCENTERS(end))+binwidth/2,length(TFBINCENTERS)+1));
+MONKEY2MARKER = '^';
+EXAMPLEMAGNOCELL = 'A070717002.nex'; % example magnocell. Different from IsoSampPaperStuff.m
+EXAMPLEPARVOCELL = 'A122117002.nex'; % example parvocell. Different from IsoSampPaperStuff.m
+
+GETRFFROMSTAMODE = 2;
+GETRFFROMSTATHRESH = .95;
+MAXT= 6; % n frames back to compute STA
+
+ecc_to_diam_deg_M = @(rf_r_deg) 10.^(-1.2459+0.0345*rf_r_deg); % temporal retina equivalent
+a = 0.9729; % Table 1
+r2 = 1.084; % Table 1
+re = 7.633; % Table 1
+dc_0 = 14804.6; % Cone density of fovea
+rm = 41.03; % See Equation 7
+ecc_to_diam_deg_P = @(x)(sqrt(2./(sqrt(3).*... % Equation 9. Distance between adjacent midget RF centers.
+    (2*dc_0.*(1+x./rm).^-1.*(a*(1+(x./r2)).^-2+(1-a)*exp(-x./re)))...
+    ./2))... % Dividing y by 2 to estimate RF size from only ON or OFF mosaics (halving the density).
+    *HUMAN2MONKPSCALEFACTOR); % Monkey midget RFs are slightly smaller than human midget RFs
+
+bpdf_vec=@(x,y,mu_x,mu_y,sigma)(exp(-((x-mu_x).^2)./(2*sigma^2)-((y-mu_y).^2)/(2*sigma^2))./(2*pi*sigma^2)); % bivariate normpdf
+
+% Stuff for DTcones_gh
+fundamentals = load('T_cones_smj10');
+params = [];
+params.runType = 'isosamp';
+params.obsMethod = 'obsMethod_filteredWtFxn';
+params.impulseResponse = 'rieke';
+params.DTV1_fname = [];
+params.DTNT_fname = [];
+params.unitTest = false;
+params.eqMosaic = false;
+params.saveDir = '/Users/greghorwitz/Documents/MATLAB';
+params.notes = 'IsoSamp test';
+params.parallelOperations = false;
+params.eyeType = 'monkey';
+params.eyeNumber = 1; % LGN neurons are monocular
+params.coneSampRate = 2400;
+params.flatPowerSpect = false;
+params.enableScones = false;
+params.sacamp_deg = 0;
+params.sacdur_s = 0;
+
+
+%%
+% Section 1: Cone weights
+% Taken from IsoSampPop.m section 5
+
+% Section 20 of IsoSampPaperStuff.m
+
+
+%%
+% Section 2: Example rasters and PSTHs
+% Rasters of example neurons. Taken from Section 4 of "IsoSampFigures.m"
+% Assumes spike 1.
+filenames = {EXAMPLEMAGNOCELL, EXAMPLEPARVOCELL};
+STIMTYPES = {'RG','LUM'};
+spikeNum = 'sig001a';
+AXHEIGHT = 9;
+AXHMARGIN = 3.5;
+AXVMARGIN = 1;
+AXWIDTH = 6;
+PSTHSCALEFACTOR = 15;
+axpositions = [3 3; 3+AXWIDTH+AXHMARGIN 3+AXHEIGHT+AXVMARGIN];
+
+figprefs;
+for filenameidx = 1:length(filenames)
+    for STIMTYPEidx = 1:length(STIMTYPES)
+        STIMTYPE = STIMTYPES{STIMTYPEidx};
+        binwidth = 0.008; % bins for PSTH
+        filename = char(filenames(filenameidx));
+        stro = nex2stro(findfile(filename,[nexfilepath,filesep,'Greg',filesep,'Apollo']));
+        
+        Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+        Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+        TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+        stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+        stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+        fpoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'rew_t'));
+        
+        dur = mean(stimoff_t-stimon_t);
+        spikeidx = strcmp(stro.sum.rasterCells(1,:),spikeNum);
+        spikes = stro.ras(:,spikeidx);
+        [uniquestim, dprime, signal, noise] = IsoSampGetDPrime(stro,1);
+        
+        Lblank = all(uniquestim == 0,2);
+        if strcmp(STIMTYPE, 'LUM')
+            Lstimtype = (sign(uniquestim(:,1)) == sign(uniquestim(:,2))) & ~Lblank;
+        elseif strcmp(STIMTYPE, 'RG')
+            Lstimtype = (sign(uniquestim(:,1)) ~= sign(uniquestim(:,2))) & ~Lblank;
+        else
+            error('unknown stimtype');
+        end
+        Lwhichstimtypes = Lstimtype | Lblank;
+        
+        % Rasters for all conditions
+        offset = [-.1 .1];  % pre and post time wrt stimon/stimoff
+        bins = offset(1):binwidth:dur+offset(2);
+        %figure('position',[900 80 375 725]); axes('units','centimeters','position',[2 3 9 20]); hold on; % One column
+        %set(gca,'TickDir','out');
+        axes('position',[axpositions(filenameidx,1) axpositions(STIMTYPEidx,2) AXWIDTH AXHEIGHT]);
+        counter = 0;
+        for j = find(Lwhichstimtypes)'
+            L = Lcc == uniquestim(j,1) & Mcc == uniquestim(j,2) & TF == uniquestim(j,3);
+            psth = zeros(size(bins));
+            spikes_and_trialidxs = [];
+            for i = find(L)'
+                tmpspikes = spikes{i}-stimon_t(i);
+                tmpspikes(tmpspikes < offset(1) | tmpspikes > dur+offset(2)) = [];
+                spikes_and_trialidxs = [spikes_and_trialidxs; tmpspikes, repmat(i,length(tmpspikes),1)];
+            end
+            % plotting the PSTH first for ease of viewing
+            psth = hist(spikes_and_trialidxs(:,1),bins);
+            h = plot(bins,counter+1+psth./sum(L)./binwidth/PSTHSCALEFACTOR,'-','Linewidth',2,'Color',[.5 .5 .5]);
+            for i = find(L)'
+                tmpspikes = spikes_and_trialidxs(spikes_and_trialidxs(:,2) == i,1);
+                nspikestot = length(tmpspikes);
+                h = plot([tmpspikes tmpspikes]',[zeros(nspikestot,1) 1*ones(nspikestot,1)]'+counter,'k-','linewidth',1);
+                counter = counter + 1;
+            end
+            if j ~= max(find(Lwhichstimtypes))
+                plot([offset(1) dur+offset(2)],counter*[1 1],'k-');
+            end
+            
+            if uniquestim(j,3) == 0
+                h = text(-.12,counter-sum(L)/2,'Blank');
+                h(2) = text(dur+offset(2)+.1,counter-sum(L)/2,'0.00');
+            else
+                h = text(-.12,counter-sum(L)/2,num2str(round(uniquestim(j,3)*10)/10));
+                % BELOW: Using L-cone contrast == M-cone contrast as a proxy for luminance contrast
+                % (see BenardeteKaplanSims.m)
+                h(2) = text(dur+offset(2)+.1,counter-sum(L)/2,num2str(round(abs(uniquestim(j,1))*100)/100));
+            end
+            set(h,'HorizontalAlignment','right','FontSize',8,'FontAngle','Italic');
+            %if uniquestim(j,1) == 0 & uniquestim(j,2) == 0
+            %    plot([0 dur dur 0 0],[counter counter 0 0 counter],'k-','LineWidth',1);
+            %end
+            counter = counter + 1;
+        end
+        plot([0 0],[0 counter],'k-','LineWidth',.5);
+        plot([dur dur],[0 counter],'k-','LineWidth',.5);
+        set(gca,'Xlim',[0+offset(1) dur+offset(2)],'Ylim',[0 counter],'Ytick',[],'Xtick',[0 .2 .4 .6 .8],'Box','off','FontSize',8,'FontAngle','italic');
+        set(gcf,'Renderer','painters');
+      
+        if strcmp(stro.sum.fileName(find(stro.sum.fileName == filesep,1,'last')+1:end), EXAMPLEMAGNOCELL)
+            titlestr = 'Magno';
+        else
+            titlestr = 'Parvo';
+        end
+        if strcmp(STIMTYPE, 'LUM')
+            titlestr = [titlestr,' (L+M)'];
+        else
+            titlestr = [titlestr,' (L-M)'];
+        end
+        title(titlestr,'FontSize',12);
+        
+        if STIMTYPEidx == 1
+            xlabel('Time (s)','FontSize',10);
+        else
+            set(gca,'Xticklabel',[]);
+        end
+        
+        h(3) = text(-1,AXHEIGHT/2,'Frequency (Hz)','HorizontalAlignment','center','Units','centimeters','Rotation',90,'FontAngle','italic');
+        h(4) = text(AXWIDTH+1,AXHEIGHT/2,'Contrast','HorizontalAlignment','center','Units','centimeters','Rotation',-90,'FontAngle','italic');
+
+    end
+end
+
+
+%%
+% Section 3
+% Power spectral densities of spike trains
+
+maxf = 120; % Maximum frequency in Hz
+timebins = [0:1/(maxf*2):.660];
+deltaT = timebins(2)-timebins(1);
+nyquist = 1./(2*deltaT);
+
+fftdata = nan*ones(2, 2,length(TFBINCENTERS),length(filenames),length(timebins)); % cell class x colordir x tf x cell x hz
+for cellclassidx = 1:2
+    if cellclassidx == 1
+        cellclass = 'M';
+    else
+        cellclass = 'P';
+    end
+    [filenames, ~, spikenames, neuronids] = fnamesFromTxt('IsoSamp_LGN','cellClass',{cellclass});
+
+    for i = 1:length(filenames)
+        idx = neuronids(i);
+        tmpfilenames = filenames{neuronids == idx};
+        tmpspikename = spikenames(neuronids == idx,:);
+        
+        stro=[];
+        for j = 1:length(tmpfilenames)
+            stro = strocat(stro,nex2stro(findfile(tmpfilenames{j})));
+        end
+        
+        ntrials = size(stro.trial,1);
+        Lcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_l'));
+        Mcc = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stim_m'));
+        TF = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'tf'));
+        uniquestim = sortrows(unique([Lcc Mcc TF],'rows'),3);
+        stimon_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimon_t'));
+        stimoff_t = stro.trial(:,strcmp(stro.sum.trialFields(1,:),'stimoff_t'));
+        dur = mean(stimoff_t-stimon_t);
+        
+        tmpfftdata = nan*ones(ntrials,length(timebins));
+        for j=1:ntrials
+            spikeidx = strcmp(stro.sum.rasterCells,tmpspikename);
+            tmp = stro.ras{j,spikeidx}-stimon_t(j);
+            tmp(tmp<0) = [];
+            tmp(tmp>dur) = [];
+            n = hist(tmp,timebins);
+            tmpfftdata(j,:) = fftshift(fft(n));
+        end
+        
+        freqs = linspace(-nyquist, nyquist,size(tmpfftdata,2)); % Is this correct?
+        Llum = sign(uniquestim(:,1)) == sign(uniquestim(:,2)) & uniquestim(:,3) > 0;
+        Lrg = sign(uniquestim(:,1)) ~= sign(uniquestim(:,2)) & uniquestim(:,3) > 0;
+        
+        colors = hot(length(unique(TF)));
+        
+        for colordiridx = 1:2 % L+M and L-M
+            if colordiridx == 1
+                whichconditions = find(Llum);
+            else
+                whichconditions = find(Lrg);
+            end
+            for k = 1:length(whichconditions)
+                L = Lcc == uniquestim(whichconditions(k),1) & Mcc == uniquestim(whichconditions(k),2) & TF == uniquestim(whichconditions(k),3);
+                amp = mean(abs(tmpfftdata(L,:)));
+                if sum(softEq(uniquestim(whichconditions(colordiridx),3),TFBINCENTERS,3)) ~= 1
+                    disp('error')
+                    keyboard
+                end
+                fftdata(cellclassidx,colordiridx,softEq(uniquestim(whichconditions(k),3),TFBINCENTERS,3),i,:) = amp; % colordir x tf x cell x hz
+            end
+        end
+    end
+end
+
+AXHEIGHT = 5;
+AXWIDTH = 5;
+AXHMARGIN = 2;
+AXVMARGIN = 2;
+axpositions = [4 12];
+
+colors = jet(size(fftdata,3));
+figprefs;
+celltypelabels = {'Magnocellular','Parvocellular'};
+colordirlabels = {'L+M','L-M'};
+for i = 1:size(fftdata,1) % cell type
+    for j = 1:size(fftdata,2) % colordir
+        axes('position',[axpositions(1)+(j-1)*(AXWIDTH+AXHMARGIN) axpositions(2)-(i-1)*(AXHEIGHT+AXVMARGIN) AXWIDTH AXHEIGHT])
+        hold on;
+        for k = 1:size(fftdata,3) % stim TF
+            if sum(~isnan(fftdata(i,j,k,:,1)),4) > 1 % Don't use conditions with only one observation
+                tmp = squeeze(nanmean(fftdata(i,j,k,:,:),4));
+                df = freqs(2)-freqs(1);
+                %plot(freqs,tmp.^2/(2*df),'color',colors(k,:));
+                L = freqs >= 0;
+                plot(freqs(L),tmp(L).^2/(2*df),'color',colors(k,:));
+                set(gca,'yscale','log');
+            end
+        end
+        title([celltypelabels{i},' ',colordirlabels{i}]);
+        set(gca,'Xlim',[0 maxf]);
+        if i == 2
+            xlabel('Frequency (Hz)');
+        end
+        if j == 1
+            ylabel('Amplitude (a.u.)');
+        end
+    end
+end
+equatesubplotaxeslims;
+
+% Colorbar
+axes('position',[axpositions(1)+j*(AXWIDTH+AXHMARGIN) axpositions(2)-(i-1)*(AXHEIGHT+AXVMARGIN) .5 AXHEIGHT])
+image([1:size(colors,1)]');
+colormap(colors);
+set(gca,'YAxisLocation','right');
+set(gca,'Ylim',[1 size(colors,1)],'Ytick',[1:2:size(colors,1)],'Yticklabels',round(TFBINCENTERS(1:2:end)*10)/10);
+set(gca,'Ylim',[1 size(colors,1)],'Xtick',[]);
+ylabel('Frequency (Hz)');

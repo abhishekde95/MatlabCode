@@ -1,0 +1,38 @@
+% Fitting a glm to neuronal response 
+% Author - Abhishek De, 2/20
+close all; clearvars;
+plot_counter = 1;
+
+% Created a whitenoise stimulus 
+T = 300; % in seconds 
+dt = 0.005; % Sampling time
+t = 0:dt:T;
+Stim = randn(size(t));
+
+% Generate a dummy temporal impulse response filter
+maxT = 10;
+Filt = exp(-(0:maxT)).*poisspdf(0:maxT,5); % Filter response of a hypothetical response
+Filt(1) = 0;
+
+% Create a spike train from the hypothetical linear-nonlinear model
+drive = conv(Stim,Filt,'same');
+response = [];
+for ii = 1:numel(t)
+    response = [response poissrnd(exp(max([0 drive(ii)])))];
+end
+
+% Now, I want to fit the responses to a simple GLM with exponential kernel and poisson spiking response
+Neurofilter = fitGLM_AD(Stim,response,maxT+1); % custom made GLM function with post-spike filter
+% First column of the Neurofilter - stimulus dependent filter
+% Second column of the Neurofilter - Post-spike/History dependent filter
+
+% Plotting the Results
+figure(plot_counter);
+subplot(221); plot(t,Stim,'k'); axis square; set(gca,'Tickdir','out'); xlabel('time(s)'); ylabel('Stim'); title('Gaussian WN stim')
+subplot(222); plot(0:dt:dt*maxT,Filt,'k'); axis square; set(gca,'Tickdir','out'); xlabel('time(s)'); ylabel('Filter response'); title('Temporal IRF');
+subplot(223); plot(t,response,'k'); axis square; set(gca,'Tickdir','out'); xlabel('time(s)'); ylabel('Spike counts'), title('Spiking responses');
+subplot(224); plot(0:dt:dt*maxT,Neurofilter(:,1)./max(abs(Neurofilter(:,1))),'k'); hold on;
+plot(0:dt:dt*maxT,Neurofilter(:,2)./max(abs(Neurofilter(:,2))),'r'); axis square; set(gca,'Tickdir','out'); xlabel('time(s)'); 
+legend('Spike filter','History filter'); ylabel('Filter response'); title('Fitted IRF');
+plot_counter = plot_counter + 1;
+

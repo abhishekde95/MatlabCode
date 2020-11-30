@@ -1,0 +1,742 @@
+% Figures for the Waveform paper titled " Chromatic tuning of putative
+% inhibitory and excitatory neurons in macaque primary visual cortex."
+% Author - Abhishek De, 11/19
+ 
+close all; clearvars;
+%% Figure 1: Cone weights
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+DO_conewts = [ColorOpponentIds_conewts Sconedominated_conewts];
+
+% First thing I want to plot are the cone weights
+figure(plot_counter); set(gcf,'Name','Cone wts')
+subplot(211); hold on;
+for ii = 1:numel(LumIds_conewts)
+    h(ii) = plot(conewts_svd(1,LumIds_conewts(ii)),conewts_svd(2,LumIds_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+for ii = 1:numel(DO_conewts)
+    if ii ~=26 | ii ~=30
+        h(ii) = plot(conewts_svd(1,DO_conewts(ii)),conewts_svd(2,DO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+        set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+    end
+    if ii == 26 | ii ==30
+        plot(conewts_svd(1,DO_conewts(ii)),conewts_svd(2,DO_conewts(ii)),'o','MarkerSize',8,'LineWidth',0.5,'MarkerFaceColor','c','MarkerEdgeColor',[1 1 1]); hold on;
+        
+    end
+    
+end
+for ii = 1:numel(Other_conewts)
+    h(ii) = plot(conewts_svd(1,Other_conewts(ii)),conewts_svd(2,Other_conewts(ii)),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out'); plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');  xlabel('L'), ylabel('M'); title('Spatially opponent');
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+SO_conewts = find(sum(sign(conewts_svdSO(1:2,:)),1)==0);
+LNO_conewts = find(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+subplot(212); hold on;
+for ii = 1:numel(SO_conewts)
+    h(ii) = plot(conewts_svdSO(1,SO_conewts(ii)),conewts_svdSO(2,SO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor','c','MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+for ii = 1:numel(LNO_conewts)
+    h(ii) = plot(conewts_svdSO(1,LNO_conewts(ii)),conewts_svdSO(2,LNO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor','m','MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out');  plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k');  xlabel('L'), ylabel('M'); title('Spatially non-opponent');
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+
+%% Figure 2: Waveform width & peak-to-trough ratio
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+load timediff.mat
+load peak_waveform.mat
+load trough_waveform.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+timediff(~Z_cellsofinterest) = [];
+peak_waveform(~Z_cellsofinterest) = [];
+trough_waveform(~Z_cellsofinterest) = [];
+
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+SOidx = find(Singleopponent & simplecells);
+
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+ind = find(~Singleopponent & simplecells);
+LUMidx = ind(LumIds_conewts);
+COidx = ind(ColorOpponentIds_conewts);
+Sconeidx = ind(Sconedominated_conewts);
+DOidx = [COidx; Sconeidx];
+LNOidx = SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+hardtoclassifyidx = [ind(Other_conewts); find(~simplecells)]; % unclassified and complex cells
+SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2) = [];
+idx = [LUMidx; LNOidx; DOidx; SOidx; hardtoclassifyidx]; % First DO, then simple cells, then SO and then hardtoclassify cells
+group = [ones(numel(LUMidx),1); 2*ones(numel(LNOidx),1); 3*ones(numel(DOidx),1); 4*ones(numel(SOidx),1); 5*ones(numel(hardtoclassifyidx),1)];
+
+
+bins = logspace(log10(0.1),log10(10),20);
+% PLotting the histograms of aspect ratios and waveform widths
+figure(plot_counter);
+subplot(621); histogram(timediff,10:30:700,'DisplayStyle','stairs','EdgeColor',[0.5 0.5 0.5],'Linewidth',2); hold on;
+set(gca,'Tickdir','out','Xlim',[0 600],'Ylim',[0 70],'XTick',0:200:600,'YTick',0:35:70); ylabel('# cells'); axis square;
+subplot(623); histogram(timediff(LUMidx),10:30:700,'FaceColor',[0 1 0],'EdgeColor',[1 1 1]); hold on
+plot(median(timediff(LUMidx)),19,'v','MarkerFaceColor','g','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0 600],'XTick',0:200:600,'Ylim',[0 20],'YTick',[0 20]); ylabel('# cells'); axis square;
+subplot(625); hold on;
+histogram(timediff(LNOidx),10:30:700,'FaceColor','m','EdgeColor',[1 1 1]);
+plot(median(timediff(LNOidx)),1.5,'v','MarkerFaceColor','m','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0 600],'Ylim',[0 2],'XTick',0:200:600,'YTick',[0 2]);  ylabel('# cells'); axis square;
+subplot(627); hold on;
+histogram(timediff(DOidx),10:30:700,'FaceColor',[1 0 0],'EdgeColor',[1 1 1]);
+plot(median(timediff(DOidx)),20,'v','MarkerFaceColor','r','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0 600],'Ylim',[0 30],'XTick',0:200:600,'YTick',[0 30]);  ylabel('# cells'); axis square;
+subplot(629); hold on;
+histogram(timediff(SOidx),10:30:700,'FaceColor','c','EdgeColor',[1 1 1]);
+plot(median(timediff(SOidx)),9,'v','MarkerFaceColor','c','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0 600],'Ylim',[0 10],'XTick',0:200:600,'YTick',[0 10]); xlabel('waveform width (us)'); ylabel('# cells'); axis square;
+subplot(6,2,11); hold on;
+histogram(timediff(hardtoclassifyidx),10:30:700,'FaceColor','k','EdgeColor',[1 1 1]);
+plot(median(timediff(hardtoclassifyidx)),14,'v','MarkerFaceColor','k','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0 600],'Ylim',[0 15],'XTick',0:200:600,'YTick',[0 15]); xlabel('waveform width (us)'); ylabel('# cells'); axis square;
+subplot(622); histogram(abs(peak_waveform)./abs(trough_waveform),bins,'DisplayStyle','stairs','EdgeColor',[0.5 0.5 0.5],'Linewidth',2); hold on;
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 100],'YTick',0:50:100,'XScale','log');  axis square;
+subplot(624); histogram(abs(peak_waveform(LUMidx))./abs(trough_waveform(LUMidx)),bins,'FaceColor',[0 1 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(abs(peak_waveform(LUMidx))./abs(trough_waveform(LUMidx))),29,'v','MarkerFaceColor','g','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 30],'YTick',[0 30],'XScale','log');  axis square;
+subplot(626); hold on;
+histogram(abs(peak_waveform(LNOidx))./abs(trough_waveform(LNOidx)),bins,'FaceColor','m','EdgeColor',[1 1 1]);
+plot(median(abs(peak_waveform(LNOidx))./abs(trough_waveform(LNOidx))),4,'v','MarkerFaceColor','m','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 5],'YTick',[0 5],'XScale','log'); axis square;
+subplot(628); hold on;
+histogram(abs(peak_waveform(DOidx))./abs(trough_waveform(DOidx)),bins,'FaceColor','r','EdgeColor',[1 1 1]);
+plot(median(abs(peak_waveform(DOidx))./abs(trough_waveform(DOidx))),44,'v','MarkerFaceColor','r','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 45],'YTick',[0 45],'XScale','log'); axis square;
+subplot(6,2,10); hold on;
+histogram(abs(peak_waveform(SOidx))./abs(trough_waveform(SOidx)),bins,'FaceColor','c','EdgeColor',[1 1 1]);
+plot(median(abs(peak_waveform(SOidx))./abs(trough_waveform(SOidx))),19,'v','MarkerFaceColor','c','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 20],'YTick',[0 20],'XScale','log');  axis square;
+subplot(6,2,12); hold on;
+histogram(abs(peak_waveform(hardtoclassifyidx))./abs(trough_waveform(hardtoclassifyidx)),bins,'FaceColor','k','EdgeColor',[1 1 1]);
+plot(median(abs(peak_waveform(hardtoclassifyidx))./abs(trough_waveform(hardtoclassifyidx))),19,'v','MarkerFaceColor','k','MarkerSize',6,'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[0.1 10],'XTick',[0.1 0.3 1 3 10],'Ylim',[0 20],'YTick',[0 20],'XScale','log'); xlabel('log(peak/trough)'); axis square;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% Using k-means to divide the data into two groups:
+idx = kmeans(timediff,2);
+narrow_wf = timediff(idx==1);
+broad_wf = timediff(idx==2);
+
+% Calculating whether there is any correlation between the waveform duration and spontaneous firing rate
+baselineFR = cell2mat(Output_List(:,18));
+[r1,p1] = corr(timediff,baselineFR,'type','Spearman');
+
+% Trying to fit gaussian mixture model
+GMModel1 = fitgmdist(timediff,1);
+GMModel2 = fitgmdist(timediff,2);
+GMModel3 = fitgmdist(timediff,3);
+figure(plot_counter); hold on;
+histogram(timediff,10:30:700,'Normalization','pdf','FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(10:30:700,pdf(GMModel1,(10:30:700)'),'r','Linewidth',2); plot(10:30:700,pdf(GMModel2,(10:30:700)'),'g','Linewidth',2); 
+plot(10:30:700,pdf(GMModel3,(10:30:700)'),'b','Linewidth',2); axis square;
+plot_counter = plot_counter + 1;
+
+% Hartigan's dip test
+[dip,pval] = HartigansDipSignifTest(timediff,500);
+
+% Bootstrapping based on Efron and Tibshirani
+h = 5:5:100;
+p = zeros(numel(h),1);
+for ii = 1:numel(h)
+    p(ii) = testbimodality(h(ii),timediff,10,700,500);
+end
+figure,subplot(121); plot(h,p,'k','Linewidth',2); axis square; set(gca,'Tickdir','out');
+subplot(122); histogram(timediff,10:60:700,'FaceColor','k','EdgeColor',[1 1 1]); axis square; set(gca,'Tickdir','out');
+plot_counter = plot_counter + 1;
+
+%% Figure 3: Boxplots of waveform widths, peak-to-trough ratio, Mean waveform with error bars
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+load timediff.mat
+load peak_waveform.mat
+load trough_waveform.mat
+load all_waveforms.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+timediff(~Z_cellsofinterest) = [];
+peak_waveform(~Z_cellsofinterest) = [];
+trough_waveform(~Z_cellsofinterest) = [];
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+all_waveforms(~Z_cellsofinterest) = [];
+
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+SOidx = find(Singleopponent & simplecells);
+
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+ind = find(~Singleopponent & simplecells);
+LUMidx = ind(LumIds_conewts);
+COidx = ind(ColorOpponentIds_conewts);
+Sconeidx = ind(Sconedominated_conewts);
+DOidx = [COidx; Sconeidx];
+LNOidx = SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+hardtoclassifyidx = [ind(Other_conewts); find(~simplecells)]; % unclassified and complex cells
+SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2) = [];
+idx = [LUMidx; LNOidx; DOidx; SOidx; hardtoclassifyidx]; % First DO, then simple cells, then SO and then hardtoclassify cells
+group = [ones(numel(LUMidx),1); 2*ones(numel(LNOidx),1); 3*ones(numel(DOidx),1); 4*ones(numel(SOidx),1); 5*ones(numel(hardtoclassifyidx),1)];
+
+p1 = kruskalwallis(abs(peak_waveform(idx))./abs(trough_waveform(idx)),group,'off'); % comparing peak/trough
+p2 = kruskalwallis(timediff(idx),group,'off'); % comparing trough-peak time
+
+figure(plot_counter);
+subplot(312); boxplot(abs(peak_waveform(idx))./abs(trough_waveform(idx)),group); set(gca,'Tickdir','out','XTicklabel',{'Lum','LNO','DO','SO','oth'},'Ylim',[0.1 10],'YTick',[0.1 1 10],'YScale','log'); ylabel('peak/trough');
+title(strcat('p=',num2str(p1,2))); axis square;
+subplot(311); boxplot(timediff(idx),group); set(gca,'Tickdir','out','XTicklabel',{'Lum','LNO','DO','SO','oth'},'Ylim',[0 600],'YTick',0:200:600); ylabel('peak-trough time');
+title(strcat('p=',num2str(p2,2))); axis square;
+
+DO_waveform = nan(numel(DOidx),1000); countDO = 1;
+LUM_waveform = nan(numel(LUMidx),1000); countLUM = 1;
+LNO_waveform = nan(numel(LNOidx),1000); countLNO = 1;
+SO_waveform = nan(numel(SOidx),1000); countSO = 1;
+htc_waveform = nan(numel(hardtoclassifyidx),1000); counthtc = 1;
+for ii = 1:size(all_waveforms,1)
+    L = size(all_waveforms{ii},2);
+    inds = 1:numel(all_waveforms{ii});
+    [~,jj] = min(all_waveforms{ii});
+    inds = inds - jj;
+    W = all_waveforms{ii};
+    W = W - ((min(W)+max(W))/2);
+    if any(ismember(DOidx,ii))
+        DO_waveform(countDO,200-jj+1:200+L-jj) = W;
+        countDO = countDO + 1;
+    elseif any(ismember(LUMidx,ii))
+        LUM_waveform(countLUM,200-jj+1:200+L-jj) = W;
+        countLUM = countLUM + 1;
+    elseif any(ismember(SOidx,ii))
+        SO_waveform(countSO,200-jj+1:200+L-jj) = W;
+        countSO = countSO + 1;
+    elseif any(ismember(LNOidx,ii))
+        LNO_waveform(countLNO,200-jj+1:200+L-jj) = W;
+        countLNO = countLNO + 1;
+    else
+        htc_waveform(counthtc,200-jj+1:200+L-jj) = W;
+        counthtc = counthtc + 1;
+    end
+end
+
+% Further processing for plotting the waveforms
+DW = nanmean(DO_waveform,1); DW = DW - ((min(DW)+max(DW))/2); DW = DW/max(DW); % mean DO waveform
+LW = nanmean(LUM_waveform,1); LW = LW - ((min(LW)+max(LW))/2); LW = LW/max(LW); % mean LUM waveform
+LNW = nanmean(LNO_waveform,1); LNW = LNW - ((min(LNW)+max(LNW))/2); LNW = LNW/max(LNW); % mean LNO waveform
+SW = nanmean(SO_waveform,1); SW = SW - ((min(SW(100:400))+max(SW(100:400)))/2); SW = SW/max(SW(100:400)); % mean SO waveform
+HW = nanmean(htc_waveform,1); HW = HW - ((min(HW)+max(HW))/2); HW = HW/max(HW); % mean htc waveform
+errDW = nanstd(DO_waveform,1)/(sqrt(numel(DOidx))*max(DW));
+errLW = nanstd(LUM_waveform,1)/(sqrt(numel(LUMidx))*max(LW));
+errLNW = nanstd(LNO_waveform,1)/(sqrt(numel(LNOidx))*max(LNW));
+errSW = nanstd(SO_waveform,1)/(sqrt(numel(SOidx))*max(SW));
+errHW = nanstd(htc_waveform,1)/(sqrt(numel(hardtoclassifyidx))*max(HW));
+indices = 1:10:numel(DW);
+t = 2.5*(0:1:999)-500;
+subplot(313); errorbar(t(indices),HW(indices),errHW(indices),'Linewidth',2,'Color','k'); hold on; errorbar(t(indices),DW(indices),errDW(indices),'Linewidth',2,'Color','r'); errorbar(t(indices),LW(indices),errLW(indices),'Linewidth',2,'Color','g'); 
+errorbar(t(indices),SW(indices),errSW(indices),'Linewidth',2,'Color','c'); errorbar(t(indices),LNW(indices),errLNW(indices),'Linewidth',2,'Color','m'); set(gca,'Tickdir','out','Xlim',[-200 600],'Ylim',[-1.1 1.1],'YTick',-1:1:1); axis square; 
+xlabel('time (us)'); ylabel('Normalized Voltage'); hold off;
+set(gcf,'renderer','painters'); 
+plot_counter = plot_counter + 1;
+
+
+%% Figure 4: Control Analyses 
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+load timediff.mat
+load peak_waveform.mat
+load trough_waveform.mat
+load all_waveforms.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+timediff(~Z_cellsofinterest) = [];
+peak_waveform(~Z_cellsofinterest) = [];
+trough_waveform(~Z_cellsofinterest) = [];
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+all_waveforms(~Z_cellsofinterest) = [];
+
+
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+% LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+LumIds_conewts = find(conewts_svd(2,:) + conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)-0.5).^2)<0.3);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts]) = [];
+DO_conewts = [ColorOpponentIds_conewts];
+
+% First thing I want to plot are the cone weights
+figure(plot_counter); set(gcf,'Name','Control analyses')
+subplot(311); hold on;
+for ii = 1:numel(LumIds_conewts)
+    h(ii) = plot(conewts_svd(1,LumIds_conewts(ii)),conewts_svd(2,LumIds_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+for ii = 1:numel(DO_conewts)
+    plot(conewts_svd(1,DO_conewts(ii)),conewts_svd(2,DO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor','r','MarkerEdgeColor',[1 1 1]); hold on;
+    
+end
+for ii = 1:numel(Other_conewts)
+    h(ii) = plot(conewts_svd(1,Other_conewts(ii)),conewts_svd(2,Other_conewts(ii)),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out'); plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');  xlabel('L'), ylabel('M'); title('Spatially opponent');
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+% SO_conewts = find(sum(sign(conewts_svdSO(1:2,:)),1)==0);
+SO_conewts = find(conewts_svdSO(2,:) - conewts_svdSO(1,:) >thresh & sum(sign(conewts_svdSO(1:2,:)),1)==0 & sqrt((conewts_svdSO(2,:)-0.5).^2 + (conewts_svdSO(1,:)+0.5).^2)<0.3);
+LNO_conewts = find(conewts_svdSO(2,:) + conewts_svdSO(1,:) >thresh & sum(sign(conewts_svdSO(1:2,:)),1)==2 & sqrt((conewts_svdSO(2,:)-0.5).^2 + (conewts_svdSO(1,:)-0.5).^2)<0.3);
+Other_conewtsSO = 1:size(conewts_svdSO,2); Other_conewtsSO([SO_conewts LNO_conewts]) = [];
+% LNO_conewts = find(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+
+subplot(312); hold on;
+for ii = 1:numel(SO_conewts)
+    h(ii) = plot(conewts_svdSO(1,SO_conewts(ii)),conewts_svdSO(2,SO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor','c','MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+for ii = 1:numel(LNO_conewts)
+    h(ii) = plot(conewts_svdSO(1,LNO_conewts(ii)),conewts_svdSO(2,LNO_conewts(ii)),'o','MarkerSize',4,'LineWidth',0.5,'MarkerFaceColor','m','MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+for ii = 1:numel(Other_conewtsSO)
+    h(ii) = plot(conewts_svdSO(1,Other_conewtsSO(ii)),conewts_svdSO(2,Other_conewtsSO(ii)),'o','MarkerSize',3,'LineWidth',0.5,'MarkerFaceColor','k','MarkerEdgeColor',[1 1 1]); hold on;
+    set(h(ii),'ButtonDownFcn',['disp(''', num2str(ii),''')']);
+end
+plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k'); plot([-1 1],[0 0],'k');
+axis equal; set(gca,'Xlim',[-1 1],'Ylim',[0 1],'XTick',-1:0.5:1,'YTick',0:0.5:1,'Tickdir','out');  plot([-1 0],[0 1],'k'); plot([0 1],[1 0],'k');  xlabel('L'), ylabel('M'); title('Spatially non-opponent');
+set(gcf,'renderer','painters');
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+ind = find(~Singleopponent & simplecells);
+LUMidx = ind(LumIds_conewts);
+DOidx = ind(ColorOpponentIds_conewts);
+SOidx = find(Singleopponent & simplecells);
+LNOidx = SOidx(LNO_conewts);
+hardtoclassifyidx = [ind(Other_conewts); find(~simplecells); SOidx(Other_conewtsSO)]; % unclassified and complex cells
+SOidx = SOidx(SO_conewts);
+idx = [LUMidx; LNOidx; DOidx; SOidx; hardtoclassifyidx]; % First DO, then simple cells, then SO and then hardtoclassify cells
+group = [ones(numel(LUMidx),1); 2*ones(numel(LNOidx),1); 3*ones(numel(DOidx),1); 4*ones(numel(SOidx),1); 5*ones(numel(hardtoclassifyidx),1)];
+
+p1 = kruskalwallis(abs(peak_waveform(idx))./abs(trough_waveform(idx)),group,'off'); % comparing peak/trough
+p2 = kruskalwallis(timediff(idx),group,'off'); % comparing trough-peak time
+
+
+DO_waveform = nan(numel(DOidx),1000); countDO = 1;
+LUM_waveform = nan(numel(LUMidx),1000); countLUM = 1;
+LNO_waveform = nan(numel(LNOidx),1000); countLNO = 1;
+SO_waveform = nan(numel(SOidx),1000); countSO = 1;
+htc_waveform = nan(numel(hardtoclassifyidx),1000); counthtc = 1;
+for ii = 1:size(all_waveforms,1)
+    L = size(all_waveforms{ii},2);
+    inds = 1:numel(all_waveforms{ii});
+    [~,jj] = min(all_waveforms{ii});
+    inds = inds - jj;
+    W = all_waveforms{ii};
+    W = W - ((min(W)+max(W))/2);
+    if any(ismember(DOidx,ii))
+        DO_waveform(countDO,200-jj+1:200+L-jj) = W;
+        countDO = countDO + 1;
+    elseif any(ismember(LUMidx,ii))
+        LUM_waveform(countLUM,200-jj+1:200+L-jj) = W;
+        countLUM = countLUM + 1;
+    elseif any(ismember(SOidx,ii))
+        SO_waveform(countSO,200-jj+1:200+L-jj) = W;
+        countSO = countSO + 1;
+    elseif any(ismember(LNOidx,ii))
+        LNO_waveform(countLNO,200-jj+1:200+L-jj) = W;
+        countLNO = countLNO + 1;
+    else
+        htc_waveform(counthtc,200-jj+1:200+L-jj) = W;
+        counthtc = counthtc + 1;
+    end
+end
+
+% Further processing for plotting the waveforms
+DW = nanmean(DO_waveform,1); DW = DW - ((min(DW)+max(DW))/2); DW = DW/max(DW); % mean DO waveform
+LW = nanmean(LUM_waveform,1); LW = LW - ((min(LW)+max(LW))/2); LW = LW/max(LW); % mean LUM waveform
+LNW = nanmean(LNO_waveform,1); LNW = LNW - ((min(LNW)+max(LNW))/2); LNW = LNW/max(LNW); % mean LNO waveform
+SW = nanmean(SO_waveform,1); SW = SW - ((min(SW(100:400))+max(SW(100:400)))/2); SW = SW/max(SW(100:400)); % mean SO waveform
+HW = nanmean(htc_waveform,1); HW = HW - ((min(HW)+max(HW))/2); HW = HW/max(HW); % mean htc waveform
+errDW = nanstd(DO_waveform,1)/(sqrt(numel(DOidx))*max(DW));
+errLW = nanstd(LUM_waveform,1)/(sqrt(numel(LUMidx))*max(LW));
+errLNW = nanstd(LNO_waveform,1)/(sqrt(numel(LNOidx))*max(LNW));
+errSW = nanstd(SO_waveform,1)/(sqrt(numel(SOidx))*max(SW));
+errHW = nanstd(htc_waveform,1)/(sqrt(numel(hardtoclassifyidx))*max(HW));
+indices = 1:10:numel(DW);
+t = 2.5*(0:1:999)-500;
+subplot(313); errorbar(t(indices),HW(indices),errHW(indices),'Linewidth',2,'Color','k'); hold on; errorbar(t(indices),DW(indices),errDW(indices),'Linewidth',2,'Color','r'); errorbar(t(indices),LW(indices),errLW(indices),'Linewidth',2,'Color','g'); 
+errorbar(t(indices),SW(indices),errSW(indices),'Linewidth',2,'Color','c'); errorbar(t(indices),LNW(indices),errLNW(indices),'Linewidth',2,'Color','m'); set(gca,'Tickdir','out','Xlim',[-200 600],'Ylim',[-1.1 1.1],'YTick',-1:1:1); axis square; 
+xlabel('time (us)'); ylabel('Normalized Voltage'); hold off;
+set(gcf,'renderer','painters'); 
+plot_counter = plot_counter + 1;
+
+
+%% Additional figures: plotting the STAs of simple, DO, SO and non-opponent cells
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+% load Output_ListWN.mat
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+SOidx = find(Singleopponent & simplecells);
+
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+ind = find(~Singleopponent & simplecells);
+LUMidx = ind(LumIds_conewts);
+COidx = ind(ColorOpponentIds_conewts);
+Sconeidx = ind(Sconedominated_conewts);
+DOidx = [COidx; Sconeidx];
+LNOidx = SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+hardtoclassifyidx = [ind(Other_conewts); find(~simplecells)]; % unclassified and complex cells
+SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2) = [];
+
+% plotting STAs of Simlpe cells
+figure(plot_counter); set(gcf,'Name','Simple cells');
+for ii = 1:numel(LUMidx)
+    tmp_vec_gun = Output_List{LUMidx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+ 
+    subplot(14,10,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+end
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% plotting STAs of DO cells
+figure(plot_counter); set(gcf,'Name','DO cells');
+for ii = 1:numel(DOidx)
+    tmp_vec_gun = Output_List{DOidx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+ 
+    subplot(14,10,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+end
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% plotting STAs of Single-opponent cells
+figure(plot_counter); set(gcf,'Name','SO');
+for ii = 1:numel(SOidx)
+    tmp_vec_gun = Output_List{SOidx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+ 
+    subplot(14,10,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+end
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% plotting STAs of Single-opponent cells
+figure(plot_counter); set(gcf,'Name','LNO');
+for ii = 1:numel(LNOidx)
+    tmp_vec_gun = Output_List{LNOidx(ii),2};
+    normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+    im = normfactor*tmp_vec_gun + 0.5;
+    im = reshape(im,[10 10 3]);
+ 
+    subplot(14,10,ii); image(im); set(gca,'XTick',[],'YTick',[]); axis square;
+end
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+%% Additional figure for visualizing narrow and broad spiking waveforms
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+load Output_List_waveform.mat
+load Singleopponent_waveform.mat
+load timediff.mat
+load peak_waveform.mat
+load trough_waveform.mat
+load all_waveforms.mat
+
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+timediff(~Z_cellsofinterest) = [];
+peak_waveform(~Z_cellsofinterest) = [];
+trough_waveform(~Z_cellsofinterest) = [];
+all_waveforms(~Z_cellsofinterest) = [];
+
+Singleopponent_waveform(~Z_cellsofinterest) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = Singleopponent_waveform;
+Singleopponent = logical(Singleopponent);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+RGB_svd = cell2mat(Output_List(~Singleopponent & simplecells,5)');
+bkgndlms = cell2mat(Output_List(1,16)');
+Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+Mrgbtocc = inv(Mrgbtocc');
+conewts_svd = Mrgbtocc * RGB_svd;
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+RGB_svdSO = cell2mat(Output_List(Singleopponent & simplecells,5)');
+conewts_svdSO = Mrgbtocc * RGB_svdSO;
+conewts_svdSO = conewts_svdSO./repmat(sum(abs(conewts_svdSO),1),[3 1]);
+conewts_svdSO = conewts_svdSO .* repmat(sign(conewts_svdSO(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+SOidx = find(Singleopponent & simplecells);
+
+
+% Next, I am plotting the SVD derived luminance, color-opponent and other cells
+ind = find(~Singleopponent & simplecells);
+LUMidx = ind(LumIds_conewts);
+COidx = ind(ColorOpponentIds_conewts);
+Sconeidx = ind(Sconedominated_conewts);
+DOidx = [COidx; Sconeidx];
+LNOidx = SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2);
+hardtoclassifyidx = [ind(Other_conewts); find(~simplecells)]; % unclassified and complex cells
+SOidx(sum(sign(conewts_svdSO(1:2,:)),1)==2) = [];
+idx = [LUMidx; LNOidx; DOidx; SOidx; hardtoclassifyidx]; % First DO, then simple cells, then SO and then hardtoclassify cells
+group = [ones(numel(LUMidx),1); 2*ones(numel(LNOidx),1); 3*ones(numel(DOidx),1); 4*ones(numel(SOidx),1); 5*ones(numel(hardtoclassifyidx),1)];
+
+
+% Using k-means to divide the data into two groups:
+idx = kmeans(timediff,2);
+narrow_wf = find(idx==1);
+broad_wf = find(idx==2);
+
+narrow_waveform = nan(numel(narrow_wf),1000); count_narrow = 1;
+broad_waveform = nan(numel(broad_wf),1000); count_broad = 1;
+indices = 1:10:size(narrow_waveform,2);
+t = 2.5*(0:1:999)-500;
+figure(plot_counter); subplot(122);
+for ii = 1:size(all_waveforms,1)
+    L = size(all_waveforms{ii},2);
+    inds = 1:numel(all_waveforms{ii});
+    [~,jj] = min(all_waveforms{ii});
+    inds = inds - jj;
+    W = all_waveforms{ii};
+    W = W - ((min(W)+max(W))/2);
+    W = W./max(W);
+    if any(ismember(narrow_wf,ii))
+        narrow_waveform(count_narrow,200-jj+1:200+L-jj) = W;
+        subplot(121); plot(t(indices),narrow_waveform(count_narrow,indices),'Color','k'); hold on;
+        count_narrow = count_narrow + 1;
+    elseif any(ismember(broad_wf,ii))
+        broad_waveform(count_broad,200-jj+1:200+L-jj) = W;
+        subplot(121); plot(t(indices),broad_waveform(count_broad,indices),'Color','r'); hold on;
+        count_broad = count_broad + 1;
+    end
+end
+subplot(121); set(gca,'Tickdir','out','Xlim',[-200 600],'Ylim',[-1.1 1.1],'YTick',-1:1:1); axis square; 
+xlabel('time (us)'); ylabel('Normalized Voltage'); hold off;
+% Further processing for plotting the waveforms
+NW = nanmean(narrow_waveform,1); NW = NW - ((min(NW)+max(NW))/2); NW = NW/max(NW); % mean narrow waveform
+BW = nanmean(broad_waveform,1); BW = BW - ((min(BW)+max(BW))/2); BW = BW/max(BW); % mean broad waveform
+
+errNW = nanstd(narrow_waveform,1)/(sqrt(numel(narrow_waveform))*max(NW));
+errBW = nanstd(broad_waveform,1)/(sqrt(numel(broad_waveform))*max(BW));
+
+
+subplot(122); errorbar(t(indices),NW(indices),errNW(indices),'Linewidth',2,'Color','k'); hold on; errorbar(t(indices),BW(indices),errBW(indices),'Linewidth',2,'Color','r');  
+set(gca,'Tickdir','out','Xlim',[-200 600],'Ylim',[-1.1 1.1],'YTick',-1:1:1); axis square; 
+xlabel('time (us)'); ylabel('Normalized Voltage'); hold off;
+set(gcf,'renderer','painters'); 
+plot_counter = plot_counter + 1;

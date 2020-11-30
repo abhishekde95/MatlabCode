@@ -1,0 +1,168 @@
+% Analyzing OFF responses from all the cells in the during the isoreponse
+% measurement - Are DO cells cone-opponent simple cells?
+% Author - Abhishek De, 10/18
+close all; clearvars;
+load filename_c.mat
+load filename_l.mat
+load S1LMS.mat
+load S2LMS.mat
+load newOCidx.mat
+load newLMidx.mat
+load newLUMidx.mat
+load newSOidx.mat
+load newhardtoclassifyidx.mat
+OCidx = newOCidx;
+LMidx = newLMidx;
+LUMidx = newLUMidx;
+SOidx = newSOidx;
+hardtoclassifyidx = newhardtoclassifyidx;
+filename = [filename_c; filename_l];
+binwidth = 0.010;
+t1 = 0.3;
+t2 = 0.2;
+N = numel(filename);
+PSTHbins = -t1:binwidth:t2;
+PSTH = cell(1,N);
+OFFrespindices= find(PSTHbins>=0 & PSTHbins<=0.15); % from STIMOFFCD to STIMOFFCD + 150 ms
+afterOFFrespindices= find(PSTHbins>0.15);
+eyepossamplingrate = 500; % in Hz
+sampligrate = 1000; % in Hz for spikes 
+meanOFFfiringrate = zeros(N,1);
+peakOFFfiringrate = zeros(N,1);
+meanafterOFFfiringrate = zeros(N,1);
+baselineFR = zeros(N,1);
+baselineFRalltrials = cell(N,1);
+pranksumOFF = [];
+hranksumOFF = [];
+plot_counter = 1;
+numsubplots = ceil(sqrt(N));
+for ii = 1:N
+    ind = ii;
+    % Plotting the OFF responses
+    fileofinterest = char(filename(ind,:));
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh');
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    t_offset = stro.trial(end,latencyidx)/1000;
+    neurothreshmode = stro.trial(:,neurothreshidx);
+    basisvec_dropidx = inds(end);
+    neurothresh_startidx = max(find(neurothreshmode==1,1),basisvec_dropidx+1);
+    baselinespikecounts = []; % from stimon - 150ms to stimon
+    spikecountsduringstimpresent = []; % from stimon to stimoff
+    spikecountsafter = []; % from stimoff to stimoff + 150ms
+    idxs = neurothresh_startidx:1:size(stro.trial,1);
+    num_dur = [];
+    for jj = 1:numel(idxs)
+        tmp = cell2mat(stro.ras(idxs(jj),1));
+        baselinespikecounts = [baselinespikecounts; numel(tmp(tmp<stro.trial(idxs(jj),stimonidx) & tmp>stro.trial(idxs(jj),stimonidx)-0.15))];
+        spikecountsduringstimpresent = [spikecountsduringstimpresent; numel(tmp(tmp<stro.trial(idxs(jj),stimoffidx) & tmp>stro.trial(idxs(jj),stimonidx)))];
+        spikecountsafter = [spikecountsafter; numel(tmp(tmp<stro.trial(idxs(jj),stimoffidx)+0.15 & tmp>stro.trial(idxs(jj),stimoffidx)))];
+        num_dur = [num_dur; stro.trial(idxs(jj),stimonidx)-stro.trial(idxs(jj),fpacqidx)];    
+    end
+    [newspikecounts,newidxs] = sort(spikecountsduringstimpresent);
+    if any(newspikecounts==0) | sum(newspikecounts==0)>=5
+        [p,h] = ranksum(baselinespikecounts(newidxs(newspikecounts==0)),spikecountsafter(newidxs(newspikecounts==0)));
+    else
+        p = 1; h = 1;
+    end
+    pranksumOFF = [pranksumOFF; p];
+    hranksumOFF = [hranksumOFF; h];
+    % performing wilcoxon rank sum test for 
+    newidxs = idxs(newidxs);
+    newidxs = newidxs(newspikecounts==0);% for only printing where the spikecounts = 0 
+    count = 1;
+    spcounts = [];
+    % for plotting purposes
+    analogstridx = find(strcmp(stro.sum.rasterCells(1,:),'anlgStartTime'));
+    spikestampidx = find(strcmp(stro.sum.rasterCells(1,:),'sig001a'));
+    heyeposidx = find(strcmp(stro.sum.rasterCells(1,:),'AD11'));
+    veyeposidx = find(strcmp(stro.sum.rasterCells(1,:),'AD12'));
+    for jj = 1:numel(newidxs)
+        tmp = cell2mat(stro.ras(newidxs(jj),spikestampidx));
+        spikes = tmp(tmp<stro.trial(newidxs(jj),stimoffidx)+t2 & tmp>stro.trial(newidxs(jj),stimoffidx)-t1);
+        spikes = spikes - stro.trial(newidxs(jj),stimoffidx);
+        spikestodisp = tmp(tmp<stro.trial(newidxs(jj),stimoffidx)+t2 & tmp>stro.trial(newidxs(jj),stimoffidx)-t1-0.2);
+        spikestodisp = spikestodisp - stro.trial(newidxs(jj),stimoffidx);
+        figure(plot_counter);subplot(numsubplots,numsubplots,ii); plot(spikestodisp,(count)*ones(1,length(spikestodisp)),'k.'); hold on;
+        count = count + 1;
+        [tmp,~] = hist(spikes,PSTHbins);
+        spcounts = [spcounts; tmp];
+        analogstarttime = stro.ras{newidxs(jj),analogstridx};
+        timestamps = analogstarttime:(1/eyepossamplingrate):analogstarttime + ((numel(stro.ras{newidxs(jj),heyeposidx})-1)*(1/eyepossamplingrate));
+        timestamps = timestamps - stro.trial(newidxs(jj),stimoffidx);
+        dir = stro.ras{newidxs(jj),5}; % directions in the subunit space which did not drive a response
+    end
+    
+    if any(OCidx == ind)
+        c = 'b';
+    elseif any(LMidx == ind)
+        c = 'g';
+    else
+        c = 'k';
+    end
+    set(gca,'XColor',c,'YColor',c,'Xlim',[-t1-0.2 t2],'Ylim',[0 count]); hold off; drawnow;
+    figure(plot_counter),hold on; set(gca,'Xlim',[-t1-0.2 t2]);
+    line([0 0],[0 numel(newidxs)],'Color',[1 0 0]);
+    line([0.15 0.15],[0 numel(newidxs)],'Color',[1 0 0]); hold off;  
+    line([-t1 -t1],[0 numel(newidxs)],'Color',[1 0 0]); hold off;
+    line([-t1-0.15 -t1-0.15],[0 numel(newidxs)],'Color',[1 0 0]); hold off;
+    % Plotting the PSTH
+%     baselineFR(ii) = mean(baselinespikecounts./num_dur);
+%     baselineFRalltrials{ii} = baselinespikecounts./num_dur;
+%     if ~isempty(spcounts)
+%         PSTH{ii} = mean(spcounts,1)/binwidth;
+%     else
+%         PSTH{ii} = zeros(size(PSTHbins));
+%     end
+%     tmp = PSTH{ii};
+%     meanOFFfiringrate(ii) = mean(tmp(OFFrespindices));
+%     meanafterOFFfiringrate(ii) = mean(tmp(afterOFFrespindices));
+%     peakOFFfiringrate(ii) = max(tmp(OFFrespindices));
+%     figure(plot_counter+1);subplot(numsubplots,numsubplots,ii); plot(PSTHbins,PSTH{ii},'b','Linewidth',1); line([0 0],[0 max(PSTH{ii})],'Color',[1 0 0]);
+%     line([0.15 0.15],[0 max(PSTH{ii})],'Color',[1 0 0]); line([-t1 t2],[baselineFR(ii) baselineFR(ii)],'Color',[0 0 0]);
+%     set(gca,'XColor',c,'YColor',c,'Xlim',[-t1 t2]);hold off;   
+end
+figure(plot_counter); set(gcf,'Name','OFF responses');
+plot_counter = plot_counter + 1;
+savevariables = 1;
+if savevariables == 1
+    save pranksumOFF pranksumOFF
+    save hranksumOFF hranksumOFF
+end
+
+tmp = [numel(OCidx) numel(LMidx) numel(LUMidx) numel(SOidx) numel(hardtoclassifyidx)];
+tmp = [0 cumsum(tmp)];
+OCidx = tmp(1)+1:tmp(2);
+LMidx = tmp(2)+1:tmp(3);
+LUMidx = tmp(3)+1:tmp(4);
+SOidx = tmp(4)+1:tmp(5);
+hardtoclassifyidx = tmp(5)+1:tmp(6);
+
+%% Quantifying the p-values of the OFF responses
+[p1,h1] = ranksum(log10(pranksumOFF(OCidx)),log10(pranksumOFF(LMidx)));
+[p2,h2] = ranksum(log10(pranksumOFF([OCidx LMidx])),log10(pranksumOFF(LUMidx)));
+[p3,h3] = ranksum(log10(pranksumOFF([OCidx LMidx LUMidx])),log10(pranksumOFF(hardtoclassifyidx)));
+bins = -10:0.5:0;
+figure(plot_counter); set(gcf,'Name','p-value dist');
+subplot(221); histogram(log10(pranksumOFF),bins); xlabel('log p'); line([log10(0.05) log10(0.05)],[0 10],'Linestyle','--','Linewidth',2); title('All cells');
+subplot(222); histogram(log10(pranksumOFF(OCidx)),bins); hold on; histogram(log10(pranksumOFF(LMidx)),bins); line([-2 -2],[0 10],'Linestyle','--','Linewidth',2); xlabel('log p'); title('OC vs LM'); hold off;
+subplot(223); histogram(log10(pranksumOFF([OCidx LMidx])),bins); hold on; histogram(log10(pranksumOFF(LUMidx)),bins); line([-2 -2],[0 10],'Linestyle','--','Linewidth',2); xlabel('log p'); title('DO vs LUM'); hold off;
+subplot(224); histogram(log10(pranksumOFF([OCidx LMidx LUMidx])),bins); hold on; histogram(log10(pranksumOFF(hardtoclassifyidx)),bins); line([-2 -2],[0 10],'Linestyle','--','Linewidth',2); xlabel('log p'); title('DO & LUM vs htc'); hold off;
+plot_counter = plot_counter + 1;
+
+propOFFresp_DO =  sum(pranksumOFF([OCidx LMidx])<0.05)/numel([OCidx LMidx]); % prop of DO cells showing significant OFF responses
+propOFFresp_LUM =  sum(pranksumOFF(LUMidx)<0.05)/numel(LUMidx); % prop of LUM cells showing significant OFF responses
+propOFFresp_htc =  sum(pranksumOFF(hardtoclassifyidx)<0.05)/numel(hardtoclassifyidx); % % prop of hardtoclassify cells showing significant OFF responses
