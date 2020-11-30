@@ -1,0 +1,439 @@
+% This is a variant of the code I wrote before and am trying it out for Greg's old WN data
+% Comparing the Gabor and DOG fits for the WN data
+% Author - Abhishek De, 1/19
+close all; clearvars;
+resize_fact = 1;
+% Include Gun noise data for statistical tests in order to estimate the RF size
+channels = 3;
+NPOINTS = 65536;
+resize_fact2 = 1;
+CHI2CRIT = 0.95; % For flaging a stixel as significant (adding gun and cone noise z-scores, squared)
+maxT = 9;
+crit = chi2inv(CHI2CRIT,300); % 3 color channels
+spikename_options = ['sig001a'; 'sig001b'];
+[filename_Lum, spikeIdx_Lum] = fnamesFromTxt2('Lum.txt');
+[filename_ColorOpponent, spikeIdx_ColorOpponent] = fnamesFromTxt2('ColorOpponent.txt');
+
+% Loading the Neurothresh files
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+tmp_filename = fetch(conn,'SELECT filename FROM WNthresh');
+NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+close(conn);
+tmp_filename = tmp_filename(~strcmp('STAvsPC1',NTmode));
+spikeidx_NT = ones(size(tmp_filename));
+filename_NT = cell(size(tmp_filename));
+for kk = 1:size(tmp_filename)
+    filename_NT(kk) = {tmp_filename(kk)};
+end
+
+% Loading the just the subunit files 
+conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+tmp_filename = fetch(conn,'SELECT filename FROM WNSubunit');
+subunit_mode = fetch(conn,'SELECT mode FROM WNSubunit');
+spikeidx_subunit = cell2mat(fetch(conn,'SELECT spikeidx FROM WNSubunit'));
+close(conn);
+tmp_filename = tmp_filename(strcmp('STA',subunit_mode));
+spikeidx_subunit = spikeidx_subunit(strcmp('STA',subunit_mode));
+filename_subunit = cell(size(tmp_filename));
+for kk = 1:size(tmp_filename)
+    filename_subunit(kk) = {tmp_filename(kk)};
+end
+
+% Merging all the files in the list
+Input_List = [filename_Lum; filename_ColorOpponent; filename_NT; filename_subunit];
+spikeIdx = [spikeIdx_Lum; spikeIdx_ColorOpponent; spikeidx_NT; spikeidx_subunit];
+plotresults = 0;
+computeNLI = 1;
+numcells = numel(Input_List);
+files_not_working = [];
+files_not_working_idxs = [];
+count = 1;
+CHI2CRIT = .95;
+channels = 3;
+for ii = 1:numcells
+    flag = 0;
+    disp(ii);
+    filename = char(Input_List{ii}{1}); % acquiring the filename (1st column) from the List
+    
+    WN = {};
+    for jj = 1:size(Input_List{ii},2)
+        try 
+            tmpstro = nex2stro(findfile(char(Input_List{ii}(jj))));
+        catch 
+            files_not_working = [files_not_working; Input_List{ii}];
+            files_not_working_idxs = [files_not_working_idxs; ii];
+            flag = 1;
+            break;
+        end
+        if (isempty(WN))
+            WN = tmpstro;
+        else
+            WN = strocat(WN, tmpstro);
+        end
+        if ~any(strcmp(WN.sum.rasterCells,'sig001a_wf'))
+            files_not_working = [files_not_working; Input_List{ii}];
+            files_not_working_idxs = [files_not_working_idxs; ii];
+            flag = 1;
+        end
+    end
+    if flag 
+        continue;
+    end
+    
+    Output_List{count,1} = filename;
+    framerate = WN.sum.exptParams.framerate;
+    nstixperside = WN.sum.exptParams.nstixperside;
+    ntrials = length(WN.sum.absTrialNum);
+    stimonidx = find(strcmp(WN.sum.trialFields(1,:),'stim_on'));
+    stimoffidx = find(strcmp(WN.sum.trialFields(1,:),'all_off'));
+    nframesidx = find(strcmp(WN.sum.trialFields(1,:),'num_frames'));
+    noisetypeidx = find(strcmp(WN.sum.trialFields(1,:),'noise_type'));
+    sigmaidxs = strmatch('sigma',WN.sum.trialFields(1,:));
+    hepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD11'));
+    vepidx = find(strcmp(WN.sum.rasterCells(1,:),'AD12'));
+    maskidx = strcmp(WN.sum.rasterCells(1,:), 'subunit_mask');
+    anlgStartTimeidx = find(strcmp(WN.sum.rasterCells(1,:),'anlgStartTime'));
+    L = WN.trial(:,noisetypeidx)==1;
+    mu1idx = find(strcmp(WN.sum.trialFields(1,:),'mu1'));
+    mu2idx = find(strcmp(WN.sum.trialFields(1,:),'mu2'));
+    mu3idx = find(strcmp(WN.sum.trialFields(1,:),'mu3'));
+    sigma1idx = find(strcmp(WN.sum.trialFields(1,:),'sigma1'));
+    sigma2idx = find(strcmp(WN.sum.trialFields(1,:),'sigma2'));
+    sigma3idx = find(strcmp(WN.sum.trialFields(1,:),'sigma3'));
+    maskidx = strcmp(WN.sum.rasterCells(1,:),'subunit_mask');
+    basisvecidx = strcmp(WN.sum.rasterCells(1,:),'basis_vec');
+    gammaTable = WN.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    gammaTable1 = interp1(linspace(0,255,256),gammaTable,linspace(0,255,65536), 'spline');
+    invgamma = InvertGamma(gammaTable, 0);
+    sigmavect = unique(WN.trial(L,[sigma1idx sigma2idx sigma3idx]),'rows')/1000;
+    sigmavect(all(any(sigmavect == 0),2),:) = [];
+    gausslims = [WN.sum.exptParams.gauss_locut WN.sum.exptParams.gauss_hicut]/1000;
+    x = linspace(gausslims(1),gausslims(2),NPOINTS);
+    Fx = norminv(x)*sigmavect(1);
+    sigmacorrectionfactor = std(Fx)./sigmavect(1);
+    muvar = (sigmavect(1)*sigmacorrectionfactor)^2;
+    
+    % Calculating the M matrix for files
+    fundamentals = WN.sum.exptParams.fundamentals;
+    mon_spd = WN.sum.exptParams.mon_spd;
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+    mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+    M = fundamentals'*mon_spd;
+    
+    % Getting the background rgb/lms
+    ridx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(WN.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(WN.trial(:,ridx)), mode(WN.trial(:,gidx)), mode(WN.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+    % storing backgroung LMS excitation info
+    Output_List{count,16} = bkgndlms;
+
+    WN.ras(~L ,:) = []; % modiftying the WN structure
+    WN.trial(~L,:) = []; % modiftying the WN structure
+    mask_changes = [2 size(WN.trial,1)];
+    if any(basisvecidx)
+        mask_changes = [2];
+        all_masks = WN.ras(:,maskidx);
+        Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+        inds = find(cellfun(Fx,WN.ras(:,basisvecidx))==0);
+        if isempty(inds)
+            inds = size(WN.trial,1)-1;
+        end
+        last_wntrial =  inds(1)-1;
+        for k = 3:last_wntrial
+            if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+                continue
+            else
+                mask_changes = [mask_changes k-1 k]; %#ok<AGROW>
+            end
+        end
+        if mask_changes(end) == last_wntrial
+            mask_changes(end) = [];
+        else
+            mask_changes = [mask_changes  last_wntrial];
+        end
+        mask_changes = reshape(mask_changes , 2, []);
+        mask_changes  = mask_changes(:,1);  
+        
+        idxs = zeros(size(WN.trial,1),1);
+        idxs(mask_changes(2,1)+1:end) = 1;
+        idxs = logical(idxs);
+        WN.ras(idxs,:) = []; % modiftying the WN structure 
+        WN.trial(idxs,:) = []; % modiftying the WN structure
+    end
+    spikeidx = spikeIdx(ii);
+    spikename = spikename_options(spikeidx,:); 
+    
+    % Storing the mumat and sigmamat: Code added on 4/20, based on line 793 in WNAnalysis.m
+    muvect = unique(WN.trial(:,[mu1idx mu2idx mu3idx]),'rows')/1000;
+    sigmavect = unique(WN.trial(:,[sigma1idx sigma2idx sigma3idx]),'rows')/1000;
+    sigmavect(all(any(sigmavect == 0),2),:) = [];
+    mumat = reshape(repmat(muvect,nstixperside^2,1),[nstixperside^2*3, 1]);
+    sigmamat = reshape(repmat(sigmavect,nstixperside^2,1),[nstixperside^2* 3, 1]);
+    Output_List{count,26} = mumat;
+    Output_List{count,27} = sigmamat;
+   
+    % Calculating STA and STC for frames which triggered spikes
+    out_gun = getWhtnsStats(WN,maxT,'STCOVmex',{nstixperside^2,3,maxT},spikename);
+    STS_gun = out_gun{1}; STCross_gun = out_gun{2}; nspikes_gun = out_gun{3}; clear out_gun;
+    Output_List{count,15} = nspikes_gun;
+    STAs_gun = STS_gun/nspikes_gun;
+            
+    % Code for Statistical testing begins here 
+    s_gun = std(STAs_gun(:,1));
+    STAs_gun_z = STAs_gun./s_gun;
+    
+    % Spatial map
+    grandz = zeros([nstixperside nstixperside]);
+    maxzs = [];
+    for i = 1:maxT
+        tmp_gun = reshape(STAs_gun_z(:,i),[nstixperside nstixperside 3]); % This is the only place in the code where I use data from gun noise
+        grandz = grandz+sum(tmp_gun.^2,3);
+        maxzs = [maxzs; sum(sum(tmp_gun(:,:,1).^2)) sum(sum(tmp_gun(:,:,2).^2)) sum(sum(tmp_gun(:,:,3).^2))];
+    end
+    peakframe1 = max(maxzs(:,1)) == maxzs(:,1);
+    peakframe2 = max(maxzs(:,2)) == maxzs(:,2);
+    peakframe3 = max(maxzs(:,3)) == maxzs(:,3);
+    peakframe = max(sum(maxzs,2)) == sum(maxzs,2);
+    id = find(peakframe==1);
+    latency = find(peakframe)*1000/WN.sum.exptParams.framerate;
+    if id~=1
+        peakframe(id-1)= 1;
+    end
+    if id <=maxT-1
+        peakframe(id+1)=1;
+    end
+    
+    STAweights = sqrt(sum(STAs_gun(:,peakframe).^2));
+    STAweights = STAweights./sum(STAweights);
+    tmpSTA = STAs_gun(:,peakframe)*STAweights';
+    Output_List{count,2} = reshape(tmpSTA, [nstixperside^2 3]);
+    
+    STAgunmat_pf = Output_List{count,2};
+    [u1,s,v1] = svd(STAgunmat_pf');
+    m = reshape(v1(:,1),[nstixperside nstixperside]);
+    Output_List{count,4} = sign(m).*(abs(m).^(1.0));
+    Output_List{count,5} = u1(:,1); % storing R,G,B values
+    eigvals = [s(1,1) s(2,2) s(3,3)];
+    Output_List{count,17} = eigvals;
+    
+    % Storing the cone weights from SVD - added this code on  4/20
+    Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+    Mrgbtocc = inv(Mrgbtocc');
+    Output_List{count,23} = Mrgbtocc * u1(:,1); % cone weights
+    Output_List{count,28} = Mrgbtocc;
+    
+    % Storing the eigvals of the noise frame
+    STAnoiseframe = reshape(STAs_gun(:,1), [nstixperside^2 3]);
+    [u_noise,s_noise,v_noise] = svd(STAnoiseframe');
+    Output_List{count,21} = [s_noise(1,1) s_noise(2,2) s_noise(3,3)];
+    
+    % Another measure of SNR: Taking the signal from the weighted STA and
+    % not just the peakframe of the STA
+    Output_List{count,22} = sum((tmpSTA/std(STAs_gun(:,1))).^2,1);
+    
+    % Computing spatial SNR
+    a = reshape(tmpSTA,[100 3])*u1(:,1);b = reshape(STAs_gun(:,1),[100 3])*u1(:,1);
+    tmp_z = a/std(b);
+    Output_List{count,20} = sum(tmp_z.^2);
+    
+    % Now get largest contiguous block
+    try
+        crit = chi2inv(CHI2CRIT,channels*maxT); % 3 color channels
+        L = grandz > crit;
+        [i,j] = ind2sub(size(L),find(L));
+        ij = [i,j];
+        T = clusterdata(ij,'linkage','single','distance','euclidean','criterion','distance','cutoff',sqrt(2));
+        clusternmembers = [];
+        for k =1:max(T)
+            clusternmembers(k) = sum(T == k);
+        end
+        dominantcluster = find(clusternmembers == max(clusternmembers));
+        clustermat = zeros(nstixperside, nstixperside);
+        clustermat(sub2ind(size(clustermat),ij(T==dominantcluster(1),1),ij(T==dominantcluster(1),2))) = 1;
+        % Then get convex hull
+        dominantclusteridxs = ij(T==dominantcluster(1),:);
+        K=convhull(dominantclusteridxs(:,1), dominantclusteridxs(:,2));
+        tmp = dominantclusteridxs(K,:);
+        [x,y] = meshgrid(1:nstixperside,1:nstixperside);
+        inRF = reshape(inpolygon(x(:),y(:),dominantclusteridxs(K,2),dominantclusteridxs(K,1)),[nstixperside, nstixperside]);
+        Output_List{count,18} = inRF;
+        [u1,s,v1] = svd(STAgunmat_pf(inRF(:),:)');
+        eigvals = [s(1,1) s(2,2) s(3,3)];
+        Output_List{count,19} = eigvals;
+    catch
+        Output_List{count,18} = nan([nstixperside nstixperside]);
+        Output_List{count,19} = [nan nan nan];
+    end
+   
+    % storing latency
+    Output_List{count,6} = latency;
+    
+    % Storing the zscore based on spatiotemporal energy
+    zscoremeans = STAs_gun/std(STAs_gun(:,1));
+%     zscoremeans = tmpSTA/std(STAs_gun(:,1));
+    Output_List{count,7} = sum(zscoremeans.^2,1);
+    
+    % Storing the eccentricity
+    Output_List{count,8} = [WN.sum.exptParams.rf_x WN.sum.exptParams.rf_y];
+    
+    % Storing other essential elements
+    tmp = STS_gun(:,id)*STS_gun(:,id)';
+    STCs = (nspikes_gun.*reshape(STCross_gun(:,id),[300 300])-tmp)/(nspikes_gun*(nspikes_gun-1));
+    P = eye(size(STCs)) - STAs_gun(:,id)*inv(STAs_gun(:,id)'*STAs_gun(:,id))*STAs_gun(:,id)';
+    subSTCs = P*STCs*P';
+    [v,d] = eig(subSTCs);
+    [~, idxs] = sort(diag(d));
+    Output_List{count,9} = diag(d);
+    Output_List{count,10} = real(reshape(v(:,idxs(end)),[nstixperside nstixperside 3])); % excitatory filter
+    Output_List{count,11} = real(reshape(v(:,idxs(1)),[nstixperside nstixperside 3])); % suppressive filter
+    
+    % Storing variance in the noise, using for an analysis suggested by Ringach et al., 2002
+    [un,~,vn] = svd(reshape(STAs_gun(:,1),[nstixperside^2 3])');
+    noise_image = sign(m(:)'*vn(:,1))*reshape(vn(:,1),[nstixperside nstixperside]);
+    Output_List{count,14} = noise_image;
+    
+    
+    % Calculating NLI (Horwitz et al; 2007)
+    % Calculating maximally informative dimension
+    if computeNLI
+%         out = getWhtnsStats(WN,maxT,'STCOVfull', {nstixperside^2, 3, 1, maxT}, spikename);
+%         nspikes = out{3};
+%         STA = out{1}/nspikes;
+%         STC = out{2}/nspikes-(STA*STA');
+%         
+%         % Getting all stim
+%         out_all = getWhtnsStats(WN,maxT,'STCOVfull', {nstixperside^2, 3, 1, maxT}, spikename,[],1);
+%         nspikes_all = out_all{3};
+%         STA_all = out_all{1}/nspikes_all;
+%         STC_all = out_all{2}/nspikes_all-(STA_all*STA_all');
+%         
+%         reshapedSTA = reshape(STA,[nstixperside nstixperside 3 maxT]); 
+%         energy_t = squeeze(sum(sum(sum(reshapedSTA.^2,1),2),3));
+%         whichframe = find(energy_t(:) == max(energy_t(:)));
+%         subSTA = squeeze(reshapedSTA(:,:,:,whichframe));
+%         tmp = reshape([1:size(STC,1)],nstixperside, nstixperside,3,maxT);
+%         STCidxs = squeeze(tmp(:,:,:,whichframe));
+%         subSTC = STC(STCidxs(:),STCidxs(:));
+%         if rank(subSTC) == size(subSTC,1)
+%             [filts, infovals, GaussParams,nullBasis] = compiSTAC(subSTA(:),subSTC,STA_all(STCidxs(:)),STC_all(STCidxs(:),STCidxs(:)),1);
+%         end
+        
+%         Calculating STA and STC for all frames
+        out_all = getWhtnsStats(WN,0,'STCOVmex',{nstixperside^2,3,1},spikename,[],1);
+        STS_all = out_all{1}; STCross_all = out_all{2}; nspikes_all = out_all{3}; clear out_all;
+        STAs_all = STS_all/nspikes_all;
+        tmp_all = STS_all*STS_all';
+        STCs_all = (nspikes_all.*reshape(STCross_all,[300 300])-tmp_all)/(nspikes_all*(nspikes_all-1));
+        Output_List{count,3} = getRFfromSTA(tmpSTA,1,0.75); % arbitrary threshold of 70%
+        fact = Output_List{count,3};
+        fact = diag(repmat(fact(:),[3 1]));
+        [b, ~, ~] = compiSTAC(fact*STAs_gun(:,id),fact*STCs*fact',fact*STAs_all,fact*STCs_all*fact', 1); % Running it through J Pillow's compute iSTAC code
+        b = sign(dot(b,tmpSTA))*b;
+        filts = b; whichframe = id;
+        
+        initargs = {filts, whichframe, sum(WN.trial(:,nframesidx)), [nstixperside^2 3 1]};     % projecting onto the maximally informative dimension
+        out = getWhtnsStats(WN,whichframe,'STPROJmod',initargs,spikename);
+        proj = out{1}; Lspike = out{2}; clear out;
+        lowerbound = prctile(proj,5);
+        upperbound = prctile(proj,95);
+        L = logical(proj < lowerbound | proj > upperbound);
+        proj(L) = []; Lspike(L) = [];
+        bins = linspace(min(proj), max(proj),15)';
+        [Na,~] = hist(proj,bins);
+        [Ns,~] = hist(proj(Lspike > 0),bins);
+        fr = Ns./Na;
+        [B_lin, BINT_lin, R, RINT, STATS_lin] = regress(fr', [ones(length(bins),1), bins]);
+        [B_quad, BINT_quad, R, RINT, STATS_quad] = regress(fr', [ones(length(bins),1), bins.^2]);
+        [B_both, BINT_both, R, RINT, STATS_both] = regress(fr', [ones(length(bins),1), bins, bins.^2]);
+        NLI = (STATS_quad(1)-STATS_lin(1))/STATS_both(1);
+        Output_List{count,12} = filts;
+        Output_List{count,13} = NLI;
+        
+        % Storing the firing rates as a function of bins
+        Output_List{count,24} = fr'; % estimated firing rate in response to projections 
+        Output_List{count,25} = bins; % projection values
+    end
+    
+    % Code for storing the eye movement amplitudes
+    
+    if ~isempty(WN.sum.analog.storeRates)
+        samplingrate = WN.sum.analog.storeRates{1};
+        H = [];
+        V = [];
+        for ll = 1:size(WN.trial,1)
+            
+            anlgStarttime = WN.ras{ll,anlgStartTimeidx};
+            stimont = WN.trial(ll,stimonidx);
+            stimofft = WN.trial(ll,stimoffidx);
+            
+            h_eyepos = WN.ras{ll,hepidx}*4096/400;
+            v_eyepos = WN.ras{ll,vepidx}*4096/400;
+            t = anlgStarttime: (1/samplingrate): anlgStarttime+(numel(h_eyepos)-1)*(1/samplingrate);
+            tmp = t>=stimont & t<=stimofft;
+            
+            % Storing the H and V position
+            H = [H; h_eyepos(tmp)];
+            V = [V; v_eyepos(tmp)];
+            
+        end
+        
+        % Storing the median amplitude of the eye position
+        Amp = sqrt((H-mean(H)).^2 + (V-mean(V)).^2);
+        
+        if ~isempty(Amp)
+            Output_List{count,29} = median(Amp(abs(Amp)<1));
+        else
+            Output_List{count,29} = nan;
+        end
+    else 
+        Output_List{count,29} = nan;
+    end
+    
+    % plotting the results 
+    if plotresults
+        tmp_vec_gun = Output_List{count,10};
+        normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+        im = normfactor*tmp_vec_gun + 0.5;
+        im = reshape(im,[10 10 3]);
+        figure(5),subplot(ceil(sqrt(numcells)),ceil(sqrt(numcells)),count);image(im); axis square; set(gca,'XTick',[],'YTick',[]);
+        tmp_vec_gun = Output_List{count,11};
+        normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+        im = normfactor*tmp_vec_gun + 0.5;
+        im = reshape(im,[10 10 3]);
+        figure(6),subplot(ceil(sqrt(numcells)),ceil(sqrt(numcells)),count);image(im); axis square; set(gca,'XTick',[],'YTick',[]);
+        tmp_vec_gun = Output_List{count,2};
+        normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+        im = normfactor*tmp_vec_gun + 0.5;
+        im = reshape(im,[10 10 3]);
+        figure(7),subplot(ceil(sqrt(numcells)),ceil(sqrt(numcells)),count);image(im); axis square; set(gca,'XTick',[],'YTick',[]);
+        tmp_vec_gun = filts;
+        normfactor = 0.5/(max(abs(tmp_vec_gun(:)))+0.01);
+        im = normfactor*tmp_vec_gun + 0.5;
+        im = reshape(im,[10 10 3]);
+        figure(8),subplot(ceil(sqrt(numcells)),ceil(sqrt(numcells)),count);image(im); axis square; set(gca,'XTick',[],'YTick',[]);
+        figure(9),subplot(ceil(sqrt(numcells)),ceil(sqrt(numcells)),count);plot(fr); set(gca,'XTick',[],'YTick',[]);
+        if NLI>0
+            set(gca,'XColor',[1 0 0],'Ycolor',[1 0 0]);
+        end
+    end
+    count = count + 1;
+    
+end
+
+figure(5); hold on; set(gcf,'Name','PC1'); hold off;
+figure(6); hold on; set(gcf,'Name','PC end'); hold off;
+figure(7); hold on; set(gcf,'Name','STA'); hold off;
+figure(8); hold on; set(gcf,'Name','iSTAC filter'); hold off;
+figure(9); hold on; set(gcf,'Name','frames proj onto iSTAC filter'); hold off;
+
+savevariables = 1;
+if savevariables
+    save Output_ListWN2 Output_List
+    save files_not_working_idxs2 files_not_working_idxs
+end

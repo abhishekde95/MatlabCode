@@ -1,0 +1,108 @@
+% Analysing the spatial extent of the effect
+% Author - Abhishek De, 5/18
+close all; clearvars;
+%%%%%5/16
+filenameatRF1 = {'M051618003.nex';'M051618004.nex';'M051618005.nex';'M051618006.nex';'M051618007.nex';'M051618008.nex';'M051618009.nex';'M051618010.nex';'M051618015.nex';'M051618016.nex'}; %5/16, 200 stim, 300 laser
+filenameoutsideRF1 = {'M051618011.nex';'M051618012.nex';'M051618013.nex';'M051618014.nex'}; 
+%%%%%5/17
+filenameatRF2 = {'M051718014.nex';'M051718018.nex';'M051718019.nex'};
+filenameoutsideRF2 = {'M051718021.nex';'M051718022.nex'};
+%%%%%5/18
+filenameatRF3 = {'M051818002.nex';'M051818003.nex';'M051818015.nex'};
+filenameoutsideRF3 = {'M051818004.nex';'M051818005.nex';'M051818006.nex';'M051818007.nex';'M051818008.nex';'M051818009.nex';'M051818010.nex';'M051818011.nex';'M051818012.nex';'M051818013.nex';'M051818014.nex'};
+
+filename = [filenameatRF1; filenameoutsideRF1];
+color = ['r';'g';'b';'k';'m';'c';'y'];
+HitL = []; HitNL = [];
+MissL = []; MissNL = [];
+CRL = []; CRNL = [];
+FAL = []; FANL = [];
+h_hit = []; p_hit = [];
+h_FA = []; p_FA = [];
+TPRNL = []; TPRL = [];
+FPRNL = []; FPRL = [];
+alpha = 0.05;
+plot_counter = 1;
+RF = [];
+stimabsentL = []; stimabsentNL = [];
+stimpresentL = []; stimpresentNL = [];
+for jj = 1:size(filename,1)
+    stro = nex2stro(findfile(char(filename(jj,:))));
+    fponidx  = strcmp(stro.sum.trialFields(1,:),'fpon_t');
+    fpacqidx  = strcmp(stro.sum.trialFields(1,:),'fpacq_t');
+    fpoffidx  = strcmp(stro.sum.trialFields(1,:),'fpoff_t');
+    stimonidx  = strcmp(stro.sum.trialFields(1,:),'stimon_t');
+    stimoffidx  = strcmp(stro.sum.trialFields(1,:),'stimoff_t');
+    targonidx  = strcmp(stro.sum.trialFields(1,:),'targon_t');
+    saccstartidx  = strcmp(stro.sum.trialFields(1,:),'saccstart_t');
+    saccendidx  = strcmp(stro.sum.trialFields(1,:),'saccend_t');
+    rewidx  = strcmp(stro.sum.trialFields(1,:),'rew_t');
+    stimpresentidx  = strcmp(stro.sum.trialFields(1,:),'stimpresent');
+    Lcc = strcmp(stro.sum.trialFields(1,:),'lcc');
+    Mcc = strcmp(stro.sum.trialFields(1,:),'mcc');
+    Scc = strcmp(stro.sum.trialFields(1,:),'scc');
+    tf = strcmp(stro.sum.trialFields(1,:),'tf');
+    oog = strcmp(stro.sum.trialFields(1,:),'oog');
+    stimidx = strcmp(stro.sum.trialFields(1,:),'stim_idx');
+    optstim = strcmp(stro.sum.trialFields(1,:),'optstim');
+    correct = strcmp(stro.sum.trialFields(1,:),'correct');
+    laseron = strcmp(stro.sum.trialFields(1,:),'laseron_t');
+    laseroff = strcmp(stro.sum.trialFields(1,:),'laseroff_t');
+    correcttrials = stro.trial(:,correct);
+    diridxs = stro.trial(:,stimidx);
+    stimpresent = logical(stro.trial(:,stimpresentidx));
+    LMStriplet = [stro.trial(:,Lcc) stro.trial(:,Mcc) stro.trial(:,Scc)];
+    uniquediridxs = unique(diridxs);
+    lasertrials = logical(stro.trial(:,optstim));
+    N = numel(uniquediridxs);
+    RF = [RF; stro.sum.exptParams.rf_x stro.sum.exptParams.rf_y];
+    for ii = 1:N
+        lasertrialidxs = logical(stro.trial(diridxs == ii-1,optstim));
+        colordirchoiceidxs = correcttrials(diridxs == ii-1);
+        colorstimpresent = logical(stimpresent(diridxs==ii-1));
+        percentcorrectlasertrials = sum(colordirchoiceidxs & lasertrialidxs)/sum(lasertrialidxs);
+        percentcorrectnonlasertrials = sum(colordirchoiceidxs & ~lasertrialidxs)/sum(~lasertrialidxs);
+        
+        % Laser trials
+        Hitlasertrial = sum(colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Hit
+        Misslasertrial = sum(~colordirchoiceidxs & lasertrialidxs & colorstimpresent); % Miss
+        CRlasertrial = sum(colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAlasertrial = sum(~colordirchoiceidxs & lasertrialidxs & ~colorstimpresent); % False Alarm
+        
+        % Non-Laser trials
+        Hitnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Hit
+        Missnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & colorstimpresent); % Miss
+        CRnonlasertrial = sum(colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % Correct Reject
+        FAnonlasertrial = sum(~colordirchoiceidxs & ~lasertrialidxs & ~colorstimpresent); % False Alarm
+    end
+    stimabsentL = [stimabsentL; sum(CRlasertrial) + sum(FAlasertrial)];
+    stimabsentNL = [stimabsentNL; sum(CRnonlasertrial) + sum(FAnonlasertrial)];
+    stimpresentL = [stimpresentL; sum(Hitlasertrial) + sum(Misslasertrial)];
+    stimpresentNL = [stimpresentNL; sum(Hitnonlasertrial) + sum(Missnonlasertrial)];
+    
+    % Now storing the Hits, Miss, CR and FA for laser and non-laser trials
+    HitL = [HitL; Hitlasertrial]; HitNL = [HitNL; Hitnonlasertrial];
+    MissL = [MissL; Misslasertrial]; MissNL = [MissNL; Missnonlasertrial];
+    CRL = [CRL; CRlasertrial]; CRNL = [CRNL; CRnonlasertrial];
+    FAL = [FAL; FAlasertrial]; FANL = [FANL; FAnonlasertrial];
+    TPRNL = [TPRNL; Hitnonlasertrial/(Hitnonlasertrial+Missnonlasertrial)]; % True positive ratio, non-laser trial
+    FPRNL = [FPRNL; FAnonlasertrial/(FAnonlasertrial+CRnonlasertrial)]; % False positive ratio, non-laser trial
+    TPRL = [TPRL; Hitlasertrial/(Hitlasertrial+Misslasertrial)]; % True positive ratio, laser trial
+    FPRL = [FPRL; FAlasertrial/(FAlasertrial+CRlasertrial)]; % False positive ratio, laser trial 
+    
+end
+
+[RFlocations,ia,ib] = unique(RF,'rows');
+nrows = 3;
+figure(plot_counter); subplot(nrows,nrows,1);plot(0,0,'+','Markersize',15,'Linewidth',2); hold on;
+for ii = 1:numel(unique(ib))
+    subplot(nrows,nrows,1);plot(RFlocations(ii,1),RFlocations(ii,2),'o','MarkerSize',7,'LineWidth',0.5,'MarkerFaceColor',color(ii),'MarkerEdgeColor',color(ii));hold on;
+    ind = find(ib==ii);
+    [~,p1] = equalproptest([sum(HitL(ind)) sum(HitNL(ind))],[sum(stimpresentL(ind)) sum(stimpresentNL(ind))],alpha);
+    [~,p2] = equalproptest([sum(FAL(ind)) sum(FANL(ind))],[sum(stimabsentL(ind)) sum(stimabsentNL(ind))],alpha);
+    subplot(nrows,nrows,ii+1), bar([sum(HitL(ind)) sum(HitNL(ind)); sum(MissL(ind)) sum(MissNL(ind)); sum(CRL(ind)) sum(CRNL(ind)); sum(FAL(ind)) sum(FANL(ind))]); hold on;
+    text(4.5,25,strcat('p1=',num2str(p1,3))); text(4.5,10,strcat('p2=',num2str(p2,3))); 
+    ylabel('Count'); set(gca,'XTick',[1 2 3 4],'XTickLabel',{'H','M','CR','FA'}); title(num2str(RFlocations(ii,:)));axis square; set(gca,'XColor',color(ii),'YColor',color(ii)); hold off;
+end
+subplot(nrows,nrows,1);grid on; set(gca,'Xlim',[-80 80],'Ylim',[-80 80]); axis square; xlabel('X'); ylabel('Y'); title('RF locations');
+plot_counter = plot_counter + 1;

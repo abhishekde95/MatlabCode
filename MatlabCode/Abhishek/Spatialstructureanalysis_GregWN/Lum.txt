@@ -1,0 +1,73 @@
+% Luminance cells
+% Just selected by eye - looking at the STA at the "peak" frame.  It might be nice someday to have a
+% more automated way of doing this.  Right now, I'm just trying to get something together for some
+% pilot analyses:
+% 1) Effects of fixational eye movements on response
+% 2) Correlation between preferred spatial frequency and static non-linearity
+% 3) Correlation between preferred spatial frequency and responses to chromatic gratings
+% 4) Correlation between RF parameters measured with gratings and white noise 
+% 		(orientation, SF, direction selectivity, bandwidth?, color?)
+% Some of these are undoubtly complex cells.
+K021408004	1
+K021508004	1  % Analog data (eye position) is screwed up?
+K022208008	1
+K032608005	1
+K032708003	1
+K032808002	1
+K033108004	1  % RF mostly off side of stimulus
+K040208001	1
+K040708003	1
+K040708004	1
+K040808001	1
+K041208003	1
+K050108003	1
+K050608002	1
+K050908002	1
+K051608004	1  % L-M?
+K052108001	1  % L-M?
+K052108002	1  % L-M?
+K071708001	1
+K071808004	1
+K072908002	1
+K080508004	2  % Gabor fit is strangely bad
+K080508005	1
+K080808008	1
+K081508002	1
+K081808001	1 % Analog data (eye position) is screwed up
+K081808002	1
+K082208004	1
+K082608005	1
+K090108006	1
+K090108008	1
+K090308005	1
+K090508003	1
+K090508009	1
+K091208007	1
+K091608005	1
+K102308001	1
+K102408001	1
+K102708002	1
+K110708002	1
+K111308001	1
+K111308001	2
+K111808001	2
+K010709002	1
+K020709002	1
+K021609004 K021609005	1
+K021809002	1
+K022109002	1
+K042409007 K042409011	1
+K050409001 K050409001	1
+K051509005 K051509007	1
+K062309006 K062309008	1
+K072009001 K072009005	1
+K080709004	1
+K080709004	2
+K082709001	1
+K082809001	1
+K101409001	1
+K101509001	1
+K102209008	1
+K102809001	1
+K110309001 K110309005	1
+
