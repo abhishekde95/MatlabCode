@@ -697,7 +697,8 @@ bins2 = logspace(log10(0.3),log10(10),10);
 Lumid = zeros(size(gaborphases_relevantcells))'; Lumid(LumIds_conewts) = 1;
 COid = zeros(size(gaborphases_relevantcells))'; COid(ColorOpponentIds_conewts) = 1;
 Sid = zeros(size(gaborphases_relevantcells))'; Sid(Sconedominated_conewts) = 1;
-Lumid = logical(Lumid); COid = logical(COid); Sid = logical(Sid);
+DOid = zeros(size(gaborphases_relevantcells))'; DOid([ColorOpponentIds_conewts Sconedominated_conewts]) = 1;
+Lumid = logical(Lumid); COid = logical(COid); Sid = logical(Sid); DOid = logical(DOid); 
 
 % All cells and Best fitting Gabor cells
 figure(plot_counter); set(gcf,'Name','Gabor Phases & aspect ratios');
@@ -748,6 +749,7 @@ p12 = ranksum(90-abs(90-gaborphases_relevantcells(Lumid)),90-abs(90-gaborphases_
 p13 = ranksum(aspectratio_relevantcells(Lumid),aspectratio_relevantcells(COid));
 p14 = ranksum(aspectratio_relevantcells(Sid),aspectratio_relevantcells(COid));
 p15 = ranksum(aspectratio_relevantcells(Lumid),aspectratio_relevantcells(Sid));
+p21 = ranksum(aspectratio_relevantcells(Lumid),aspectratio_relevantcells(DOid));
 
 data1 = [aspectratio_relevantcells(Lumid)';aspectratio_relevantcells(COid)';aspectratio_relevantcells(Sid)'];
 data2 = [90-abs(90-gaborphases_relevantcells(Lumid))';90-abs(90-gaborphases_relevantcells(COid))';90-abs(90-gaborphases_relevantcells(Sid))'];

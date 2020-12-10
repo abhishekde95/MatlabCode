@@ -512,6 +512,9 @@ p1 = kruskalwallis(data,group','off');
 
 [r2,p2] = corr(Isoresponse_NLI,Whitenoise_NLI,'type','Spearman');
 
+% DO + Simple cells vs. hardtoclassify cells
+[p3,h] = ranksum(Whitenoise_NLI([DOidx LUMidx]),Whitenoise_NLI(hardtoclassifyidx));
+
 %% Figure 3-part1: Iso-response data from example LUM, DO and HTC cells 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -886,6 +889,9 @@ p1 = kruskalwallis(data,group,'off');
 
 % Comparing spatial NLI between simple and DO cells
 [p2,h] = ranksum(RSSEisoresp_medianofratios(LUMidx),RSSEisoresp_medianofratios(DOidx));
+
+% Comparing spatial NLI between simple + DO cells and other cells
+[p5,h] = ranksum(RSSEisoresp_medianofratios([LUMidx DOidx]),RSSEisoresp_medianofratios(hardtoclassifyidx));
 
 % Some control analyses to check the relationship between spatial structure and non-linearity
 % Classifying the spatial structure as 1 (center-surround) or 2 (adjacent) based on selection of subunits

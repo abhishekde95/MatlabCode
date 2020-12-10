@@ -3,9 +3,9 @@ function [beta, fitInfo] = WN_LARS(X, y, lassoon, preproc, nsteps)
 % This applys LASSO regularization using least angle regression (LARS)
 %  
 % Inputs:
-%   'x' [nstim, ncovariates] - 2D array of stimuli data
+%   'X' [nstim, ncovariates] - 2D array of stimuli data
 %   'y' [nstim] - Vector of response
-
+%   'lassoon' [bool] - Turn on LASSO modification
 %   'preproc' [bool] - Center and scale input data
 %   'nsteps' [int] - number of steps to compute (max iterations)
 %
@@ -130,12 +130,12 @@ while ~stopcondition
     fitInfo.df(ii) = length(nonzeros(beta(:,ii+1)));
     % Calculate cp - risk value (models with a higher value are more likely
     % to be poor)
-    fitInfo.cp(ii) = sum((yc-mu).^2)/var(yc-Xc*bOLS) - length(mu) + 2*fitInfo.df(ii);
-    % Calculate pe - percent explained (unsure if this is correct)
-%     fitInfo.pe(ii) = 1 - sum((mu-yc).^2)/sum(yc.^2);
+    mult = 2;
+    fitInfo.cp(ii) = sum((yc-mu).^2)/var(yc-Xc*bOLS) - length(mu) + ...
+        mult*fitInfo.df(ii);
     
     % Check stop condition
-    if size(beta, 2) == nsteps || length(nonzeros(beta(:,ii+1))) == size(X,2)
+    if size(beta, 2) == (nsteps+1) || length(nonzeros(beta(:,ii+1))) == size(X,2)
         stopcondition = true;
     end
     
@@ -145,6 +145,4 @@ while ~stopcondition
     ii = ii + 1;
 end
 close(wtbar);
-% Trim beta
-% % beta = beta(:,2:end);
 
