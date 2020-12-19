@@ -1,4 +1,4 @@
-function [minmse, mseStep, LARSmse, cvidx] = WNLARS_kfoldcv(X, y, kfold, predictSet, verbose)
+function [minmse, mseStep, LARSmse, cvidx] = WNLARS_kfoldcv(X, y, kfold, rng_seed, predictSet, verbose)
 %% 
 % This function performs kfold cross validation (cv) on LARS outputs to 
 % estimate the optimal step size(i.e. feature selection).
@@ -7,7 +7,9 @@ function [minmse, mseStep, LARSmse, cvidx] = WNLARS_kfoldcv(X, y, kfold, predict
 %   'X' [nstim, ncovariates] - 2D array of stimuli data
 %   'y' [nstim] - Vector of response
 %   'kfold' [int] - Number of folds for k-fold cv
-%   'predictSet' [bool] - Exclude a kfold set from LARS and cv
+%   'rng_seed' [int]/['default']/[] - Seed for random cv folds. Leave empty
+%       '[]' to randomize. 
+%   'predictSet' [bool] - To exclude a kfold set from LARS and cv or not
 %   'verbose' [bool] - Display which fold is being processed
 %
 % Outputs:
@@ -21,9 +23,9 @@ function [minmse, mseStep, LARSmse, cvidx] = WNLARS_kfoldcv(X, y, kfold, predict
 %%
 
 % Run cv on all kfold sets if not specified
-if nargin < 4; predictSet = False; end
+if nargin < 5; predictSet = false; end
 % Do not display kfold progress if not specified
-if nargin < 5; verbose = False; end
+if nargin < 6; verbose = false; end
 
 % Define set of kfold indices to use in cross validation.
 if predictSet
@@ -33,6 +35,7 @@ else
 end
     
 % Partition data for cross validation
+if ~isempty(rng_seed); rng(rng_seed); end 
 cvidx = crossvalind('Kfold', size(X,1), kfold);
 
 % K-fold cross validation
@@ -41,6 +44,7 @@ for ii = kfoldSet
     % Define set of indices for LARS for each kfold
     kfoldidx = kfoldSet(kfoldSet~=ii);
     
+    % Display progress of k-fold cv
     if verbose; disp(['Computing k-fold ' num2str(ii)]); end
     
     % Run LARS on training data

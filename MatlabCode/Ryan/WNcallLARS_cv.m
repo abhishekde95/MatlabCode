@@ -1,7 +1,7 @@
 %% White noise LARS with cross validation for a single frame
-close all
-clear all
-clc
+% close all
+% clear all
+% clc
 
 %% Load WN data
 WN=nex2stro;
@@ -9,6 +9,7 @@ WN=nex2stro;
 % Path to save dataa
 p2s = ['D:\Users\Ryan\Desktop\' num2str(WN.sum.fileName(28:37)) ...
     '_LARS_Figs\'];
+save_figs = true; 
 
 % Run and plot LARS for a range of offset values.
 nstixperside = WN.sum.exptParams.nstixperside;
@@ -30,8 +31,8 @@ for kk = 1:length(frame_offset)
     projWN = getWhtnsStats(WN,maxT,'STPROJmod',initargs);
 
     % K-fold cross validation
-    [minStep(kk), mseStep(kk,:),~,cvidx] = WNLARS_kfoldcv(projWN{1}, projWN{2},...
-        kfold, true, true);
+    [minStep(kk), mseStep(kk,:),~,cvidx] = WNLARS_kfoldcv(projWN{1}, ...
+        projWN{2},kfold,[], true, true);
 
     % Run LARS on 80% of CV data to get model features
     [beta, ~] = WN_LARS(projWN{1}(cvidx~=kfold,:),...
@@ -44,6 +45,9 @@ for kk = 1:length(frame_offset)
     Xc = Xc./sqrt(sum(Xc.^2,1));
     yc = y-mean(y);
     
+    % Extract weights for the 'best' step size given k-fold cv
+    beta_cvopt(:,kk) = beta(:,minStep(kk));
+    
     % Calculate MSE of CV features with 
     CVmse(kk) = sum((yc-Xc*beta(:,minStep(kk))).^2,1)/size(Xc, 1);
     
@@ -54,6 +58,7 @@ for kk = 1:length(frame_offset)
 end
 disp('Done');
 
+
 %% Plot MSE results
 figure; hold on; 
 plot(0:8,CVmse, 'LineWidth', 2); 
@@ -62,32 +67,11 @@ hold off;
 legend('CV', 'STA'); 
 title(num2str(WN.sum.fileName(28:37)))
 ylabel('MSE'); xlabel('Frame Offset');
-saveas(gcf, [p2s 'LARS_STA_MSEcomp2.png']);
+saveas(gcf, [p2s 'LARS_STA_MSEcomp.png']);
+
+%% Save Data
+save([p2s 'LARS_MSE.mat'], 'CVmse', 'STAmse', 'frame_offset', ...
+    'beta_cvopt', 'minStep', 'mseStep', 'cvidx');
 
 %% Plot beta at each 
-% rowidxs = reshape([1:3*nstixperside^2],[nstixperside^2 3]);
-% maxes = []; mins = [];
-% imagevectors = betamse;
-% for i = 1:3
-%     maxes = [maxes; max(max(imagevectors(rowidxs(:,i),:)))];
-%     mins = [mins; min(min(imagevectors(rowidxs(:,i),:)))];
-% end
-% potentialnormfactors = [(1-[.5; .5; .5]-eps)./(maxes-[.5; .5; .5]); (-[.5; .5; .5]+eps)./(mins-[.5; .5; .5])];
-% % 'eps' in above line is a kludge that is required for avoiding
-% % out of bounds errors.
-% potentialnormfactors(potentialnormfactors < 0) = []; % if min > mu or max < mu
-% normfactor = min(potentialnormfactors);
-% muvect = reshape(repmat([.5 .5 .5],nstixperside^2,1),nstixperside^2*3,1);
-% 
-% % Plot each vector as an image
-% figure('Renderer', 'painters', 'Position', [100 100 2500 200])
-% for jj = 1:size(imagevectors,2)
-%     subplot(1,9,jj)
-%     STAlars = normfactor*(imagevectors(:,jj)-muvect)+muvect;
-%     STAlars = reshape(STAlars,[nstixperside nstixperside 3]);
-%     image(STAlars);
-%     title(['BETA ' num2str(minStep(jj)) ' - Offset: ' num2str(jj-1)],...
-%         'FontSize', 12);
-%     axis square
-% end
-% saveas(gcf, [p2s 'LARS_4foldcv_leftoutdata.png']);
+WN_plotSTAest(beta_cvopt, nstixperside, 'Beta Optimal', save_figs, p2s)

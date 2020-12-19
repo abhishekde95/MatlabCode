@@ -1,0 +1,69 @@
+"1","M040918005.nex","yes","staircase ON, luminance only",
+"2","M033018001.nex","yes",,
+"3","M033018004.nex","yes",,
+"4","M032518018.nex","no",,"SCstimcue"
+"5","M041018006.nex","yes",,
+"6","M041018007.nex","yes",,
+"7","M041218002.nex","no",,"SCstimcue"
+"8","M041218005.nex","no",,"SCstimcue"
+"9","M041218010.nex","no",,"SCstimcue"
+"10","M041618004.nex","yes",,
+"11","M041618005.nex","yes",,"SCstimcuegrid"
+"12","M042518001.nex","no",,"SCstimcue"
+"13","M042518003.nex","no ",,
+"14","M042618002.nex","no",,"SCstimcue"
+"15","M042618008.nex","no",,"SCstimcuegrid"
+"16","M051318006.nex","no","2 targets","SCstimcue"
+"17","M051318007.nex","no","3x3 targets in lower-right and upper-left visual hemifield","SCstimcuegrid"
+"18","M042718004.nex","no",,"SCstimcuegrid"
+"19","M042718005.nex","no",,"SCstimcue"
+"20","M042718011.nex","no",,"SCstimcuegrid"
+"21","M051418004.nex","no",,"SCstimcuegrid"
+"22","M051418005.nex","no",,"SCstimcue"
+"23","M051418007.nex","no",,"SCstimcuegrid"
+"24","M051518001.nex","no",,"SCstimcuegrid"
+"25","M051518002.nex","no",,"SCstimcue"
+"26","M051618001.nex","no",,"SCstimcuegrid"
+"27","M051618002.nex","no",,"SCstimcue"
+"28","M051718013.nex","no","RF loc = 12,-51","SCstimcuegrid"
+"29","M051718017.nex","no",,"SCstimcue"
+"30","M051718020.nex","no","Saccade targets same as DTonleoc saccade targts. Wanted to check if Maui can has",
+"31","M052218001.nex","yes","5/22 beh experiment, saccade targets same as the DToneloc saccde targets",
+"32","P053018001.nex","yes","Pangu's first SCstimcue file",
+"33","P053018002.nex","yes",,
+"34","P053018003.nex","yes",,
+"35","P053018004.nex","yes",,
+"36","P053018005.nex","yes",,
+"37","A011419001.nex","no",,"SCstimcue"
+"38","A011419003.nex","no",,"SCstimcuegrid"
+"40","A011519001.nex","no",,"SCstimcuegrid"
+"41","A011519002.nex","no",,"SCstimcue"
+"42","A011519003.nex","no",,"SCstimcue"
+"43","A011519004.nex","no",,"SCstimcue"
+"44","A011519009.nex","no",,"SCstimcuegrid"
+"45","A011519010.nex","no",,"SCstimcuegrid"
+"46","A011719007.nex","no",,"SCstimcue"
+"47","A011719008.nex","no",,"SCstimcue"
+"48","A012319001.nex","no",,"SCstimcue"
+"49","A012319002.nex","no",,"SCstimcue"
+"50","A012319003.nex","no",,"SCstimcue"
+"51","A013019001.nex","no",,"SCstimcue"
+"52","A013019002.nex","no",,"SCstimcue"
+"53","A013019010.nex","no",,"SCstimcue"
+"54","A013019011.nex","no",,"SCstimcue"
+"55","A013019013.nex","no",,"SCstimcue"
+"56","A020119007.nex","no",,"SCstimcue"
+"58","A012219004.nex","no",,"SCstimcue"
+"59","A011519005.nex","no",,"SCstimcuegrid"
+"62","A012319001.nex","no",,"SCstimcue"
+"63","A012319002.nex","no",,"SCstimcue"
+"65","A012319005.nex","no",,"SCstimcuegrid"
+"67","A013019014.nex","no",,"SCstimcue"
+"68","A020119008.nex","no",,"SCstimcue"
+"69","M041218005.nex","no",,"SCstimcue"
+"70","M041218010.nex","no",,"SCstimcue"
+"71","M042718004.nex","no",,"SCstimcuegrid"
+"72","M042718005.nex","no",,"SCstimcue"
+"73","M042718011.nex","no",,"SCstimcuegrid"
+"74","M051418005.nex","no",,"SCstimcue"
+"75","M051418007.nex","no",,"SCstimcuegrid"

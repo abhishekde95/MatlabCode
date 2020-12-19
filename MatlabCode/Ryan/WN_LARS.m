@@ -1,11 +1,11 @@
-function [beta, fitInfo] = WN_LARS(X, y, lassoon, preproc, nsteps)
+function [beta, fitInfo] = WN_LARS(X, y, lassoOn, preproc, nsteps)
 %%
 % This applys LASSO regularization using least angle regression (LARS)
 %  
 % Inputs:
 %   'X' [nstim, ncovariates] - 2D array of stimuli data
 %   'y' [nstim] - Vector of response
-%   'lassoon' [bool] - Turn on LASSO modification
+%   'lassoOn' [bool] - Turn on LASSO modification
 %   'preproc' [bool] - Center and scale input data
 %   'nsteps' [int] - number of steps to compute (max iterations)
 %
@@ -18,7 +18,7 @@ function [beta, fitInfo] = WN_LARS(X, y, lassoon, preproc, nsteps)
 
 % If unspecified, set to run LASSO, preprocess data, and return all steps
 if nargin < 3
-    lassoon = true;
+    lassoOn = true;
 end
 if nargin < 4
     preproc = true;
@@ -28,8 +28,6 @@ if nargin < 5
 end
 
 %% Preprocess data if necessary
-% Ensure y is a column vector. Take out when working with higher dimensional responses.
-if size(y, 1) == 1 && size(y,2) > 1; y = y(:); end
 
 % Center and normalize response and input if requested
 if preproc
@@ -109,7 +107,7 @@ while ~stopcondition
     gamma = min(gamma_temp(gamma_temp>0));
     
     % LASSO modification to LARS
-    if lassoon
+    if lassoOn
         gamma_lasso = -beta(act,ii)./w;
         [gamma_tilde] = min(gamma_lasso(gamma_lasso>0));
         if gamma_tilde < gamma
@@ -131,7 +129,7 @@ while ~stopcondition
     % Calculate cp - risk value (models with a higher value are more likely
     % to be poor)
     mult = 2;
-    fitInfo.cp(ii) = sum((yc-mu).^2)/var(yc-Xc*bOLS) - length(mu) + ...
+    fitInfo.cp(ii) = sum((yc-mu).^2)/var(yc-Xc*bOLS,1) - length(mu) + ...
         mult*fitInfo.df(ii);
     
     % Check stop condition
@@ -142,6 +140,7 @@ while ~stopcondition
     % Display progress 
     waitbar(length(nonzeros(beta(:,ii)))./(size(X,2)), wtbar);
     
+    % Iterate
     ii = ii + 1;
 end
 close(wtbar);

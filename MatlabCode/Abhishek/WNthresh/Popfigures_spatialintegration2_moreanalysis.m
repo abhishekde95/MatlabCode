@@ -15,6 +15,8 @@
 
 % Section 6: Regularization of the STA and the spatial weighting function
 
+% Section 7: Relationship between the RGB vectors of the 2 subunits in angular units 
+
 close all; clearvars;
 plot_counter = 1;
 
@@ -1135,4 +1137,6 @@ V = regularizeSTA(cum_rgbs, cum_n, maxT, tmpSTA, kbasis, flip(STAs_gun,2));
 
 %Don't know why this is not working at all. Am leaving this for the
 %time being but will come back to some other day.
+
+%% Section 7: Relationship between the RGB vectors of the 2 subunits in angular units 
 
