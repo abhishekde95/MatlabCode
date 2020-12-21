@@ -132,8 +132,9 @@ for ii = 1:numel(Input_List)
     STAweights = sqrt(sum(STAs(:,peakenergy).^2));
     STAweights = STAweights./sum(STAweights);
     tmpSTA = reshape(STAs(:,peakenergy)*STAweights',[nstixperside.^2 3]);
-    [u1,s,v1] = svd(tmpSTA);
-    RGB_svd = v1(:,1);
+    %[u1,s,v1] = svd(tmpSTA);
+%     RGB_svd = v1(:,1);
+    RGB_svd = tmpSTA(peakpixelloc(1),:)';
     tmp_conewts_svd = Mrgbtocc * RGB_svd;
     tmp_conewts_svd = tmp_conewts_svd./repmat(sum(abs(tmp_conewts_svd),1),[3 1]);
 %     tmp_conewts_svd = tmp_conewts_svd .* repmat(sign(tmp_conewts_svd(2,:)),[3 1]);
@@ -235,6 +236,7 @@ plot_counter = plot_counter + 1;
 save ConesignalNLI_LGN ConesignalNLI_LGN
 save AUROClin_LGN AUROClin
 save AUROCquad_LGN AUROCquad
+save conewtsLGN_svd conewtsLGN_svd
 
 
 [r,p] = corr(abs(conewtsLGN_svd(3,:))', ConesignalNLI_LGN, 'type', 'Spearman');

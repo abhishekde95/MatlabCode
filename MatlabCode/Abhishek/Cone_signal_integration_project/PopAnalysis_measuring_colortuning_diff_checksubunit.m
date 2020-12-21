@@ -30,6 +30,8 @@ conewtscheck_svd = [];
 conewtssubunit_svd = [];
 anglediffWNchecksubunit = []; % Stores the differences in color tuning - angle between 2 6-D RGB vectors
 anglediffWNchecksubunit_SVD_LMS = []; % Stores the diffeneces in color tuning - angle between 2 3-D LMS vectors 
+nspikes_check = [];
+nspikes_subunit = [];
 
 for ii = 1:numel(filename)
     ind = ii;
@@ -169,6 +171,7 @@ for ii = 1:numel(filename)
             STAweights = sqrt(sum(STAcheck(:,id).^2));
             STAweights = STAweights./sum(STAweights);
             weighted_STAcheck = STAcheck(:,id)*STAweights';
+            nspikes_check = [nspikes_check; nspikes];
             
             
         else
@@ -191,6 +194,7 @@ for ii = 1:numel(filename)
             % SVD on chekerboard STA 
             [u,~,~] = svd(reshape(weighted_STAsubunit,[2 3])');
             conewtssubunit_svd = [conewtssubunit_svd Mrgbtocc * u(:,1)];
+            nspikes_subunit = [nspikes_subunit; nspikes];
             
         end
         clear STCOV_st out
@@ -235,6 +239,8 @@ if savevariables
     save conewtssubunit_svd conewtssubunit_svd 
     save anglediffWNchecksubunit anglediffWNchecksubunit
     save anglediffWNchecksubunit_SVD_LMS anglediffWNchecksubunit_SVD_LMS 
+    save nspikes_subunit nspikes_subunit
+    save nspikes_check nspikes_check
 end
 
 %% Analysis of color tuning 
@@ -266,3 +272,40 @@ plot_counter = plot_counter + 1;
 
 [r,p] = corr(anglediffWNchecksubunit,anglediffWNchecksubunit_SVD_LMS,'type','Spearman');
 
+
+%% Some more analysis of the subunit color tuning
+
+anglebRFsubfields_Phase1 = [];
+anglebRFsubfields_Phase2 = [];
+for ii = 1:numel(RGBsubunits)
+    vec1 = RGBsubunits{ii}(1:3);
+    vec2 = RGBsubunits{ii}(4:end);
+    
+    vec3 = RGBcheck{ii}(1:3);
+    vec4 = RGBcheck{ii}(4:end);
+ 
+    anglebRFsubfields_Phase2 = [anglebRFsubfields_Phase2; 180*acos(dot(vec1,vec2)/(norm(vec1)*norm(vec2)))/pi];
+    
+    anglebRFsubfields_Phase1 = [anglebRFsubfields_Phase1; 180*acos(dot(vec3,vec4)/(norm(vec3)*norm(vec4)))/pi];
+
+end
+
+bins = 0:10:180;
+figure(plot_counter)
+subplot(221); histogram(anglediffWNchecksubunit, 0:5:90, 'FaceColor',[0 0 0], 'EdgeColor', [1 1 1]);
+xlabel('Angle difference between check and subunit'); ylabel('# cells'); axis square;
+set(gca,'Tickdir','out', 'Xlim',[0 90])
+
+subplot(222); histogram(anglebRFsubfields_Phase2, bins, 'FaceColor', [0 0 0], 'EdgeColor', [1 1 1]);
+xlabel('Angle between the subunit RGB'); ylabel('# cells'); axis square; set(gca,'Tickdir','out');
+
+subplot(223); histogram(anglebRFsubfields_Phase1, bins, 'FaceColor', [0 0 0], 'EdgeColor', [1 1 1]);
+xlabel('Angle between the check RGB'); ylabel('# cells'); axis square; set(gca,'Tickdir','out');
+
+subplot(224); plot(anglebRFsubfields_Phase2, anglediffWNchecksubunit, 'o', 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', [1 1 1]); hold on; lsline;
+xlabel('Angle between the subunit RGB'); ylabel('Angle between the 6-D check and subunit'); axis square; set(gca,'Tickdir','out','Xlim',[0 180],'Ylim',[0 90]);
+
+plot_counter = plot_counter + 1;
+
+% Some stats
+[r,p] = corr(anglebRFsubfields_Phase2, anglediffWNchecksubunit,'type','Spearman');

@@ -502,7 +502,7 @@ function protocol = PickNewProtocol
             protocol = 1;
             disp(['old preferred sf was ',num2str(lastprefsf)]);
         else
-            protocol = 4;
+            protocol = 10;
         end
     elseif (gl.protocol == 3)  % Flashed background
         protocol = 0;  % Done
@@ -627,7 +627,7 @@ function SetUpFigure()
     a.uicontrols.sftextbox = uicontrol('style','text','Position',[460 350 80 12],'String','SF');
     a.uicontrols.changesf = uicontrol('style','slider','Min',0.5,'Max',4,'Callback',@ChangeSF,'SliderStep',[.01 .1],'Value',2,'Position',[460 330 80 20]);
     a.uicontrols.diamtextbox = uicontrol('style','text','Position',[460 300 80 12],'String','Diam');
-    a.uicontrols.changediam = uicontrol('style','slider','Min',0.2,'Max',10,'Callback',@ChangeDiam,'SliderStep',[.01 .1],'Value',1,'Position',[460 280 80 20]);
+    a.uicontrols.changediam = uicontrol('style','slider','Min',0.3,'Max',10,'Callback',@ChangeDiam,'SliderStep',[.01 .1],'Value',.3,'Position',[460 280 80 20]);
     a.uicontrols.reset = uicontrol('style','pushbutton','String','Reset','Position',[370 350 80 20],'Callback',@ResetCallback);
     
     a.axeshandles.tuningcurve = h1;
@@ -683,11 +683,11 @@ function SetUpFigure()
         TS = TrialSpecCodes;
         
         uicontrols = getfield(get(gcf,'UserData'),'uicontrols');
-        diam = get(uicontrols.changediam,'Value');
+        diam = get(uicontrols.changediam,'Value')
         for i = 1:size(gl.trialspecs,1)
             gl.trialspecs{i,TS.DIAM} = diam;
         end
-        gl.DEFAULTDIAM = diam;
+      %  gl.DEFAULTDIAM = diam;
         gl.prefdiam = diam;
    end
 

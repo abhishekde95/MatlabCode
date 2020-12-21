@@ -460,9 +460,10 @@ hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
-% Load the integration within the subunit data
+% Load the integration within the subunit whitenoise analysis data
 load AUROClinsubunits_CV.mat
 load AUROCquadsubunits_CV.mat
+
 % Load the isoresponse data
 load RSSE_linearmodel_CV.mat % Robust regression
 load RSSE_quadmodel_CV.mat

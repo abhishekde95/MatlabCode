@@ -181,7 +181,7 @@ end
 % statistics that don't require the header to
 % be dropped (e.g. STS, STCross, and nspikes)
 function ClearStats()
-    TOTALPOSSIBLESPIKES = 3;
+    TOTALPOSSIBLESPIKES = 32;
     a = get(gcf,'UserData');
     nframesback = str2double(get(a.uicontrols.nframes,'String'));
     a.stats.murgb = [nan nan nan];
