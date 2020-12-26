@@ -23,6 +23,9 @@ plot_counter = 1;
 
 % Section 8: Checking whether DO and simple cell RF locations differed systematically
 
+% Section 9: Trying to plot all the cells (All, cells better fit by Gabor,
+% cells better fit by DoG) for Figure 6; JNP review 2
+
 %% Section 1: RF sizes as a function of eccentricity 
 % Check how the sqrt(RF area) varies with eccentricity 
 
@@ -866,6 +869,126 @@ plot([actualdist actualdist],[0 700],'color','k','Linewidth',2)
 set(gca,'Tickdir','out'); axis square; title('Randomization test'); 
 ylabel('Count'); xlabel('Distance between simple and DO centroids'); 
 legend('Randomization data', 'Actual data'); hold off;
+plot_counter = plot_counter + 1;
+
+%% Section 9: Trying to plot all the cells (All, cells better fit by Gabor,
+% cells better fit by DoG) for Figure 6; JNP review 2
+% Figure 6 of the JNP manuscript: Check figure 6 in Popfigures_spatialstructure3.m
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+% load Output_ListWN.mat
+load Output_ListWN2.mat
+load Singleopponent.mat
+load modelfits.mat
+load Ratio_of_power.mat
+crit = chi2inv(0.9999,300);
+Z = cell2mat(Output_List(:,7));
+Zmax = max(Z(:,2:7),[],2);
+Z_cellsofinterest = Zmax>crit;
+Output_List(~Z_cellsofinterest,:) = [];
+NLI = cell2mat(Output_List(:,13));
+simplecells = NLI<0;
+Singleopponent = logical(Singleopponent);
+% Singleopponent = logical(Ratio_of_power<1.2);
+
+numcells = size(Output_List,1);
+% calculating the M matrix
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+% calculating the cone weights
+conewts_svd = cell2mat(Output_List(~Singleopponent & simplecells,23)');
+conewts_svd = conewts_svd./repmat(sum(abs(conewts_svd),1),[3 1]);
+conewts_svd = conewts_svd .* repmat(sign(conewts_svd(2,:)),[3 1]);
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+load Peraccuracy.mat
+load SSE.mat
+load Deviation.mat
+meanperaccuracy = zeros(size(Peraccuracy));
+meanSSE = zeros(size(SSE));
+meanR = zeros(size(SSE));
+for ii = 1:size(Peraccuracy,1)
+    for jj = 1:size(Peraccuracy,2)
+        meanperaccuracy(ii,jj) = mean(Peraccuracy{ii,jj});
+        meanSSE(ii,jj) = mean(SSE{ii,jj});
+        meanR(ii,jj) = mean(cos(Deviation{ii,jj}*pi/180));
+    end
+end
+meanperaccuracy = meanperaccuracy(~Singleopponent & simplecells,:);
+meanSSE = meanSSE(~Singleopponent & simplecells,:);
+meanR = meanR(~Singleopponent & simplecells,:);
+meanR_GaborDOG = meanR(:,2)-meanR(:,3); % Gabor - DoG
+
+% storing gabor phases of the cells
+load Gaborparams
+gaborphases = zeros(1,numcells);
+aspectratio = zeros(1,numcells);
+for ii = 1:numcells
+    gaborphases(ii) = rem(Gaborparams{ii}.phi,pi)*180/pi;
+    aspectratio(ii) = Gaborparams{ii}.gamma;
+end
+Singleopponent = logical(Singleopponent);
+gaborphases_relevantcells = gaborphases(~Singleopponent & simplecells);
+aspectratio_relevantcells = aspectratio(~Singleopponent & simplecells);
+
+bins1 = 0:10:90;
+bins2 = logspace(log10(0.3),log10(10),10);
+Lumid = zeros(size(gaborphases_relevantcells))'; Lumid(LumIds_conewts) = 1;
+COid = zeros(size(gaborphases_relevantcells))'; COid(ColorOpponentIds_conewts) = 1;
+Sid = zeros(size(gaborphases_relevantcells))'; Sid(Sconedominated_conewts) = 1;
+DOid = zeros(size(gaborphases_relevantcells))'; DOid([ColorOpponentIds_conewts Sconedominated_conewts]) = 1;
+Lumid = logical(Lumid); COid = logical(COid); Sid = logical(Sid); DOid = logical(DOid); 
+
+% All cells and Best fitting Gabor cells
+figure(plot_counter); set(gcf,'Name','Gabor Phases & aspect ratios');
+
+subplot(321),histogram(90-abs(90-gaborphases_relevantcells(Lumid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]);
+histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('Lum'); 
+
+subplot(322),histogram(aspectratio_relevantcells(Lumid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid)),30,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]);
+histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+hold on; plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]);
+plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
+set(gca,'Tickdir','out','Ylim',[0 30],'YTick',0:15:30,'Xlim',[0.3 10],'XTick',[0.3 1 3 10], 'Xscale','log'); axis square; title('Lum'); 
+
+subplot(323),histogram(90-abs(90-gaborphases_relevantcells(COid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(COid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+histogram(90-abs(90-gaborphases_relevantcells(COid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('L-M'); 
+
+subplot(324),histogram(aspectratio_relevantcells(COid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]);  hold on;
+plot(median(aspectratio_relevantcells(COid)),30,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(COid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+plot(median(aspectratio_relevantcells(COid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
+histogram(aspectratio_relevantcells(COid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(COid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 30],'YTick',0:15:30,'Xscale','log'); axis square;title('L-M'); 
+
+subplot(325),histogram(90-abs(90-gaborphases_relevantcells(Sid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(Sid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+histogram(90-abs(90-gaborphases_relevantcells(Sid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 10],'YTick',0:5:10); axis square; title('S');
+
+subplot(326),histogram(aspectratio_relevantcells(Sid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on; 
+plot(median(aspectratio_relevantcells(Sid)),15,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(Sid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+plot(median(aspectratio_relevantcells(Sid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
+histogram(aspectratio_relevantcells(Sid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Sid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 15],'YTick',0:5:15,'Xscale','log'); axis square; title('S');
+
+set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
 

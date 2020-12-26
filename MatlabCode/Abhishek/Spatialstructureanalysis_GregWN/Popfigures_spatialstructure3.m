@@ -701,19 +701,56 @@ DOid = zeros(size(gaborphases_relevantcells))'; DOid([ColorOpponentIds_conewts S
 Lumid = logical(Lumid); COid = logical(COid); Sid = logical(Sid); DOid = logical(DOid); 
 
 % All cells and Best fitting Gabor cells
+% figure(plot_counter); set(gcf,'Name','Gabor Phases & aspect ratios');
+% subplot(321),histogram(90-abs(90-gaborphases_relevantcells(Lumid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+% histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('Lum');
+% subplot(322),histogram(aspectratio_relevantcells(Lumid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid)),30,'kv','MarkerFaceColor',[1 1 1]);
+% histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Ylim',[0 30],'YTick',0:15:30,'Xlim',[0.3 10],'XTick',[0.3 1 3 10], 'Xscale','log'); axis square; title('Lum');
+% subplot(323),histogram(90-abs(90-gaborphases_relevantcells(COid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+% histogram(90-abs(90-gaborphases_relevantcells(COid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('L-M');
+% subplot(324),histogram(aspectratio_relevantcells(COid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]);  hold on; plot(median(aspectratio_relevantcells(COid)),30,'kv','MarkerFaceColor',[1 1 1]);
+% histogram(aspectratio_relevantcells(COid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(COid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 30],'YTick',0:15:30,'Xscale','log'); axis square;title('L-M');
+% subplot(325),histogram(90-abs(90-gaborphases_relevantcells(Sid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+% histogram(90-abs(90-gaborphases_relevantcells(Sid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 10],'YTick',0:5:10); axis square; title('S');
+% subplot(326),histogram(aspectratio_relevantcells(Sid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Sid)),15,'kv','MarkerFaceColor',[1 1 1]);
+% histogram(aspectratio_relevantcells(Sid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Sid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 15],'YTick',0:5:15,'Xscale','log'); axis square; title('S');
+
+
+% All cells and Best fitting Gabor cells
 figure(plot_counter); set(gcf,'Name','Gabor Phases & aspect ratios');
-subplot(321),histogram(90-abs(90-gaborphases_relevantcells(Lumid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
-histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('Lum'); 
-subplot(322),histogram(aspectratio_relevantcells(Lumid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid)),30,'kv','MarkerFaceColor',[1 1 1]);
-histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Ylim',[0 30],'YTick',0:15:30,'Xlim',[0.3 10],'XTick',[0.3 1 3 10], 'Xscale','log'); axis square; title('Lum'); 
-subplot(323),histogram(90-abs(90-gaborphases_relevantcells(COid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+
+subplot(321),histogram(90-abs(90-gaborphases_relevantcells(Lumid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]);
+histogram(90-abs(90-gaborphases_relevantcells(Lumid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('Lum'); 
+
+subplot(322),histogram(aspectratio_relevantcells(Lumid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Lumid)),30,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]);
+histogram(aspectratio_relevantcells(Lumid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+hold on; plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]);
+plot(median(aspectratio_relevantcells(Lumid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
+set(gca,'Tickdir','out','Ylim',[0 30],'YTick',0:15:30,'Xlim',[0.3 10],'XTick',[0.3 1 3 10], 'Xscale','log'); axis square; title('Lum'); 
+
+subplot(323),histogram(90-abs(90-gaborphases_relevantcells(COid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(COid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
 histogram(90-abs(90-gaborphases_relevantcells(COid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 30],'YTick',0:10:30); axis square; title('L-M'); 
-subplot(324),histogram(aspectratio_relevantcells(COid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]);  hold on; plot(median(aspectratio_relevantcells(COid)),30,'kv','MarkerFaceColor',[1 1 1]);
+
+subplot(324),histogram(aspectratio_relevantcells(COid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]);  hold on;
+plot(median(aspectratio_relevantcells(COid)),30,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(COid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+plot(median(aspectratio_relevantcells(COid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
 histogram(aspectratio_relevantcells(COid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(COid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 30],'YTick',0:15:30,'Xscale','log'); axis square;title('L-M'); 
-subplot(325),histogram(90-abs(90-gaborphases_relevantcells(Sid)),bins1,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on;
+
+subplot(325),histogram(90-abs(90-gaborphases_relevantcells(Sid)),bins1,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on;
+histogram(90-abs(90-gaborphases_relevantcells(Sid & meanR_GaborDOG<0)),bins1,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
 histogram(90-abs(90-gaborphases_relevantcells(Sid & meanR_GaborDOG>0)),bins1,'FaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0 90],'XTick',0:45:90,'Ylim',[0 10],'YTick',0:5:10); axis square; title('S');
-subplot(326),histogram(aspectratio_relevantcells(Sid),bins2,'FaceColor',[1 1 1],'EdgeColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Sid)),15,'kv','MarkerFaceColor',[1 1 1]);
+
+subplot(326),histogram(aspectratio_relevantcells(Sid),bins2,'DisplayStyle','stairs','EdgeColor',[0 0 0]); hold on; 
+plot(median(aspectratio_relevantcells(Sid)),15,'kv','MarkerFaceColor',[1 1 1]);
+histogram(aspectratio_relevantcells(Sid & meanR_GaborDOG<0),bins2,'DisplayStyle','stairs','EdgeColor',[1 0 0]);
+plot(median(aspectratio_relevantcells(Sid & meanR_GaborDOG<0)),5,'rv','MarkerFaceColor',[1 0 0]);
 histogram(aspectratio_relevantcells(Sid & meanR_GaborDOG>0),bins2,'FaceColor',[0 0 0]); hold on; plot(median(aspectratio_relevantcells(Sid & meanR_GaborDOG>0)),0,'kv','MarkerFaceColor',[0 0 0]); set(gca,'Tickdir','out','Xlim',[0.3 10],'XTick',[0.3 1 3 10],'Ylim',[0 15],'YTick',0:5:15,'Xscale','log'); axis square; title('S');
+
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
