@@ -445,6 +445,24 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load S1RGB.mat
+load S2RGB.mat
+
+% Calculating some metrics for circular stats and discarding SO cells
+unitvectors = [];
+anglebwvectors = [];
+for ii = 1:size(S1RGB,2)
+    vec1 = S1RGB(:,ii);
+    vec2 = S2RGB(:,ii);
+    vec = exp(atan2(norm(cross(vec1,vec2)),dot(vec1,vec2))*i);
+    
+    % Storing the angle bewteen the vectors
+    anglebwvectors = [anglebwvectors; atan2(norm(cross(vec1,vec2)),dot(vec1,vec2))*180/pi];
+    
+    % Converting the angle difference into unit vectors
+    unitvectors = [unitvectors; real(vec) imag(vec)];
+end
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -459,6 +477,8 @@ hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
 
 % Load the integration within the subunit whitenoise analysis data
 load AUROClinsubunits_CV.mat
@@ -476,7 +496,6 @@ Isoresponse_NLI = [];
 Whitenoise_NLI = [];
 
 for ii = 1:numel(AUROClinsubunits) 
-    
     
     % White noise NLI 
     Error_quad = 1-(AUROCquadsubunits{ii});
@@ -515,6 +534,37 @@ p1 = kruskalwallis(data,group','off');
 
 % DO + Simple cells vs. hardtoclassify cells
 [p3,h] = ranksum(Whitenoise_NLI([DOidx LUMidx]),Whitenoise_NLI(hardtoclassifyidx));
+
+
+% Summary circular stats for all cells
+meanvec = mean(unitvectors,1);
+stdvec = std(unitvectors,1);
+% Calculating the circular mean and circular standard deviation
+circmean = atan2(meanvec(2),meanvec(1))*180/pi;
+circstd = atan2(stdvec(2),stdvec(1))*180/pi;
+
+
+% Summary circular stats for Simple cells
+meanvec_LUM = mean(unitvectors(LUMidx,:),1);
+stdvec_LUM = std(unitvectors(LUMidx,:),1);
+% Calculating the circular mean and circular standard deviation
+circmean_LUM = atan2(meanvec_LUM(2),meanvec_LUM(1))*180/pi;
+circstd_LUM = atan2(stdvec_LUM(2),stdvec_LUM(1))*180/pi;
+
+
+% Summary circular stats for DO cells
+meanvec_DO = mean(unitvectors(DOidx,:),1);
+stdvec_DO = std(unitvectors(DOidx,:),1);
+% Calculating the circular mean and circular standard deviation
+circmean_DO = atan2(meanvec_DO(2),meanvec_DO(1))*180/pi;
+circstd_DO = atan2(stdvec_DO(2),stdvec_DO(1))*180/pi;
+
+% Summary circular stats for HTC cells
+meanvec_HTC = mean(unitvectors(hardtoclassifyidx,:),1);
+stdvec_HTC = std(unitvectors(hardtoclassifyidx,:),1);
+% Calculating the circular mean and circular standard deviation
+circmean_HTC = atan2(meanvec_HTC(2),meanvec_HTC(1))*180/pi;
+circstd_HTC = atan2(stdvec_HTC(2),stdvec_HTC(1))*180/pi;
 
 %% Figure 3-part1: Iso-response example data from example LUM, DO and HTC cells 
 if ~exist('plot_counter')

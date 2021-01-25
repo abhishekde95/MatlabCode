@@ -1,7 +1,6 @@
 % Some more analyses based on friendly reviewer's comments
 % Author - Abhishek De, 9/20
 
-
 % Section 1: Smoothing the spatial structure of the STA
 
 % Section 2: Isoresponse data from example DO cell
@@ -16,6 +15,8 @@
 % Section 6: Regularization of the STA and the spatial weighting function
 
 % Section 7: Relationship between the RGB vectors of the 2 subunits in angular units 
+
+% Section 8 - Finding a lenient criteria for a cone weights (Robustness of cone-weight classification)
 
 close all; clearvars;
 plot_counter = 1;
@@ -1205,4 +1206,96 @@ stdvec_HTC = std(unitvectors(hardtoclassifyidx,:),1);
 circmean_HTC = atan2(meanvec_HTC(2),meanvec_HTC(1))*180/pi;
 circstd_HTC = atan2(stdvec_HTC(2),stdvec_HTC(1))*180/pi;
 
+%% Section 8 - Finding a lenient criteria for a cone weights (Robustness of cone-weight classification)
 
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load conewts_svd.mat
+load vals.mat
+
+LumIds_conewts = find(conewts_svd(1,:)>0.1 & conewts_svd(3,:)>-0.10 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find((conewts_svd(1,:)<-0.1 & conewts_svd(2,:)>0.1) | (conewts_svd(3,:) <-0.1 & conewts_svd(2,:)>0.1));
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts];
+hardtoclassifyidx = 1:size(conewts_svd,2);
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+hardtoclassifyidx([LUMidx DOidx]) = [];
+
+% Checking the correlation with non-linearity indices 
+% Load the isoresponse data`
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
+% Load the integration within the subunit data
+load AUROClinsubunits_CV.mat
+load AUROCquadsubunits_CV.mat
+
+% For storing the Isoresponse NLI
+RSSEisoresp_medianofratios = [];
+
+% For storing the white noise NLI
+Whitenoise_NLI = [];
+
+indices = [109 24 74];
+for ii = 1:numel(AUROClinsubunits) 
+  
+    % White noise NLI 
+    Error_quad = 1-(AUROCquadsubunits{ii});
+    Error_lin = 1-(AUROClinsubunits{ii});
+    Whitenoise_NLI = [Whitenoise_NLI; log10(median(Error_lin./Error_quad))];
+    
+    % Isoresponse NLI
+    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];
+end
+
+
+figure(plot_counter);
+subplot(324); histogram(RSSEisoresp_medianofratios(LUMidx),logspace(-1,3,31),'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(RSSEisoresp_medianofratios(LUMidx)),10,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 10],'YTick',[0 5 10]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+subplot(322); histogram(RSSEisoresp_medianofratios(DOidx),logspace(-1,3,31),'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(RSSEisoresp_medianofratios(DOidx)),20,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 20],'YTick',[0 10 20]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+subplot(326); histogram(RSSEisoresp_medianofratios(hardtoclassifyidx),logspace(-1,3,31),'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
+plot(median(RSSEisoresp_medianofratios(hardtoclassifyidx)),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); 
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 15],'YTick',[0 5 10 15]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+
+
+% Plotting the white noise NLIs on a cell-type basis
+figure(plot_counter);
+subplot(321); histogram(Whitenoise_NLI(DOidx),-0.02:0.005:0.1,'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(Whitenoise_NLI(DOidx)),25,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 25],'YTick',[0 5 10 15 20 25]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
+subplot(323); histogram(Whitenoise_NLI(LUMidx),-0.02:0.005:0.1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(Whitenoise_NLI(LUMidx)),10,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 10],'YTick',[0 5 10]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
+subplot(325); histogram(Whitenoise_NLI(hardtoclassifyidx),-0.02:0.005:0.1,'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
+plot(median(Whitenoise_NLI(hardtoclassifyidx)),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 15],'YTick',[0 5 10 15]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+% Some stats on the whitenoise NLI
+[p1,~] = ranksum(Whitenoise_NLI(LUMidx),Whitenoise_NLI(DOidx));
+[p2,~] = ranksum(Whitenoise_NLI(DOidx),Whitenoise_NLI(hardtoclassifyidx));
+[p3,~] = ranksum(Whitenoise_NLI(LUMidx),Whitenoise_NLI(hardtoclassifyidx));
+[median(Whitenoise_NLI(LUMidx)) median(Whitenoise_NLI(DOidx)) median(Whitenoise_NLI(hardtoclassifyidx))]
+
+% Some stats on the isoresponse NLI
+[p4,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(DOidx)));
+[p5,~] = ranksum(log(RSSEisoresp_medianofratios(DOidx)),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
+[p6,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
+[p7,~] = ranksum(log(RSSEisoresp_medianofratios([LUMidx DOidx])),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
+
+[median(log(RSSEisoresp_medianofratios(LUMidx))) median(log(RSSEisoresp_medianofratios(DOidx))) median(log(RSSEisoresp_medianofratios(hardtoclassifyidx)))]
+
+% PLotting the cone weights
+figure(plot_counter);
+plot(conewts_svd(1,LUMidx), conewts_svd(2,LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(conewts_svd(1,DOidx), conewts_svd(2,DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(conewts_svd(1,hardtoclassifyidx), conewts_svd(2,hardtoclassifyidx),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+axis equal, set(gca,'Xlim',[-1 1],'Ylim',[0 1]);
+plot_counter = plot_counter + 1;
