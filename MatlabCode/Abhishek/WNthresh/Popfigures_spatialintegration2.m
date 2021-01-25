@@ -221,7 +221,6 @@ if any(basisvecidx)
         mask_changes = [mask_changes  last_wntrial];
     end
     mask_changes = reshape(mask_changes , 2, []);
-   
     
     % Modifying the STRO/WN structure after I have pulled out the
     % basis vector
@@ -445,19 +444,18 @@ end
 
 load conewts_svd.mat
 load vals.mat
-load S1RGB.mat
-load S2RGB.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
 
 % Calculating some metrics for circular stats and discarding SO cells
 unitvectors = [];
-anglebwvectors = [];
 for ii = 1:size(S1RGB,2)
     vec1 = S1RGB(:,ii);
     vec2 = S2RGB(:,ii);
-    vec = exp(atan2(norm(cross(vec1,vec2)),dot(vec1,vec2))*i);
-    
-    % Storing the angle bewteen the vectors
-    anglebwvectors = [anglebwvectors; atan2(norm(cross(vec1,vec2)),dot(vec1,vec2))*180/pi];
+    vec = exp(angulardifference_RGB(ii)*(pi/180)*i);
     
     % Converting the angle difference into unit vectors
     unitvectors = [unitvectors; real(vec) imag(vec)];
@@ -479,6 +477,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
 
 % Load the integration within the subunit whitenoise analysis data
 load AUROClinsubunits_CV.mat
@@ -535,38 +536,36 @@ p1 = kruskalwallis(data,group','off');
 % DO + Simple cells vs. hardtoclassify cells
 [p3,h] = ranksum(Whitenoise_NLI([DOidx LUMidx]),Whitenoise_NLI(hardtoclassifyidx));
 
+% DO vs. Simple cells
+[p4,~] = ranksum(Whitenoise_NLI([DOidx]),Whitenoise_NLI(LUMidx));
 
+%*************************************CIRCULAR STATS *******************
+% I am still unsure about the math here: Need to double check 
 % Summary circular stats for all cells
-meanvec = mean(unitvectors,1);
-stdvec = std(unitvectors,1);
+All = [LUMidx DOidx hardtoclassifyidx];
 % Calculating the circular mean and circular standard deviation
-circmean = atan2(meanvec(2),meanvec(1))*180/pi;
-circstd = atan2(stdvec(2),stdvec(1))*180/pi;
+circmean = mean(atan2d(unitvectors(All',2),unitvectors(All',1)));
+circstd = std(atan2d(unitvectors(All',2),unitvectors(All',1)));
 
 
 % Summary circular stats for Simple cells
-meanvec_LUM = mean(unitvectors(LUMidx,:),1);
-stdvec_LUM = std(unitvectors(LUMidx,:),1);
 % Calculating the circular mean and circular standard deviation
-circmean_LUM = atan2(meanvec_LUM(2),meanvec_LUM(1))*180/pi;
-circstd_LUM = atan2(stdvec_LUM(2),stdvec_LUM(1))*180/pi;
+circmean_LUM = mean(atan2d(unitvectors(LUMidx',2),unitvectors(LUMidx',1)));
+circstd_LUM = std(atan2d(unitvectors(LUMidx',2),unitvectors(LUMidx',1)));
 
 
 % Summary circular stats for DO cells
-meanvec_DO = mean(unitvectors(DOidx,:),1);
-stdvec_DO = std(unitvectors(DOidx,:),1);
 % Calculating the circular mean and circular standard deviation
-circmean_DO = atan2(meanvec_DO(2),meanvec_DO(1))*180/pi;
-circstd_DO = atan2(stdvec_DO(2),stdvec_DO(1))*180/pi;
+circmean_DO = mean(atan2d(unitvectors(DOidx',2),unitvectors(DOidx',1)));
+circstd_DO = std(atan2d(unitvectors(DOidx',2),unitvectors(DOidx',1)));
 
 % Summary circular stats for HTC cells
-meanvec_HTC = mean(unitvectors(hardtoclassifyidx,:),1);
-stdvec_HTC = std(unitvectors(hardtoclassifyidx,:),1);
 % Calculating the circular mean and circular standard deviation
-circmean_HTC = atan2(meanvec_HTC(2),meanvec_HTC(1))*180/pi;
-circstd_HTC = atan2(stdvec_HTC(2),stdvec_HTC(1))*180/pi;
+circmean_HTC = mean(atan2d(unitvectors(hardtoclassifyidx',2),unitvectors(hardtoclassifyidx',1)));
+circstd_HTC = std(atan2d(unitvectors(hardtoclassifyidx',2),unitvectors(hardtoclassifyidx',1)));
 
 %% Figure 3-part1: Iso-response example data from example LUM, DO and HTC cells 
+% Contains OLD indexes but still valid with the NEW criteria, so not changing this part of the code 
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -876,6 +875,14 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -891,6 +898,11 @@ hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
 load RSSE_linearmodel_CV.mat % Robust regression
@@ -899,11 +911,12 @@ load RSSE_quadmodel_CV.mat
 % For storing median of differences/ratios
 RSSEisoresp_medianofratios = [];
 RSSEisoresp_lin_median = []; RSSEisoresp_quad_median = []; % Isoresponse data
+Isoresponse_NLI = [];
 
 for ii = 1:numel(RSSE_linearmodel)   
     % computation for calculating median of differences/ratios
     RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
-    
+    Isoresponse_NLI = [Isoresponse_NLI; log10(RSSEisoresp_medianofratios(end))];
     
     RSSEisoresp_lin_median = [RSSEisoresp_lin_median; median(RSSE_linearmodel{ii})];
     RSSEisoresp_quad_median = [RSSEisoresp_quad_median; median(RSSE_quadmodel{ii})];
@@ -928,14 +941,14 @@ plot_counter = plot_counter + 1;
 
 % Comparing spatial NLI across cell types
 group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx))];
-data = RSSEisoresp_medianofratios([LUMidx'; DOidx'; hardtoclassifyidx']); 
+data = Isoresponse_NLI([LUMidx'; DOidx'; hardtoclassifyidx']); 
 p1 = kruskalwallis(data,group,'off');
 
 % Comparing spatial NLI between simple and DO cells
-[p2,h] = ranksum(RSSEisoresp_medianofratios(LUMidx),RSSEisoresp_medianofratios(DOidx));
+[p2,h] = ranksum(Isoresponse_NLI(LUMidx),Isoresponse_NLI(DOidx));
 
 % Comparing spatial NLI between simple + DO cells and other cells
-[p5,h] = ranksum(RSSEisoresp_medianofratios([LUMidx DOidx]),RSSEisoresp_medianofratios(hardtoclassifyidx));
+[p5,h] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx));
 
 % Some control analyses to check the relationship between spatial structure and non-linearity
 % Classifying the spatial structure as 1 (center-surround) or 2 (adjacent) based on selection of subunits
@@ -986,7 +999,7 @@ load TFR.mat % Target firing rates
 figure(plot_counter);
 indices = [DOidx LUMidx hardtoclassifyidx];
 TFRprctile = [];
-for iter = 1:numel(baselineFRstats)
+for iter = 1:numel(indices)
     ii = indices(iter);
     baselineFR = baselineFRstats{ii};
     if ismember(ii,DOidx)
@@ -1048,6 +1061,15 @@ end
 
 load conewts_svd.mat
 load vals.mat
+
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -1062,6 +1084,11 @@ hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1563,6 +1590,10 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+anglebwvectors = angulardifference_RGB;
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -1577,6 +1608,11 @@ hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1614,6 +1650,8 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
 
 LumIds_conewts = find(conewts_svd(1,:)>0 & conewts_svd(3,:) >0);
 ColorOpponentIds_conewts = find(conewts_svd(1,:)<0 | conewts_svd(3,:) <0);
@@ -1623,6 +1661,11 @@ DOidx = [ColorOpponentIds_conewts];
 hardtoclassifyidx = [LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1699,6 +1742,11 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -1713,6 +1761,11 @@ hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
+DOidx = DOidx(anglebwvectors(DOidx)>90);
+hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
 
 % Checking whether there is any correlation between S-cone input and non-linearities 
 
@@ -1739,7 +1792,11 @@ plot(RSSEisoresp_medianofratios(indices(3)),abs(conewts_svd(3,indices(3))),'o','
 axis square; set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 1000],'XTick',[0.1 1 10 100 1000],'Ylim',[0 0.6],'YTick',0:0.2:0.6); xlabel('Spatial NLI isoresponse'); ylabel('S cone input');
 plot_counter = plot_counter + 1;
 
-[r1,p1] = corr(RSSEisoresp_medianofratios,abs(conewts_svd(3,:)'),'type','Spearman');
+All = [LUMidx DOidx hardtoclassifyidx];
+[r1,p1] = corr(RSSEisoresp_medianofratios(All),abs(conewts_svd(3,All)'),'type','Spearman');
+[r2,p2] = corr(RSSEisoresp_medianofratios(LUMidx),abs(conewts_svd(3,LUMidx)'),'type','Spearman');
+[r3,p3] = corr(RSSEisoresp_medianofratios(DOidx),abs(conewts_svd(3,DOidx)'),'type','Spearman');
+[r4,p4] = corr(RSSEisoresp_medianofratios(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)'),'type','Spearman');
 
 %% Determining the some additional numbers
 
@@ -1751,11 +1808,7 @@ NEURONS_MONKEY2 = numel(Pangu);
 
 % RF locations 
 load RF_loc.mat
-conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
-NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
-close(conn);
-RF_LOCATIONS = RF_loc(strcmp(string(NTmode),"subunit"),:);
-RF_AMP = sqrt(sum(RF_LOCATIONS.^2,2))/10;
+RF_AMP = sqrt(sum(RF_loc.^2,2))/10;
 
 
 %% Some more analyses that Greg suggested
