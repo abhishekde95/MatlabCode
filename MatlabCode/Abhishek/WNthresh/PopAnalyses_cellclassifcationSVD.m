@@ -59,8 +59,11 @@ relativestrength_of_subunits = [];
 basisvec = cell(1,numcells);
 SVDSTA = cell(1,numcells);
 angulardifference_RGB = [];
+angulardifference_LMS = [];
 S1RGB_svd = [];
 S2RGB_svd = [];
+S1LMS_svd = [];
+S2LMS_svd = [];
 
 for ii = 1:numcells
     disp(ii);
@@ -210,9 +213,13 @@ for ii = 1:numcells
     
     % Calculating the angular difference 
     RGB1 = tmpSTA(1,:); RGB2 = tmpSTA(2,:);
+    LMS1 = Mrgbtocc*RGB1'; LMS2 = Mrgbtocc*RGB2'; 
     angulardifference_RGB = [angulardifference_RGB; acos(dot(RGB1,RGB2)/(norm(RGB1)*norm(RGB2)))*180/pi];
+    angulardifference_LMS = [angulardifference_LMS; acos(dot(LMS1,LMS2)/(norm(LMS1)*norm(LMS2)))*180/pi];
     S1RGB_svd = [S1RGB_svd RGB1'];
     S2RGB_svd = [S2RGB_svd RGB2'];
+    S1LMS_svd = [S1LMS_svd LMS1];
+    S2LMS_svd = [S2LMS_svd LMS2];
     
 end
 plot_counter = plot_counter + 2;
@@ -224,8 +231,11 @@ if savevariables
     save variance_accounted variance_accounted
     save singular_values singular_values
     save angulardifferences_RGB angulardifference_RGB
+    save angulardifferences_LMS angulardifference_LMS
     save S1RGB_svd S1RGB_svd 
     save S2RGB_svd S2RGB_svd
+    save S1LMS_svd S1LMS_svd 
+    save S2LMS_svd S2LMS_svd
 end
 
 %% Classifying cells the same way as for spatial structure paper 

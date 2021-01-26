@@ -449,6 +449,7 @@ load S2RGB_svd.mat
 load angulardifferences_RGB.mat
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
+SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
 
 % Calculating some metrics for circular stats and discarding SO cells
 unitvectors = [];
@@ -477,9 +478,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Load the integration within the subunit whitenoise analysis data
 load AUROClinsubunits_CV.mat
@@ -538,6 +539,10 @@ p1 = kruskalwallis(data,group','off');
 
 % DO vs. Simple cells
 [p4,~] = ranksum(Whitenoise_NLI([DOidx]),Whitenoise_NLI(LUMidx));
+
+% DO vs. hardtoclassify cells, LUM vs. hardtoclassify cells
+[p5,~] = ranksum(Whitenoise_NLI([DOidx]),Whitenoise_NLI(hardtoclassifyidx));
+[p6,~] = ranksum(Whitenoise_NLI([LUMidx]),Whitenoise_NLI(hardtoclassifyidx));
 
 %*************************************CIRCULAR STATS *******************
 % I am still unsure about the math here: Need to double check 
@@ -882,6 +887,7 @@ load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
+SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
@@ -899,9 +905,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1068,7 +1074,7 @@ load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
-
+SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
@@ -1086,9 +1092,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1337,7 +1343,7 @@ subplot(2,2,3); hold on; plot([0 20],[30 30],'k'); hold off;
 
 plot_counter = plot_counter + 1;
 
-%% Figure S4
+%% Figure S4 (No longer using this part)
 % Robustness of the isoresponse curves based on the last point
 % Plotting the average of the last 5 points as well for each probed direction: checking for the example cells only
 
@@ -1583,7 +1589,7 @@ for zz = 1:numel(indices)
     plot_counter = plot_counter + 1;
 end
 
-%% Figure S5- Population analysis of isoresponse curves 
+%% Figure S5- Population analysis of isoresponse curves: linear error vs. non-linear error 
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -1593,6 +1599,7 @@ load vals.mat
 load S1RGB_svd.mat
 load S2RGB_svd.mat
 anglebwvectors = angulardifference_RGB;
+SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
@@ -1610,9 +1617,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1649,23 +1656,36 @@ if ~exist('plot_counter')
 end
 
 load conewts_svd.mat
-load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
 load angulardifferences_RGB.mat
+load vals.mat
+S1RGB = S1RGB_svd;
+S2RGB = S2RGB_svd;
 anglebwvectors = angulardifference_RGB;
+SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+signS1 = sum(sign(S1RGB),1);
+signS2 = sum(sign(S2RGB),1);
+hardtoclassifyidx = 1:numel(signS1);
 
-LumIds_conewts = find(conewts_svd(1,:)>0 & conewts_svd(3,:) >0);
-ColorOpponentIds_conewts = find(conewts_svd(1,:)<0 | conewts_svd(3,:) <0);
+% Projecting onto a Luminance axis
+load fundamentals.mat % Loading the cone fundamentals 
+load('T_vos1978_Y'); % Loading the luminosity function
+Vlambda = T_vos1978_Y';
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+u = fundamentals'*Vlambda; % converting Vlambda into cone mechanisms
+u = u/norm(u); % Normalizing
 
-LUMidx = LumIds_conewts;
-DOidx = [ColorOpponentIds_conewts];
-hardtoclassifyidx = [LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
-LUMidx = LUMidx(vals(LUMidx)<95);
-DOidx = DOidx(vals(DOidx)<95);
+conewts_mod = conewts_svd./repmat(sqrt(sum(conewts_svd.^2,1)),[3 1]); % Normalizing the cone weights
+proj = abs(conewts_mod'*u); % Projecting cone weights onto the luminance cone mechanism 
+proj = proj/max(proj);
 
-% Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+% vals -> PC1 permuation test results 
+LUMidx = find((proj>0.67 & vals<95 & SpatiallyOpponent') ==1)'; % Classifying cells
+DOidx = find((proj<0.33 & vals<95 & SpatiallyOpponent') ==1)';
+hardtoclassifyidx([LUMidx DOidx]) = [];
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
 
 % Checking the correlation with non-linearity indices 
 % Load the isoresponse data
@@ -1696,43 +1716,37 @@ end
 
 figure(plot_counter);
 subplot(324); histogram(RSSEisoresp_medianofratios(LUMidx),logspace(-1,3,31),'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(RSSEisoresp_medianofratios(LUMidx)),10,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 10],'YTick',[0 5 10]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+plot(median(RSSEisoresp_medianofratios(LUMidx)),13,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 15],'YTick',[0 5 10 15]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
 subplot(322); histogram(RSSEisoresp_medianofratios(DOidx),logspace(-1,3,31),'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(RSSEisoresp_medianofratios(DOidx)),20,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 20],'YTick',[0 10 20]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+plot(median(RSSEisoresp_medianofratios(DOidx)),8,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 10],'YTick',[0 5 10]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
 subplot(326); histogram(RSSEisoresp_medianofratios(hardtoclassifyidx),logspace(-1,3,31),'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
 plot(median(RSSEisoresp_medianofratios(hardtoclassifyidx)),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); 
-set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 15],'YTick',[0 5 10 15]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
+set(gca,'Tickdir','out','XScale','log','Xlim',[0.1 100],'XTick',[0.1 1 10 100],'Ylim',[0 20],'YTick',[0 5 10 15 20]); ylabel('Count'); xlabel('Isoresponse NLI'); axis square; hold off;
 
 
 % Plotting the white noise NLIs on a cell-type basis
 figure(plot_counter);
 subplot(321); histogram(Whitenoise_NLI(DOidx),-0.02:0.005:0.1,'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(Whitenoise_NLI(DOidx)),25,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 25],'YTick',[0 5 10 15 20 25]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
-subplot(323); histogram(Whitenoise_NLI(LUMidx),-0.02:0.005:0.1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(Whitenoise_NLI(LUMidx)),10,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(median(Whitenoise_NLI(DOidx)),8,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
 set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 10],'YTick',[0 5 10]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
+subplot(323); histogram(Whitenoise_NLI(LUMidx),-0.02:0.005:0.1,'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(Whitenoise_NLI(LUMidx)),13,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 15],'YTick',[0 5 10 15]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
 subplot(325); histogram(Whitenoise_NLI(hardtoclassifyidx),-0.02:0.005:0.1,'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
 plot(median(Whitenoise_NLI(hardtoclassifyidx)),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 15],'YTick',[0 5 10 15]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
+set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 20],'YTick',[0 5 10 15 20]); xlabel('Whitenoise NLI'); ylabel('Count'); axis square; hold off;
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
 % Some stats on the whitenoise NLI
 [p1,~] = ranksum(Whitenoise_NLI(LUMidx),Whitenoise_NLI(DOidx));
-[p2,~] = ranksum(Whitenoise_NLI(DOidx),Whitenoise_NLI(hardtoclassifyidx));
-[p3,~] = ranksum(Whitenoise_NLI(LUMidx),Whitenoise_NLI(hardtoclassifyidx));
-[median(Whitenoise_NLI(LUMidx)) median(Whitenoise_NLI(DOidx)) median(Whitenoise_NLI(hardtoclassifyidx))]
+[p2,~] = ranksum(Whitenoise_NLI([LUMidx DOidx]),Whitenoise_NLI(hardtoclassifyidx));
 
 % Some stats on the isoresponse NLI
-[p4,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(DOidx)));
-[p5,~] = ranksum(log(RSSEisoresp_medianofratios(DOidx)),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
-[p6,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
-[p7,~] = ranksum(log(RSSEisoresp_medianofratios([LUMidx DOidx])),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
-
-[median(log(RSSEisoresp_medianofratios(LUMidx))) median(log(RSSEisoresp_medianofratios(DOidx))) median(log(RSSEisoresp_medianofratios(hardtoclassifyidx)))]
+[p3,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(DOidx)));
+[p4,~] = ranksum(log(RSSEisoresp_medianofratios([LUMidx DOidx])),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
 
 %% Relationship between S-cone signal and the isoresponse NLI
 
