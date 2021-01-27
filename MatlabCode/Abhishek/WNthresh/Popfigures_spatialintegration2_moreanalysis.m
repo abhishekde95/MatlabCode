@@ -1225,7 +1225,8 @@ load vals.mat
 S1RGB = S1RGB_svd;
 S2RGB = S2RGB_svd;
 anglebwvectors = angulardifference_RGB;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 signS1 = sum(sign(S1RGB),1);
 signS2 = sum(sign(S2RGB),1);
 hardtoclassifyidx = 1:numel(signS1);

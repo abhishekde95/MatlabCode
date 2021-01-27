@@ -64,6 +64,7 @@ S1RGB_svd = [];
 S2RGB_svd = [];
 S1LMS_svd = [];
 S2LMS_svd = [];
+RGBspatialweightingfunction_svd = [];
 
 for ii = 1:numcells
     disp(ii);
@@ -220,7 +221,9 @@ for ii = 1:numcells
     S2RGB_svd = [S2RGB_svd RGB2'];
     S1LMS_svd = [S1LMS_svd LMS1];
     S2LMS_svd = [S2LMS_svd LMS2];
+    RGBspatialweightingfunction_svd = [RGBspatialweightingfunction_svd; u1(:,1)'];
     
+
 end
 plot_counter = plot_counter + 2;
 
@@ -236,6 +239,7 @@ if savevariables
     save S2RGB_svd S2RGB_svd
     save S1LMS_svd S1LMS_svd 
     save S2LMS_svd S2LMS_svd
+    save RGBspatialweightingfunction_svd RGBspatialweightingfunction_svd
 end
 
 %% Classifying cells the same way as for spatial structure paper 

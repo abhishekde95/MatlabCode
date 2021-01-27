@@ -47,11 +47,12 @@ I_color_filtered(I_color_filtered<0) = 0;
 I_color_filtered = I_color_filtered./(1.5*max(I_color_filtered(:)));
 I_color_filtered = I_color_filtered + 0.5-median(I_color_filtered(:));
 
-% Nonlinear filtering 
-I_LminusM(I_LminusM<0) = 0; I_MminusL(I_MminusL<0) = 0;
+% Nonlinear filtering
+thresh = 0;
+I_LminusM(I_LminusM<thresh) = thresh; I_MminusL(I_MminusL<thresh) = thresh;
 % I_color_filteredNL = I_LminusM.^2 + I_MminusL.^2; % Squaring non-linearity
-I_color_filteredNL = I_LminusM.^2 + I_MminusL.^2; % The vanilla ReLu non-linearity
-I_color_filteredNL(I_color_filteredNL<0) = 0;
+I_color_filteredNL = I_LminusM + I_MminusL; % The vanilla ReLu non-linearity
+%I_color_filteredNL(I_color_filteredNL<0) = 0;
 I_color_filteredNL = I_color_filteredNL./(1.5*max(I_color_filteredNL(:)));
 I_color_filteredNL = I_color_filteredNL + 0.5-median(I_color_filteredNL(:));
 
@@ -448,8 +449,10 @@ load S1RGB_svd.mat
 load S2RGB_svd.mat
 load angulardifferences_RGB.mat
 S1RGB = S1RGB_svd;
-S2RGb = S2RGB_svd;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+S2RGB = S2RGB_svd;
+anglebwvectors = angulardifference_RGB;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 
 % Calculating some metrics for circular stats and discarding SO cells
 unitvectors = [];
@@ -466,9 +469,9 @@ thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
@@ -581,9 +584,10 @@ thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
 
 % Classifying cells 
 LUMidx = LumIds_conewts;
@@ -887,15 +891,17 @@ load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
@@ -1074,15 +1080,17 @@ load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
@@ -1139,6 +1147,149 @@ plot_counter = plot_counter + 1;
 [r2,p2] = corr(Isoresponse_NLI(DOidx),Whitenoise_NLI(DOidx),'type','Spearman');
 [r3,p3] = corr(Isoresponse_NLI(hardtoclassifyidx),Whitenoise_NLI(hardtoclassifyidx),'type','Spearman');
 [rc,pc] = corr(Isoresponse_NLI,Whitenoise_NLI,'type','Spearman');
+
+%% A control analysis: Some more analyses that Greg suggested
+%  1) To make the isoprobability NLI and isoresponse NLI definition more consistent 
+%  2) To split the other cell category into a) significant PC1 b) non-significant PC1
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load conewts_svd.mat
+load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGB = S2RGB_svd;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); 
+Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Introducing new categories based on Greg's suggestion
+hardtoclassifyidx = 1:size(conewts_svd,2);
+hardtoclassifyidx([LUMidx DOidx]) = [];
+hardtoclassifyidx_woPC1 = [hardtoclassifyidx(vals(hardtoclassifyidx)<95)];
+hardtoclassifyidx_wPC1 = [hardtoclassifyidx(vals(hardtoclassifyidx)>=95)]; 
+
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx_woPC1 = hardtoclassifyidx_woPC1(SpatiallyOpponent(hardtoclassifyidx_woPC1));
+hardtoclassifyidx_wPC1 = hardtoclassifyidx_wPC1(SpatiallyOpponent(hardtoclassifyidx_wPC1)); 
+
+% Checking the correlation with non-linearity indices 
+% Load the isoresponse data
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
+
+% Load the integration within the subunit data
+load AUROClinsubunits_CV.mat
+load AUROCquadsubunits_CV.mat
+
+% For storing median of differences/ratios
+Acrosssubunits_medianofdifferences = [];
+Acrosssubunits_lin_median = []; Acrosssubunits_quad_median = [];
+
+% For storing median of differences/ratios
+RSSEisoresp_medianofratios = [];
+RSSEisoresp_lin_median = []; RSSEisoresp_quad_median = []; % Isoresponse data
+Isoresponse_NLI = [];
+
+for ii = 1:numel(RSSE_linearmodel)   
+    % Isoresponse data - computation for calculating median of differences/ratios
+    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})]; 
+    Isoresponse_NLI = [Isoresponse_NLI; log10(RSSEisoresp_medianofratios(end))];
+    RSSEisoresp_lin_median = [RSSEisoresp_lin_median; median(RSSE_linearmodel{ii})];
+    RSSEisoresp_quad_median = [RSSEisoresp_quad_median; median(RSSE_quadmodel{ii})];
+    
+    % Storing the WN subunit spatial interaction data 
+    Error_quad = 1-(AUROCquadsubunits{ii});
+    Error_lin = 1-(AUROClinsubunits{ii});
+    
+    % A new definition of Acrosssubunits_medianofdifferences
+    Acrosssubunits_medianofdifferences = [Acrosssubunits_medianofdifferences; median(Error_lin./Error_quad)];
+    Acrosssubunits_lin_median = [Acrosssubunits_lin_median; median(Error_lin)];
+    Acrosssubunits_quad_median = [Acrosssubunits_quad_median; median(Error_quad)];
+    
+end
+RSSEisoresp_medianofratios(RSSEisoresp_medianofratios<0.1) = 0.1;
+indices = [109 31 74];
+
+% Isoresponse data: Plotting the results for SVD based cone weight classification including the PC1 z-scores 
+figure(plot_counter);
+subplot(221); plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
+axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
+xlabel('median Linear error'); ylabel('median Quadratic error'); legend ('LUM','DO'); title('Isoresponse'); hold off;
+
+subplot(222); plot(RSSEisoresp_lin_median(hardtoclassifyidx_woPC1),RSSEisoresp_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(RSSEisoresp_lin_median(hardtoclassifyidx_wPC1),RSSEisoresp_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
+axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); plot([0.0001 10],[0.0001 10],'k'); 
+xlabel('median Linear error'); ylabel('median Quadratic error'); legend('NSNDO woPC1','NSNDO wPC1'); title('Isoresponse'); hold off;
+
+subplot(223); histogram(log10(RSSEisoresp_medianofratios(LUMidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
+histogram(log10(RSSEisoresp_medianofratios(DOidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
+plot(log10(median(RSSEisoresp_medianofratios(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(log10(median(RSSEisoresp_medianofratios(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
+ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend ('LUM','DO'); axis square; hold off;
+
+subplot(224); histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
+histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
+plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
+plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
+set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
+ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend('NSNDO woPC1','NSNDO wPC1'); axis square; hold off;
+plot_counter = plot_counter + 1;
+
+
+% WN subunit spatial interaction data 
+figure(plot_counter);
+subplot(221); plot(Acrosssubunits_lin_median(LUMidx),Acrosssubunits_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Acrosssubunits_lin_median(DOidx),Acrosssubunits_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.08 1],[0.08 1],'k');
+axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); 
+xlabel('median GLM error'); ylabel('median GQM error'); legend ('LUM','DO'); title('Isoprobability'); hold off;
+
+subplot(222); plot(Acrosssubunits_lin_median(hardtoclassifyidx_woPC1),Acrosssubunits_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Acrosssubunits_lin_median(hardtoclassifyidx_wPC1),Acrosssubunits_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
+axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); plot([0.08 1],[0.08 1],'k'); 
+xlabel('median GLM error'); ylabel('median GQM error'); legend('HTC woPC1','HTC wPC1'); title('Isoprobability'); hold off;
+
+subplot(223); histogram(log10(Acrosssubunits_medianofdifferences(LUMidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
+histogram(log10(Acrosssubunits_medianofdifferences(DOidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
+plot(log10(median(Acrosssubunits_medianofdifferences(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(log10(median(Acrosssubunits_medianofdifferences(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
+ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend ('LUM','DO'); axis square; hold off;
+
+subplot(224); histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
+histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
+plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
+plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
+set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
+ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend('HTC woPC1','HTC wPC1'); axis square; hold off;
+
+plot_counter = plot_counter + 1;
+
+% Some more stats
+[p1,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_woPC1));
+[p2,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_wPC1));
+[p3,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI([hardtoclassifyidx_woPC1 hardtoclassifyidx_wPC1]));
 
 %% Figure 4: Downstream circuitry of simple and DO cells
 % No code for this part
@@ -1357,9 +1508,10 @@ thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
 
 % Classifying cells 
 LUMidx = LumIds_conewts;
@@ -1598,16 +1750,20 @@ load conewts_svd.mat
 load vals.mat
 load S1RGB_svd.mat
 load S2RGB_svd.mat
+S1RGB = S1RGB_svd;
+S2RGB = S2RGB_svd;
 anglebwvectors = angulardifference_RGB;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
 Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
@@ -1663,7 +1819,8 @@ load vals.mat
 S1RGB = S1RGB_svd;
 S2RGB = S2RGB_svd;
 anglebwvectors = angulardifference_RGB;
-SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 signS1 = sum(sign(S1RGB),1);
 signS2 = sum(sign(S2RGB),1);
 hardtoclassifyidx = 1:numel(signS1);
@@ -1747,6 +1904,7 @@ plot_counter = plot_counter + 1;
 % Some stats on the isoresponse NLI
 [p3,~] = ranksum(log(RSSEisoresp_medianofratios(LUMidx)),log(RSSEisoresp_medianofratios(DOidx)));
 [p4,~] = ranksum(log(RSSEisoresp_medianofratios([LUMidx DOidx])),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
+[~,p5] = ttest2(log(RSSEisoresp_medianofratios([LUMidx DOidx])),log(RSSEisoresp_medianofratios(hardtoclassifyidx)));
 
 %% Relationship between S-cone signal and the isoresponse NLI
 
@@ -1760,6 +1918,8 @@ load S1RGB_svd.mat
 load S2RGB_svd.mat
 load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
 
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
@@ -1777,9 +1937,9 @@ LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
 % Considering only the spatially opponent subunits
-LUMidx = LUMidx(anglebwvectors(LUMidx)>90);
-DOidx = DOidx(anglebwvectors(DOidx)>90);
-hardtoclassifyidx = hardtoclassifyidx(anglebwvectors(hardtoclassifyidx)>90);
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Checking whether there is any correlation between S-cone input and non-linearities 
 
@@ -1825,135 +1985,6 @@ load RF_loc.mat
 RF_AMP = sqrt(sum(RF_loc.^2,2))/10;
 
 
-%% Some more analyses that Greg suggested
-%  1) To make the isoprobability NLI and isoresponse NLI definition more consistent 
-%  2) To split the other cell category into a) significant PC1 b) non-significant PC1
-
-if ~exist('plot_counter')
-    plot_counter = 1;
-end
-
-load conewts_svd.mat
-load vals.mat
-thresh = 0.8;
-LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
-ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
-Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
-Sconesensitive = conewts_svd(:,Sconedominated_conewts);
-Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
-
-LUMidx = LumIds_conewts;
-DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
-% Introducing new categories based on Greg's suggestion
-hardtoclassifyidx_woPC1 = [Other_conewts(vals(Other_conewts)<95)];
-hardtoclassifyidx_wPC1 = [Other_conewts(vals(Other_conewts)>=95)]; 
-hardtoclassifyidx_wPC1_DOsimple = [LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)]; 
-LUMidx = LUMidx(vals(LUMidx)<95);
-DOidx = DOidx(vals(DOidx)<95);
-
-% Checking the correlation with non-linearity indices 
-% Load the isoresponse data
-load RSSE_linearmodel_CV.mat % Robust regression
-load RSSE_quadmodel_CV.mat
-
-% Load the integration within the subunit data
-load AUROClinsubunits_CV.mat
-load AUROCquadsubunits_CV.mat
-
-% For storing median of differences/ratios
-Acrosssubunits_medianofdifferences = [];
-Acrosssubunits_lin_median = []; Acrosssubunits_quad_median = [];
-
-% For storing median of differences/ratios
-RSSEisoresp_medianofratios = [];
-RSSEisoresp_lin_median = []; RSSEisoresp_quad_median = []; % Isoresponse data
-
-for ii = 1:numel(RSSE_linearmodel)   
-    % Isoresponse data - computation for calculating median of differences/ratios
-    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
-    RSSEisoresp_lin_median = [RSSEisoresp_lin_median; median(RSSE_linearmodel{ii})];
-    RSSEisoresp_quad_median = [RSSEisoresp_quad_median; median(RSSE_quadmodel{ii})];
-    
-    % Storing the WN subunit spatial interaction data 
-    Error_quad = 1-(AUROCquadsubunits{ii});
-    Error_lin = 1-(AUROClinsubunits{ii});
-    
-    % A new definition of Acrosssubunits_medianofdifferences
-    Acrosssubunits_medianofdifferences = [Acrosssubunits_medianofdifferences; median(Error_lin./Error_quad)];
-    Acrosssubunits_lin_median = [Acrosssubunits_lin_median; median(Error_lin)];
-    Acrosssubunits_quad_median = [Acrosssubunits_quad_median; median(Error_quad)];
-    
-end
-RSSEisoresp_medianofratios(RSSEisoresp_medianofratios<0.1) = 0.1;
-indices = [109 31 74];
-
-% Isoresponse data: Plotting the results for SVD based cone weight classification including the PC1 z-scores 
-figure(plot_counter);
-subplot(221); plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
-xlabel('median Linear error'); ylabel('median Quadratic error'); legend ('LUM','DO'); title('Isoresponse'); hold off;
-
-subplot(222); plot(RSSEisoresp_lin_median(hardtoclassifyidx_woPC1),RSSEisoresp_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(hardtoclassifyidx_wPC1),RSSEisoresp_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
-plot(RSSEisoresp_lin_median(hardtoclassifyidx_wPC1_DOsimple),RSSEisoresp_quad_median(hardtoclassifyidx_wPC1_DOsimple),'o','MarkerFaceColor',[0 0.5 1],'MarkerEdgeColor',[1 1 1]); hold on;
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); plot([0.0001 10],[0.0001 10],'k'); 
-xlabel('median Linear error'); ylabel('median Quadratic error'); legend('HTC woPC1','HTC wPC1','DO simple wPC1'); title('Isoresponse'); hold off;
-
-subplot(223); histogram(log10(RSSEisoresp_medianofratios(LUMidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
-histogram(log10(RSSEisoresp_medianofratios(DOidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
-plot(log10(median(RSSEisoresp_medianofratios(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(log10(median(RSSEisoresp_medianofratios(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend ('LUM','DO'); axis square; hold off;
-
-subplot(224); histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
-histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
-histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1_DOsimple)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[0 0.5 1.0],'Linewidth',2); hold on;
-plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
-plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
-plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1_DOsimple))),15,'v','MarkerSize',8,'MarkerFaceColor',[0 0.5 1.0],'MarkerEdgeColor',[1 1 1]); 
-set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend('HTC woPC1','HTC wPC1','DO simple wPC1'); axis square; hold off;
-plot_counter = plot_counter + 1;
-
-% Comparing spatial NLI across cell types
-group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx_woPC1)) 4*ones(size(hardtoclassifyidx_wPC1)) 5*ones(size(hardtoclassifyidx_wPC1_DOsimple))];
-data = RSSEisoresp_medianofratios([LUMidx'; DOidx'; hardtoclassifyidx_woPC1'; hardtoclassifyidx_wPC1'; hardtoclassifyidx_wPC1_DOsimple']); 
-% p1 = kruskalwallis(data,group);
-
-
-% WN subunit spatial interaction data 
-figure(plot_counter);
-subplot(221); plot(Acrosssubunits_lin_median(LUMidx),Acrosssubunits_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(Acrosssubunits_lin_median(DOidx),Acrosssubunits_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.08 1],[0.08 1],'k');
-axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend ('LUM','DO'); title('Isoprobability'); hold off;
-
-subplot(222); plot(Acrosssubunits_lin_median(hardtoclassifyidx_woPC1),Acrosssubunits_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(Acrosssubunits_lin_median(hardtoclassifyidx_wPC1),Acrosssubunits_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
-plot(Acrosssubunits_lin_median(hardtoclassifyidx_wPC1_DOsimple),Acrosssubunits_quad_median(hardtoclassifyidx_wPC1_DOsimple),'o','MarkerFaceColor',[0 0.5 1],'MarkerEdgeColor',[1 1 1]); hold on;
-axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); plot([0.08 1],[0.08 1],'k'); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend('HTC woPC1','HTC wPC1','DO simple wPC1'); title('Isoprobability'); hold off;
-
-subplot(223); histogram(log10(Acrosssubunits_medianofdifferences(LUMidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
-histogram(log10(Acrosssubunits_medianofdifferences(DOidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
-plot(log10(median(Acrosssubunits_medianofdifferences(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(log10(median(Acrosssubunits_medianofdifferences(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend ('LUM','DO'); axis square; hold off;
-
-subplot(224); histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
-histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
-histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1_DOsimple)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[0 0.5 1.0],'Linewidth',2); hold on;
-plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
-plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
-plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1_DOsimple))),15,'v','MarkerSize',8,'MarkerFaceColor',[0 0.5 1.0],'MarkerEdgeColor',[1 1 1]); 
-set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend('HTC woPC1','HTC wPC1','DO simple wPC1'); axis square; hold off;
-
-plot_counter = plot_counter + 1;
 
 
 %% A monte-carlo simulation to quantify how DO cells were selected
