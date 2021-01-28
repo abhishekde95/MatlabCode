@@ -554,23 +554,29 @@ All = [LUMidx DOidx hardtoclassifyidx];
 % Calculating the circular mean and circular standard deviation
 circmean = mean(atan2d(unitvectors(All',2),unitvectors(All',1)));
 circstd = std(atan2d(unitvectors(All',2),unitvectors(All',1)));
-
+Rmean = mean(cos(angle(unitvectors(All,1)+ i*unitvectors(All,2)))); % Pearson correlation coefficient using angles
+Rstd = std(cos(angle(unitvectors(All,1)+ i*unitvectors(All,2)))); 
 
 % Summary circular stats for Simple cells
 % Calculating the circular mean and circular standard deviation
 circmean_LUM = mean(atan2d(unitvectors(LUMidx',2),unitvectors(LUMidx',1)));
 circstd_LUM = std(atan2d(unitvectors(LUMidx',2),unitvectors(LUMidx',1)));
-
+Rmean_LUM = mean(cos(angle(unitvectors(LUMidx,1)+ i*unitvectors(LUMidx,2)))); 
+Rstd_LUM = std(cos(angle(unitvectors(LUMidx,1)+ i*unitvectors(LUMidx,2))));
 
 % Summary circular stats for DO cells
 % Calculating the circular mean and circular standard deviation
 circmean_DO = mean(atan2d(unitvectors(DOidx',2),unitvectors(DOidx',1)));
 circstd_DO = std(atan2d(unitvectors(DOidx',2),unitvectors(DOidx',1)));
+Rmean_DO = mean(cos(angle(unitvectors(DOidx,1)+ i*unitvectors(DOidx,2)))); 
+Rstd_DO = std(cos(angle(unitvectors(DOidx,1)+ i*unitvectors(DOidx,2))));
 
 % Summary circular stats for HTC cells
 % Calculating the circular mean and circular standard deviation
 circmean_HTC = mean(atan2d(unitvectors(hardtoclassifyidx',2),unitvectors(hardtoclassifyidx',1)));
 circstd_HTC = std(atan2d(unitvectors(hardtoclassifyidx',2),unitvectors(hardtoclassifyidx',1)));
+Rmean_HTC = mean(cos(angle(unitvectors(hardtoclassifyidx,1)+ i*unitvectors(hardtoclassifyidx,2)))); 
+Rstd_HTC = std(cos(angle(unitvectors(hardtoclassifyidx,1)+ i*unitvectors(hardtoclassifyidx,2))));
 
 %% Figure 3-part1: Iso-response example data from example LUM, DO and HTC cells 
 % Contains OLD indexes but still valid with the NEW criteria, so not changing this part of the code 
@@ -1804,7 +1810,10 @@ plot(RSSEisoresp_lin_median(indices(1)),RSSEisoresp_quad_median(indices(1)),'o',
 plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
 plot(RSSEisoresp_lin_median(indices(2)),RSSEisoresp_quad_median(indices(2)),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]);
 plot(RSSEisoresp_lin_median(indices(3)),RSSEisoresp_quad_median(indices(3)),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); xlabel('Linear error'); ylabel('Quadratic error'); title('Isoresponse'); hold off;
+axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
+xlabel('Linear error'); ylabel('Quadratic error'); title('Isoresponse'); hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
 
 %% Figure S6 - Robustness of classification
 if ~exist('plot_counter')
@@ -1826,11 +1835,13 @@ signS2 = sum(sign(S2RGB),1);
 hardtoclassifyidx = 1:numel(signS1);
 
 % Projecting onto a Luminance axis
-load fundamentals.mat % Loading the cone fundamentals 
+% load fundamentals.mat % Loading the cone fundamentals 
+% fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
 load('T_vos1978_Y'); % Loading the luminosity function
-Vlambda = T_vos1978_Y';
-fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
-u = fundamentals'*Vlambda; % converting Vlambda into cone mechanisms
+load T_cones_smj.mat
+luminosity = T_vos1978_Y;
+cone_fundamentals = T_cones_smj;
+u = cone_fundamentals'\luminosity'; % converting luminosity into cone mechanisms
 u = u/norm(u); % Normalizing
 
 conewts_mod = conewts_svd./repmat(sqrt(sum(conewts_svd.^2,1)),[3 1]); % Normalizing the cone weights
