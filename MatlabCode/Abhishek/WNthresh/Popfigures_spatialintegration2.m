@@ -72,6 +72,11 @@ I_MminusL_norm = I_MminusL - median(I_MminusL(:));
 I_MminusL_norm = I_MminusL./(2*max(I_MminusL(:)));
 I_MminusL_norm = I_MminusL_norm + 0.5;
 
+% Modying the I_color_filtered to enhance the constrast
+K = I_color_filtered;
+K(K>0.55) = 0.75;
+K(K>0.53 & K<0.55) = 0.6;
+
 % Plotting the images
 plot_counter = 1;
 figure(plot_counter); set(gcf,'Name','Analyses of images: RGB');
@@ -79,11 +84,11 @@ subplot(321); imagesc(A); axis square; set(gca,'XTick',[],'YTick',[]); title('Fi
 subplot(322); imshow(I_color); axis square; set(gca,'XTick',[],'YTick',[]); title('original pic');
 subplot(323); imshow(im2double(I_LminusM_norm)); axis square; set(gca,'XTick',[],'YTick',[]); colormap('gray'); title('Rectified L-M map');
 subplot(324); imshow(im2double(I_MminusL_norm)); axis square; set(gca,'XTick',[],'YTick',[]); colormap('gray'); title('Rectified M-L map');
-subplot(325); imshow(im2double(I_color_filtered)); axis square; set(gca,'XTick',[],'YTick',[]); colormap('gray'); hold off; title('Linear filter');
+subplot(325); imshow(im2double(K)); axis square; set(gca,'XTick',[],'YTick',[]); colormap('gray'); hold off; title('Linear filter');
 subplot(326); imshow(im2double(I_color_filteredNL)); axis square; set(gca,'XTick',[],'YTick',[]); colormap('gray'); hold off; title('Relu non-linearity');
 plot_counter = plot_counter + 1;
 
-% Trying out the non-rectified maps
+%% Trying out the non-rectified maps
 I_LminusMnon = I_Lcone - I_Mcone;  
 I_MminusLnon = I_Mcone - I_Lcone;
 I_LmminusMnon = I_LminusMnon - median(I_LminusMnon(:));
