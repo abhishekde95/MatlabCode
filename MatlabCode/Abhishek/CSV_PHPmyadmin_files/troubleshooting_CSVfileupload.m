@@ -9,8 +9,7 @@ mode = C.Var5;
 filenames = C.Var2(strcmp(mode,"subunit"));
 spikidx = C.Var3(strcmp(mode,"subunit"));
 
-for ii = 1:filenames
+for ii = 1: numel(filenames)
     fileofinterest = filenames{ii};
     stro = nex2stro(findfile(fileofinterest,'/Users/abhishekde/Google Drive/Data_Physiology'));
 end
-
