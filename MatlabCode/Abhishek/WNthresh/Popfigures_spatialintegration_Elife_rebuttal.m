@@ -8,6 +8,7 @@ plot_counter = 1;
 
 %% Figure 1: Impact of linear and non-linear spatial filtering in image processing 
 % This code has been derived from Abhishek/Physiology_modeling/Edge_processing_linear_nonlinear
+%*********************************************************************************
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -123,8 +124,8 @@ plot_counter = plot_counter + 1;
 
 %% Figure 2-part1: Extracting color-time signal from the example DO cell and some masked random WN stimulus
 % Along with its Spatial weighting function and STA
-
 % Rest of the figure was adapted from the SFN and COSYNE poster
+%*********************************************************************************
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -599,7 +600,9 @@ Rmean_HTC = mean(cos(angle(unitvectors(hardtoclassifyidx,1)+ i*unitvectors(hardt
 Rstd_HTC = std(cos(angle(unitvectors(hardtoclassifyidx,1)+ i*unitvectors(hardtoclassifyidx,2))));
 
 %% Figure 3-part1: Iso-response example data from example LUM, DO and HTC cells 
-% Contains OLD indexes but still valid with the NEW criteria, so not changing this part of the code 
+% Contains OLD indexes but still valid with the NEW criteria, so not changing this part of the code
+%*********************************************************************************
+
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -613,7 +616,6 @@ Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
 Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
 Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
-
 
 % Classifying cells 
 LUMidx = LumIds_conewts;
@@ -635,6 +637,7 @@ end
 
 % Loading all the files 
 try 
+    % Using the JDBC connection
     conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
     filename = fetch(conn,'SELECT filename FROM WNthresh');
     NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
@@ -911,6 +914,7 @@ FR = TFR(1,indices);
 
 
 %% Figure 3-part 2: Population analysis of isoresponse curves 
+
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -1325,6 +1329,8 @@ plot_counter = plot_counter + 1;
 [p3,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI([hardtoclassifyidx_woPC1 hardtoclassifyidx_wPC1]));
 
 %% Figure 4: Conceptual model of signal integration within subunits (cone-signal integration)
+% The visual effects were enhanced using Illustrator
+%*********************************************************************************
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -1347,6 +1353,7 @@ view(-22.2000, 42.8000); grid on;  xlabel('L'); ylabel('M'); zlabel('S');
 plot_counter = plot_counter + 1;
 
 %% Figure 5: Quantification of signal integration within subunit: Cone signal NLI 
+%*********************************************************************************
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -1362,7 +1369,6 @@ anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGb = S2RGB_svd;
 SpatiallyOpponent = anglebwvectors'>90;
-
 
 % Classifying cells based on cone-weights and PC1 signficance
 thresh = 0.8;
@@ -1416,21 +1422,23 @@ end
 % Plotting the results for SVD based cone weight classification including the PC1 z-scores 
 indices = [109 31 35];
 figure(plot_counter);
-subplot(311); histogram(100*(Withinsubunits_medianofdifferences(LUMidx)),linspace(-2,8,21),'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(100*(Withinsubunits_medianofdifferences(LUMidx))),20,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(100*(Withinsubunits_medianofdifferences(indices(1))),18,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+subplot(311); histogram(100*(Within_subunit_NLI(LUMidx)),linspace(-2,8,21),'FaceColor',[0 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(100*(Within_subunit_NLI(LUMidx))),20,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(100*(Within_subunit_NLI(indices(1))),18,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
 set(gca,'Tickdir','out','Xlim',[-2 8],'Ylim',[0 20],'YTick',[0 10 20]); xlabel('median CV GQM-GLM AUROC'); ylabel('Count'); title('Within subunits'); axis square; hold off;
-subplot(312); histogram(100*(Withinsubunits_medianofdifferences(DOidx)),linspace(-2,8,21),'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
-plot(median(100*(Withinsubunits_medianofdifferences(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(100*(Withinsubunits_medianofdifferences(indices(2))),12,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+
+subplot(312); histogram(100*(Within_subunit_NLI(DOidx)),linspace(-2,8,21),'FaceColor',[1 0 0],'EdgeColor',[1 1 1]); hold on;
+plot(median(100*(Within_subunit_NLI(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(100*(Within_subunit_NLI(indices(2))),12,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
 set(gca,'Tickdir','out','Xlim',[-2 8],'Ylim',[0 15],'YTick',[0 5 10 15]); xlabel('median CV GQM-GLM AUROC'); ylabel('Count'); title('Within subunits'); axis square; hold off;
-subplot(313); histogram(100*(Withinsubunits_medianofdifferences(hardtoclassifyidx)),linspace(-2,8,21),'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
-plot(median(100*(Withinsubunits_medianofdifferences(hardtoclassifyidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
-plot(100*(Withinsubunits_medianofdifferences(indices(3))),14,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
+
+subplot(313); histogram(100*(Within_subunit_NLI(hardtoclassifyidx)),linspace(-2,8,21),'FaceColor',[0.5 0.5 0.5],'EdgeColor',[1 1 1]); hold on;
+plot(median(100*(Within_subunit_NLI(hardtoclassifyidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+plot(100*(Within_subunit_NLI(indices(3))),14,'s','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[1 1 1]);
 set(gca,'Tickdir','out','Xlim',[-2 8],'Ylim',[0 15],'YTick',[0 5 10 15]); xlabel('median CV GQM-GLM AUROC'); ylabel('Count'); title('Within subunits'); axis square; hold off;
 plot_counter = plot_counter + 1;
 
-% Comparing spatial NLI across cell types
+% Statitical analysis: Comparing within subunit NLIs across cell types
 group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx))];
 data = Within_subunit_NLI([LUMidx'; DOidx'; hardtoclassifyidx']); 
 p1 = kruskalwallis(data,group);
@@ -1439,6 +1447,7 @@ p1 = kruskalwallis(data,group);
 load Withinsubunits_medianofdifferences_LGN.mat
 
 %% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI
+%*********************************************************************************
 
 if ~exist('plot_counter')
     plot_counter = 1;
