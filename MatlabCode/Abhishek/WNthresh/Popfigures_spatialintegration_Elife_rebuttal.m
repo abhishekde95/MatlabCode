@@ -1414,9 +1414,25 @@ p1 = kruskalwallis(data,group,'off');
 % Mann-Whitney U test: DO + simple cells vs hardtoclassify cells
 [p5,~] = ranksum(Within_subunit_NLI([LUMidx DOidx]),Within_subunit_NLI(hardtoclassifyidx));
 
+% Comparing the cone signal NLIs with simple and DO cells
+load ConesignalNLI_LGN.mat
+
+[p6, ~]=  ranksum(Within_subunit_NLI([LUMidx]), ConesignalNLI_LGN);
+
+[p7, ~]=  ranksum(Within_subunit_NLI([DOidx]), ConesignalNLI_LGN);
+
+[p8, ~]=  ranksum(Within_subunit_NLI([DOidx LUMidx]), ConesignalNLI_LGN);
+
+[p9, ~] = ranksum(Within_subunit_NLI([hardtoclassifyidx]), ConesignalNLI_LGN);
+
+[p10, ~]=  signrank(ConesignalNLI_LGN);
 
 %% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI
 %*********************************************************************************
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -1482,7 +1498,7 @@ for ii = 1:numel(AUROClin1)
 end
 
 
-indices = [109 31 35];
+indices = [109 24 74];
 figure(plot_counter); plot(RSSEisoresp_medianofratios(LUMidx),100*(Withinsubunits_medianofdifferences(LUMidx)),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
 plot(RSSEisoresp_medianofratios(indices(1)),100*(Withinsubunits_medianofdifferences(indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
 plot(RSSEisoresp_medianofratios(DOidx),100*(Withinsubunits_medianofdifferences(DOidx)),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
