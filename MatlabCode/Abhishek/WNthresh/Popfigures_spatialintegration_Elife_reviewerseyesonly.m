@@ -262,7 +262,61 @@ for zz = 1:numel(indices)
 end
 
 
-%% Reviewer analysis: Rebound OFF responses
+%% Reviewer analysis: Rebound OFF responses-part 1
+% Expected OFF responses from monophasic and biphasic temporal IR functions
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+t = 0:1:80;
+mp = poisspdf(t,30);
+bp1 = poisspdf(t,30)-poisspdf(t,50);
+
+% Building an artifical stimulus
+stim = zeros(500,1);
+stim(150:350) = 1;
+
+% response of temporal IRF
+mp_resp = conv(stim, mp,'full');
+bp_resp1 = conv(stim,bp1,'full');
+
+% Plotting the figures
+figure(plot_counter);
+subplot(221), plot(mp, 'Color',[1 0 0], 'linewidth', 1); hold on;
+plot(-mp, 'Color',[0 1 0], 'linewidth', 1);
+plot(t,zeros(size(t)), 'Color',[0 0 0]);
+legend('L+ IRF', 'L- IRF'); xlabel('Time (ms)');  axis square; 
+title('Monophasic mechanism Temporal IRF')
+set(gca, 'Tickdir', 'out', 'Ylim', [-0.1, 0.1], 'Xlim', [0, max(t)]); 
+
+subplot(222), plot(stim, 'Color',[0 0 0], 'linewidth', 2); hold on;
+plot(2*mp_resp, '-.', 'Color',[0 0 0], 'linewidth', 2);
+plot(-stim, 'Color',[0.5 0.5 0.5], 'linewidth', 2);
+plot(-2*mp_resp,'-.', 'Color',[0.5 0.5 0.5], 'linewidth', 2);
+legend('L+ Stimulus', 'Response to L+', 'L- Stimulus', 'Response to L-');
+title('Monophasic responses')
+xlabel('Time (ms)'); set(gca, 'Tickdir', 'out', 'Ylim', [-3, 3]); axis square;
+
+subplot(223), hold on;
+plot(bp1, 'Color',[1 0 0],'linewidth', 1);
+plot(-bp1, 'Color',[0 1 0], 'linewidth', 1);
+plot(t,zeros(size(t)), 'Color',[0 0 0]);
+legend('L+ IRF', ' L- IRF'); xlabel('Time (ms)');  axis square;
+title('Biphasic mechanism Temporal IRF')
+set(gca, 'Tickdir', 'out', 'Ylim', [-0.1, 0.1], 'Xlim', [0, max(t)]);
+
+subplot(224), plot(stim, 'Color',[0 0 0], 'linewidth', 1); hold on;
+plot(2*bp_resp1,'-.', 'Color',[0 0 0], 'linewidth', 2);
+plot(-stim, 'Color',[0.5 0.5 0.5], 'linewidth', 1);
+plot(-2*bp_resp1,  '-.', 'Color',[0.5 0.5 0.5],'linewidth', 2);
+legend('L+ Stimulus', 'Response to L+', 'L- Stimulus', 'Response to L-');
+title('Biphasic responses')
+xlabel('Time (ms)'); set(gca, 'Tickdir', 'out', 'Ylim', [-3, 3]); axis square;
+
+set(gcf, 'renderer', 'painters');
+plot_counter = plot_counter + 1;
+
+%% Reviewer analysis: Rebound OFF responses-part 2
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -285,17 +339,43 @@ hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
 
+% Load the isoresponse data
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
 
-% Loading the files 
-conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
-filename = fetch(conn,'SELECT filename FROM WNthresh');
-NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
-spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
-close(conn);
-filename = filename(strcmp(string(NTmode),"subunit"));
-NTmode = NTmode(strcmp(string(NTmode),"subunit"));
-spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+% For storing median of differences/ratios
+RSSEisoresp_medianofratios = [];
+Isoresponse_NLI = [];
 
+
+for ii = 1:numel(RSSE_linearmodel)   
+    % computation for calculating median of differences/ratios
+    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
+    Isoresponse_NLI = [Isoresponse_NLI; log10(RSSEisoresp_medianofratios(end))];
+    
+end
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
+% Measuring the OFF-rebound responses from the Isoresponse phase
 binwidth = 0.010;
 N = numel(filename);
 t1 = 0.15; t2 = 0.15;
@@ -354,8 +434,8 @@ for ii = 1:N
     [newspikecounts,newidxs] = sort(spikecountsduringstimpresent);
     
     [r,p] = corr(spikecountsduringstimpresent,spikecountsafter,'type','Spearman');
-    baselineFR = [baselineFR; mean(baselinespikecounts)/0.15];
-    OFF_FR = [OFF_FR; mean(spikecountsafter)/(0.15-t_offset)];
+    baselineFR = [baselineFR; mean(baselinespikecounts(spikecountsduringstimpresent==0))/0.15];
+    OFF_FR = [OFF_FR; mean(spikecountsafter(spikecountsduringstimpresent==0))/(0.15-t_offset)];
     rOFF = [rOFF; r];
     pOFF = [pOFF; p];
     
@@ -388,6 +468,32 @@ for ii = 1:N
     end
     
 end
+
+newLUMidx = LUMidx(baselineFR(LUMidx)>0);
+newDOidx = DOidx(baselineFR(DOidx)>0);
+newhardtoclassifyidx = hardtoclassifyidx(baselineFR(hardtoclassifyidx)>0);
+
+% Some stats on the OFF response and the Isoresponse NLI
+[r2,p2] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),OFF_FR([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman', 'rows','complete');
+[r3,p3] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),OFF_FR([LUMidx, DOidx, hardtoclassifyidx]),'type','Pearson', 'rows','complete');
+
+% Only considering cells where the baseline FR is 0
+[r4,p4] = corr(Isoresponse_NLI([newLUMidx, newDOidx, newhardtoclassifyidx]),OFF_FR([newLUMidx, newDOidx, newhardtoclassifyidx]),'type','Spearman', 'rows','complete');
+
+
+% Plotting the result
+indices = [109 24 74];
+figure(plot_counter);
+plot(Isoresponse_NLI(LUMidx), OFF_FR(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(Isoresponse_NLI(indices(1)), OFF_FR(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0]);
+plot(Isoresponse_NLI(DOidx), OFF_FR(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(Isoresponse_NLI(indices(2)), OFF_FR(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0]);
+plot(Isoresponse_NLI(hardtoclassifyidx), OFF_FR(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+plot(Isoresponse_NLI(indices(3)), OFF_FR(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
+set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',[-1 0 1 2],'Ylim',[0 100],'YTick',[0:20:100]); 
+xlabel('Isoresponse NLI'); ylabel('OFF response'); axis square; hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
 
 
 
