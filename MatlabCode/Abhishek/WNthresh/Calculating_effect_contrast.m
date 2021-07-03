@@ -15,14 +15,23 @@ plot_counter = 1;
 
 global nstixperside maxT nframesidx
 % Loading all the files
-conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
-filename = fetch(conn,'SELECT filename FROM WNthresh');
-NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
-spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
-close(conn);
-filename = filename(strcmp(string(NTmode),"subunit"));
-NTmode = NTmode(strcmp(string(NTmode),"subunit"));
-spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
 
 % Include Gun noise data for statistical tests in order to estimate the RF size
 channels = 3;
