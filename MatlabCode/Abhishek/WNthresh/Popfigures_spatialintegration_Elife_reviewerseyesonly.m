@@ -14,6 +14,15 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+SpatiallyOpponent = anglebwvectors'>90;
+
+% Classifying cells based on cone-weights and PC1 signficance
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -22,14 +31,17 @@ Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
 Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 
-
-% Classifying cells 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
 hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx)); 
 
 load RSSE_linearmodel_CV.mat % Robust regression
 load RSSE_quadmodel_CV.mat
@@ -323,6 +335,16 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -331,13 +353,17 @@ Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
 Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 
-% Classifying cells 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
 hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Load the isoresponse data
 load RSSE_linearmodel_CV.mat % Robust regression
@@ -346,7 +372,6 @@ load RSSE_quadmodel_CV.mat
 % For storing median of differences/ratios
 RSSEisoresp_medianofratios = [];
 Isoresponse_NLI = [];
-
 
 for ii = 1:numel(RSSE_linearmodel)   
     % computation for calculating median of differences/ratios
@@ -498,8 +523,155 @@ plot_counter = plot_counter + 1;
 
 
 %% Reviewer analysis: Eye movement (median eye displacement) vs. Isoresponse NLIs
+% This part is similar to the Figure 9 of Jneurophysiology paper
+% The code of computing the median eye displacement can be found in 
+% Spatialstructureanalysis_GregWN/PopAnalysis_createOutputList.m
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+% Laoding data for cone weight calculation  
+load conewts_svd.mat
+load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+SpatiallyOpponent = anglebwvectors'>90;
+
+% Classifying cells based on cone-weights and PC1 signficance
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
+% Load the isoresponse data
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
+
+% For storing median of differences/ratios
+RSSEisoresp_medianofratios = [];
+Isoresponse_NLI = [];
 
 
+for ii = 1:numel(RSSE_linearmodel)   
+    % computation for calculating median of differences/ratios
+    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
+    Isoresponse_NLI = [Isoresponse_NLI; log10(RSSEisoresp_medianofratios(end))];  
+end
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+% Measuring the OFF-rebound responses from the Isoresponse phase
+
+N = numel(filename);
+plotrasters = 0;
+median_eye_displacement = [];
+for ii = 1:N
+    disp(ii);
+    % Extracting parameters from the stro structure
+    fileofinterest = char(filename(ii,:));
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh');
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    spikestampidx = find(strcmp(stro.sum.rasterCells(1,:),spikename));
+    anlgStartTimeidx = find(strcmp(stro.sum.rasterCells(1,:),'anlgStartTime'));
+    hepidx = find(strcmp(stro.sum.rasterCells(1,:),'AD11'));
+    vepidx = find(strcmp(stro.sum.rasterCells(1,:),'AD12'));
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    
+    if ~isempty(stro.sum.analog.storeRates)
+        samplingrate = stro.sum.analog.storeRates{1};
+        H = [];
+        V = [];
+        
+        % Looping only the Isoresponse part
+        for ll = inds+1:size(stro.trial,1)
+
+            anlgStarttime = stro.ras{ll,anlgStartTimeidx};
+            stimont = stro.trial(ll,stimonidx);
+            stimofft = stro.trial(ll,stimoffidx);
+
+            h_eyepos = stro.ras{ll,hepidx}*4096/400;
+            v_eyepos = stro.ras{ll,vepidx}*4096/400;
+            t = anlgStarttime: (1/samplingrate): anlgStarttime+(numel(h_eyepos)-1)*(1/samplingrate);
+            tmp = t>=stimont & t<=stimofft;
+
+            % Storing the H and V position
+            H = [H; h_eyepos(tmp)];
+            V = [V; v_eyepos(tmp)];
+        end
+        % Storing the median amplitude of the eye position
+        Amp = sqrt((H-mean(H)).^2 + (V-mean(V)).^2);
+        median_eye_displacement = [median_eye_displacement; median(Amp)];
+    else
+        median_eye_displacement = [median_eye_displacement; nan];
+    end
+ 
+end
+
+% Median eye displacement vs. Isoresponse NLI
+indices = [109 24 74];
+figure(plot_counter); 
+plot(median_eye_displacement(LUMidx),Isoresponse_NLI(LUMidx),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+plot(median_eye_displacement(indices(1)),Isoresponse_NLI(indices(1)),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
+plot(median_eye_displacement(DOidx),Isoresponse_NLI(DOidx),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+plot(median_eye_displacement(indices(2)),Isoresponse_NLI(indices(2)),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
+plot(median_eye_displacement(hardtoclassifyidx),Isoresponse_NLI(hardtoclassifyidx),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+plot(median_eye_displacement(indices(3)),Isoresponse_NLI(indices(3)),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
+axis square; set(gca,'Tickdir','out','Ylim',[-1 2],'YTick',-1:1:2,'Xlim',[0.05 0.20],'XTick',0.05:0.05:0.20); 
+ylabel('Isoresponse NLI'); xlabel('Median eye displacement');
+
+plot_counter = plot_counter + 1;
+
+[r,p] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]), median_eye_displacement([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
+
+       
 %% Reviewer analysis: Reliability of NLI
 
 if ~exist('plot_counter')

@@ -38,7 +38,7 @@ channels = 3;
 NPOINTS = 65536;
 resize_fact2 = 1;
 CHI2CRIT = 0.95; % For flaging a stixel as significant (adding gun and cone noise z-scores, squared)
-maxT = 22;
+maxT = 15;
 crit = chi2inv(CHI2CRIT,300); % 3 color channels
 
 % 24- example BY DO cell
@@ -229,7 +229,7 @@ for ii = 1:2
     clear STPROJmod out;
     
     % Rotate the data by X degrees; X=0 to 180 
-    [X_mod,Y_mod] = rotate_data(projs(:,1),projs(:,2),0);
+    [X_mod,Y_mod] = rotate_data(projs(:,1),projs(:,2),-45);
     projs = [X_mod Y_mod];
     
     % Calculating some stuff that will be useful for plotting 
@@ -324,31 +324,45 @@ axis square; set(gca,'Tickdir','out','Xlim',[-1.3 1.3],'XTick',-1.2:0.6:1.2,'Yli
 plot_counter = plot_counter + 1;
 
 
-%%  Section 3: PLotting the firing rate map of an example DO cell along with isoresponse contours from a GLM fit 
+%  Section 3: PLotting the firing rate map of an example DO cell along with isoresponse contours from a GLM fit 
 
 % Fitting a GLM to the actual RGB triplet data
 ndiv = 15;
 modelbins = linspace(xmin_subunit,xmax_subunit,ndiv);
 [modelbinsX, modelbinsY] = meshgrid(modelbins);
+theta = 0;
+modelbinsX = modelbinsX*cosd(theta) - modelbinsY*sind(theta);
+modelbinsY = modelbinsX*sind(theta) + modelbinsY*cosd(theta);
+
+% perdiction from GLM
 mdllin =  fitglm(projs_subunit,logical(Lspike_subunit),'linear','Distribution','binomial','Link','logit');
-predlin = predict(mdllin,[modelbinsX(:) modelbinsY(:)]); % perdiction from GLM
+predlin = predict(mdllin,[modelbinsX(:) modelbinsY(:)]); 
+% NOTE: For some reason, I am not able to ablign the orientation of the firing
+% rate map and the GLM based firing rate map fits and contours
+GLMresult = reshape(predlin,[ndiv ndiv]);
+
+% perdiction from GQM
+mdlquad =  fitglm(projs_subunit,logical(Lspike_subunit),'quadratic','Distribution','binomial','Link','logit');
+predquad = predict(mdlquad,[modelbinsX(:) modelbinsY(:)]); 
+GQMresult = reshape(predquad,[ndiv ndiv]);
 
 figure(plot_counter);
 subplot(221); imagesc([xmin_subunit xmax_subunit],[xmin_subunit xmax_subunit],non_lin_subunit); hold on; 
 axis square; set(gca,'Tickdir','out','Xlim',[-0.4 0.4],'XTick',-0.4:0.2:0.4,'Ylim',[-0.4 0.4],'YTick',-0.4:0.2:0.4); xlabel('Projection magnitude S1-S2'); 
 ylabel('Projection magnitude S1+S2'); title('WN subunit: Firing rate map'); axis xy; colormap('gray');
 
-% NOTE: For some reason, I am not able to ablign the orientation of the firing
-% rate map and the GLM based firing rate map fits and contours
-GLMresult = reshape(predlin,[ndiv ndiv]);
 
 subplot(222); imagesc([xmin_subunit xmax_subunit],[xmin_subunit xmax_subunit],GLMresult');hold on; 
 axis square; set(gca,'Tickdir','out','Xlim',[-0.4 0.4],'XTick',-0.4:0.2:0.4,'Ylim',[-0.4 0.4],'YTick',-0.4:0.2:0.4); xlabel('Projection magnitude S1-S2'); 
-ylabel('Projection magnitude S1+S2'); title('Firing rate map: GLM'); axis xy; colormap('gray');
+ylabel('Projection magnitude S1+S2'); title('Firing rate map: GLM'); axis xy;  colormap('gray');
 
 subplot(223); contour(modelbinsX,modelbinsY,GLMresult',5,'Linewidth',2);hold on; 
 axis square; set(gca,'Tickdir','out','Xlim',[-0.4 0.4],'XTick',-0.4:0.2:0.4,'Ylim',[-0.4 0.4],'YTick',-0.4:0.2:0.4); xlabel('Projection magnitude S1-S2'); 
 ylabel('Projection magnitude S1+S2'); title('Contour map: GLM'); axis xy; colormap('gray');
+
+subplot(224); contour(modelbinsX,modelbinsY,GQMresult',5,'Linewidth',2);hold on; 
+axis square; set(gca,'Tickdir','out','Xlim',[-0.4 0.4],'XTick',-0.4:0.2:0.4,'Ylim',[-0.4 0.4],'YTick',-0.4:0.2:0.4); xlabel('Projection magnitude S1-S2'); 
+ylabel('Projection magnitude S1+S2'); title('Contour map: GQM'); axis xy; colormap('gray');
 
 plot_counter = plot_counter + 1;
 

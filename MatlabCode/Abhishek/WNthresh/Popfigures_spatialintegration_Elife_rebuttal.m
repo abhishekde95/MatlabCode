@@ -307,7 +307,7 @@ crit = chi2inv(CHI2CRIT,300); % 3 color channels
 
 % Loading the relevant file
 % filenumber = 31; % red-green
-filenumber = 24; % blue-yellow
+filenumber = 74; % blue-yellow
 WN = nex2stro(findfile(char(filename(filenumber))));
 
 
@@ -351,7 +351,6 @@ fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
 mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
 mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
 M = fundamentals'*mon_spd;
-
 
 
 WN.ras(~L ,:) = []; % modiftying the WN structure
@@ -436,9 +435,9 @@ weighted_im = tmpSTA3.*repmat((energymap/max(energymap(:))),[1 1 3]);
 normfactor = 0.5/(max(abs(weighted_im(:)))+0.01);
 weighted_im = normfactor*weighted_im + 0.5;
 
-imR = sigmoid(squeeze(weighted_im(:,:,1)),8,0.5);
-imG = sigmoid(squeeze(weighted_im(:,:,2)),2,0.5);
-imB = sigmoid(squeeze(weighted_im(:,:,3)),8,0.5);
+imR = sigmoid(squeeze(weighted_im(:,:,1)),7,0.5);
+imG = sigmoid(squeeze(weighted_im(:,:,2)),5,0.5);
+imB = sigmoid(squeeze(weighted_im(:,:,3)),3,0.5);
 im_new = cat(3,imR,imG,imB);
 
 % Performing the same thing for the spatial weighting function
@@ -448,7 +447,7 @@ weighted_sim = normfactor*weighted_sim + 0.5;
 sim = sigmoid(weighted_sim,2,0.5);
 
 figure(plot_counter);
-subplot(121); image(im_new); axis square; set(gca,'XTick',[],'YTick',[]); title('Same size STA')
+subplot(121); imagesc(im_new); axis square; set(gca,'XTick',[],'YTick',[]); title('Same size STA')
 subplot(122); imagesc(weighted_sim); axis square; set(gca,'XTick',[],'YTick',[]); title('Same size spatial weighting function'); colormap('gray');
 plot_counter = plot_counter + 1;
 
@@ -913,6 +912,26 @@ end
 load TFR.mat
 FR = TFR(1,indices);
 
+%% Plotting the cone wts
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+indices = [109 24 74];
+
+figure(plot_counter);
+subplot(311); bar(conewts_svd(:,indices(2)),'FaceColor','k'); 
+set(gca,'Ylim',[-1 1],'Xlim',[0 4],'XTick',[1 2 3],'XTicklabel',{'L','M','S'},'Tickdir','out'); axis square;
+subplot(312); bar(conewts_svd(:,indices(1)),'FaceColor','k'); 
+set(gca,'Ylim',[-1 1],'Xlim',[0 4],'XTick',[1 2 3],'XTicklabel',{'L','M','S'},'Tickdir','out'); axis square;
+subplot(313); bar(conewts_svd(:,indices(3)),'FaceColor','k'); 
+set(gca,'Ylim',[-1 1],'Xlim',[0 4],'XTick',[1 2 3],'XTicklabel',{'L','M','S'},'Tickdir','out'); axis square;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
 
 %% Figure 3-part 2: Population analysis of isoresponse curves 
 
@@ -1384,8 +1403,8 @@ xlabel('Isoresponse NLI'); ylabel('Cone signal NLI');
 set(gcf, 'renderer', 'painters');
 plot_counter = plot_counter + 1;
 
-[r1,p1] = corr(Whitenoise_NLI,Within_subunit_NLI,'type','Spearman');
-[r2,p2] = corr(Isoresponse_NLI,Within_subunit_NLI,'type','Spearman');
+[r1,p1] = corr(Whitenoise_NLI([LUMidx, DOidx, hardtoclassifyidx]),Within_subunit_NLI([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman');
+[r2,p2] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),Within_subunit_NLI([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman');
 
 %% Figure 7: Relationship between S-cone strength and NLIs 
 
@@ -1506,10 +1525,26 @@ xlabel('Isoresponse NLI'); ylabel('S cone input');
 set(gcf,'renderer', 'painters');
 plot_counter = plot_counter + 1;
 
-[r1,p1] = corr(Within_subunit_NLI,abs(conewts_svd(3,:)'),'type','Spearman');
-[r2,p2] = corr(Whitenoise_NLI,abs(conewts_svd(3,:)'),'type','Spearman');
-[r3,p3] = corr(Isoresponse_NLI,abs(conewts_svd(3,:)'),'type','Spearman');
+X = [LUMidx, DOidx, hardtoclassifyidx];
+[r1,p1] = corr(Within_subunit_NLI(X),abs(conewts_svd(3,(X))'),'type','Spearman');
+[r2,p2] = corr(Whitenoise_NLI(X),abs(conewts_svd(3,(X))'),'type','Spearman');
+[r3,p3] = corr(Isoresponse_NLI(X),abs(conewts_svd(3,(X))'),'type','Spearman');
 
+[r4,p4] = corr(Within_subunit_NLI(LUMidx),abs(conewts_svd(3,(LUMidx))'),'type','Spearman');
+[r5,p5] = corr(Within_subunit_NLI(DOidx),abs(conewts_svd(3,(DOidx))'),'type','Spearman');
+[r6,p6] = corr(Within_subunit_NLI(hardtoclassifyidx),abs(conewts_svd(3,(hardtoclassifyidx))'),'type','Spearman');
+
+[r7,p7] = corr(Whitenoise_NLI(LUMidx),abs(conewts_svd(3,(LUMidx))'),'type','Spearman');
+[r8,p8] = corr(Whitenoise_NLI(DOidx),abs(conewts_svd(3,(DOidx))'),'type','Spearman');
+[r9,p9] = corr(Whitenoise_NLI(hardtoclassifyidx),abs(conewts_svd(3,(hardtoclassifyidx))'),'type','Spearman');
+
+[r10,p10] = corr(Isoresponse_NLI(LUMidx),abs(conewts_svd(3,(LUMidx))'),'type','Spearman');
+[r11,p11] = corr(Isoresponse_NLI(DOidx),abs(conewts_svd(3,(DOidx))'),'type','Spearman');
+[r12,p12] = corr(Isoresponse_NLI(hardtoclassifyidx),abs(conewts_svd(3,(hardtoclassifyidx))'),'type','Spearman');
+
+group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx))];
+data = abs(conewts_svd([LUMidx'; DOidx'; hardtoclassifyidx'])); 
+p13 = kruskalwallis(data,group,'off');
 %% Figure 8: Downstream circuitry of simple and DO cells
 % No code for this part
 % The figure was provided by Greg

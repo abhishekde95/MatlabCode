@@ -41,6 +41,7 @@
 
 #include <stdio.h>
 #include "mex.h"
+#include <string.h>
 
 /* Inputs */
 
