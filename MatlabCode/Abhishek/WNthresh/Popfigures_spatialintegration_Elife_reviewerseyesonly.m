@@ -534,12 +534,8 @@ end
 % Laoding data for cone weight calculation  
 load conewts_svd.mat
 load vals.mat
-load S1RGB_svd.mat
-load S2RGB_svd.mat
 load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
-S1RGB = S1RGB_svd;
-S2RGb = S2RGB_svd;
 SpatiallyOpponent = anglebwvectors'>90;
 
 % Classifying cells based on cone-weights and PC1 signficance
@@ -570,12 +566,13 @@ load RSSE_quadmodel_CV.mat
 % For storing median of differences/ratios
 RSSEisoresp_medianofratios = [];
 Isoresponse_NLI = [];
-
+num_isoresponse_pts = [];
 
 for ii = 1:numel(RSSE_linearmodel)   
     % computation for calculating median of differences/ratios
     RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
     Isoresponse_NLI = [Isoresponse_NLI; log10(RSSEisoresp_medianofratios(end))];  
+    num_isoresponse_pts = [num_isoresponse_pts; numel(RSSE_quadmodel{ii})];
 end
 
 
@@ -671,7 +668,12 @@ plot_counter = plot_counter + 1;
 
 [r,p] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]), median_eye_displacement([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
 
-       
+[r1,p1] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]), num_isoresponse_pts([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
+
+[r2,p2] = corr(median_eye_displacement([LUMidx, DOidx, hardtoclassifyidx]), num_isoresponse_pts([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
+
+
+
 %% Reviewer analysis: Reliability of NLI
 
 if ~exist('plot_counter')
@@ -681,12 +683,8 @@ end
 % Laoding data for cone weight calculation  
 load conewts_svd.mat
 load vals.mat
-load S1RGB_svd.mat
-load S2RGB_svd.mat
 load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
-S1RGB = S1RGB_svd;
-S2RGb = S2RGB_svd;
 SpatiallyOpponent = anglebwvectors'>90;
 
 % Classifying cells based on cone-weights and PC1 signficance
@@ -902,3 +900,47 @@ plot_counter = plot_counter + 1;
 [p1,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_woPC1));
 [p2,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_wPC1));
 [p3,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI([hardtoclassifyidx_woPC1 hardtoclassifyidx_wPC1]));
+
+%% A nx7 matrix for Greg 
+% L-cone weight subunit 1
+% M-cone weight subunit 1
+% S-cone weight subunit 1
+% L-cone weight subunit 2
+% M-cone weight subunit 2
+% S-cone weight subunit 2
+% Cell type (simple, DO, NSNDO)
+
+load S1LMS_svd.mat
+load S2LMS_svd.mat
+load conewts_svd.mat
+load vals.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+SpatiallyOpponent = anglebwvectors'>90;
+
+% Classifying cells based on cone-weights and PC1 signficance
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
+
+% Creating the nx7 matrix
+ID = [ones(numel(LUMidx),1); 2*ones(numel(DOidx),1); 3*ones(numel(hardtoclassifyidx),1)];
+CONEWTS = [S1LMS_svd(:, [LUMidx, DOidx, hardtoclassifyidx])' S2LMS_svd(:, [LUMidx, DOidx, hardtoclassifyidx])' ID];
+save('CONEWTS.mat', 'CONEWTS')
