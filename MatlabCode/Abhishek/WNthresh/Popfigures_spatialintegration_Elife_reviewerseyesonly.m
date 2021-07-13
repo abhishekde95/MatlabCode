@@ -4,7 +4,7 @@
 close all;
 clearvars; 
 
-%% Reviewer figure: Consistency of Isoresponse contours: 
+%% 1. Reviewer figure: Consistency of Isoresponse contours: 
 % Robustness of the isoresponse curves based on the last point
 % Plotting the average of the last 5 points as well for each probed direction: checking for the example cells only
 
@@ -274,7 +274,7 @@ for zz = 1:numel(indices)
 end
 
 
-%% Reviewer analysis: Rebound OFF responses-part 1
+%% 2. Reviewer analysis: Rebound OFF responses-part 1
 % Expected OFF responses from monophasic and biphasic temporal IR functions
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -522,7 +522,7 @@ plot_counter = plot_counter + 1;
 
 
 
-%% Reviewer analysis: Eye movement (median eye displacement) vs. Isoresponse NLIs
+%% 3. Reviewer analysis: Eye movement (median eye displacement) vs. Isoresponse NLIs
 % This part is similar to the Figure 9 of Jneurophysiology paper
 % The code of computing the median eye displacement can be found in 
 % Spatialstructureanalysis_GregWN/PopAnalysis_createOutputList.m
@@ -674,7 +674,7 @@ plot_counter = plot_counter + 1;
 
 
 
-%% Reviewer analysis: Reliability of NLI
+%% 4. Reviewer analysis: Reliability of NLI
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -758,7 +758,7 @@ for ii = 1:numel(AUROClin1)
 end
 
 
-%% A control analysis: Some more analyses that Greg suggested (a continuation of Figure 3 but not for the paper)
+%% 5. A control analysis: Some more analyses that Greg suggested (a continuation of Figure 3 but not for the paper)
 %  1) To make the isoprobability NLI and isoresponse NLI definition more consistent 
 %  2) To split the other cell category into a) significant PC1 b) non-significant PC1
 
@@ -873,26 +873,26 @@ figure(plot_counter);
 subplot(221); plot(Acrosssubunits_lin_median(LUMidx),Acrosssubunits_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
 plot(Acrosssubunits_lin_median(DOidx),Acrosssubunits_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.08 1],[0.08 1],'k');
 axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend ('LUM','DO'); title('Isoprobability'); hold off;
+xlabel('median GLM error'); ylabel('median GQM error'); legend ('LUM','DO'); title('Cone signal integration'); hold off;
 
 subplot(222); plot(Acrosssubunits_lin_median(hardtoclassifyidx_woPC1),Acrosssubunits_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
 plot(Acrosssubunits_lin_median(hardtoclassifyidx_wPC1),Acrosssubunits_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
 axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); plot([0.08 1],[0.08 1],'k'); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend('HTC woPC1','HTC wPC1'); title('Isoprobability'); hold off;
+xlabel('median GLM error'); ylabel('median GQM error'); legend('NSNDO woPC1','NSNDO wPC1'); title('Cone signal integration'); hold off;
 
 subplot(223); histogram(log10(Acrosssubunits_medianofdifferences(LUMidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
 histogram(log10(Acrosssubunits_medianofdifferences(DOidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
 plot(log10(median(Acrosssubunits_medianofdifferences(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
 plot(log10(median(Acrosssubunits_medianofdifferences(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
 set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend ('LUM','DO'); axis square; hold off;
+ylabel('Count'); title('Cone signal integration'); xlabel('Cone signal NLI'); legend ('LUM','DO'); axis square; hold off;
 
 subplot(224); histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
 histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
 plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
 plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
 set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoprobability'); xlabel('Isoprobability NLI'); legend('HTC woPC1','HTC wPC1'); axis square; hold off;
+ylabel('Count'); title('Cone signal integration'); xlabel('Cone signal NLI'); legend('NSNDO woPC1','NDNDO wPC1'); axis square; hold off;
 
 plot_counter = plot_counter + 1;
 
@@ -901,7 +901,7 @@ plot_counter = plot_counter + 1;
 [p2,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_wPC1));
 [p3,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI([hardtoclassifyidx_woPC1 hardtoclassifyidx_wPC1]));
 
-%% A nx7 matrix for Greg 
+%% 6. A nx7 matrix for Greg 
 % L-cone weight subunit 1
 % M-cone weight subunit 1
 % S-cone weight subunit 1
@@ -944,3 +944,82 @@ hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 ID = [ones(numel(LUMidx),1); 2*ones(numel(DOidx),1); 3*ones(numel(hardtoclassifyidx),1)];
 CONEWTS = [S1LMS_svd(:, [LUMidx, DOidx, hardtoclassifyidx])' S2LMS_svd(:, [LUMidx, DOidx, hardtoclassifyidx])' ID];
 save('CONEWTS.mat', 'CONEWTS')
+
+
+%% 7. Inferring linearity of spatial summation from hyperpixel STA
+
+% Showing that it is possible to make a model neuron that does not have 
+% a significant PC1 but appears nonlinear in the white noise NLI analysis.
+ 
+% Simulation 1
+% Two linear subunits, half rectified and multiplied.
+% PC1 criterion will not be triggered, but white noise NLI will show the
+% nonlinearity. This was a kind of nonlinearity we were concerned about.
+ 
+n = 1000000;
+nbins = 20;
+stim = normrnd(0,1,n,6);
+kernel1 = [.5 -.5 .2];
+kernel2 = -kernel1;
+ 
+% Simulation 1
+ 
+lingen = stim*[[kernel1';0;0;0], [0;0;0;kernel2']];
+resp = prod(max(lingen+1,0),2);
+resp = (resp-min(resp))./(max(resp)-min(resp));
+resp = resp>unifrnd(zeros(n,1),ones(n,1));
+ 
+STA = resp'*stim;
+[v,d] = eig(cov(stim(resp,:)));
+figure; subplot(2,1,1);
+plot(flipud(diag(d)),'ko','MarkerFaceColor','black')
+ 
+clear allstim spikestim
+allstim(:,1)=stim*[STA(1:3),0 0 0]';
+allstim(:,2)=stim*[0 0 0 STA(4:6)]';
+spikestim(:,1)=stim(resp,:)*[STA(1:3),0 0 0]';
+spikestim(:,2)=stim(resp,:)*[0 0 0 STA(4:6)]';
+ 
+bins = [nbins prctile(allstim(:),5) prctile(allstim(:),95)]';
+ 
+[allstim_hist,~]=hist2(allstim,[bins bins]);
+[spikestim_hist,~]=hist2(spikestim,[bins bins]);
+subplot(2,1,2);
+imagesc(spikestim_hist./allstim_hist*255); colormap(gray(255))
+axis square;
+set(gca,'Xtick',[],'Ytick',[]);
+ 
+% Simulation 2
+% Conversely: Two subunits with a halfwave rectified response to one color
+% channel and a fullwave rectified response to another. Added linearly.
+% This cell will have a significant PC1 but the GQM will not fit better
+% than the GLM (because the fitting is in 2D).
+lingen = [];
+lingen(:,1) = stim(:,1).*kernel1(1)+(stim(:,2).*kernel1(2)).^2+stim(:,3).*kernel1(3); % nonlinear subfield
+lingen(:,2) = stim(:,[4:6])*kernel2'; % linear subfield
+resp = sum(lingen,2);
+resp = (resp-min(resp))./(max(resp)-min(resp));
+resp = resp>unifrnd(zeros(n,1),ones(n,1));
+ 
+STA = resp'*stim;
+[v,d] = eig(cov(stim(resp,:)));
+figure; subplot(2,1,1);
+plot(flipud(diag(d)),'ko','MarkerFaceColor','black')
+ 
+clear allstim spikestim
+allstim(:,1)=stim*[STA(1:3),0 0 0]';
+allstim(:,2)=stim*[0 0 0 STA(4:6)]';
+spikestim(:,1)=stim(resp,:)*[STA(1:3),0 0 0]';
+spikestim(:,2)=stim(resp,:)*[0 0 0 STA(4:6)]';
+ 
+bins = [nbins prctile(allstim(:),5) prctile(allstim(:),95)]';
+ 
+[allstim_hist,~]=hist2(allstim,[bins bins]);
+[spikestim_hist,~]=hist2(spikestim,[bins bins]);
+subplot(2,1,2);
+imagesc(spikestim_hist./allstim_hist*255); colormap(gray(255))
+axis square;
+set(gca,'Xtick',[],'Ytick',[]);
+
+
+
