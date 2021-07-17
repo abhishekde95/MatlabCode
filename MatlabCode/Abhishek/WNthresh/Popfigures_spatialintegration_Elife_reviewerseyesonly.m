@@ -963,7 +963,6 @@ kernel1 = [.5 -.5 .2];
 kernel2 = -kernel1;
  
 % Simulation 1
- 
 lingen = stim*[[kernel1';0;0;0], [0;0;0;kernel2']];
 resp = prod(max(lingen+1,0),2);
 resp = (resp-min(resp))./(max(resp)-min(resp));
@@ -988,6 +987,17 @@ subplot(2,1,2);
 imagesc(spikestim_hist./allstim_hist*255); colormap(gray(255))
 axis square;
 set(gca,'Xtick',[],'Ytick',[]);
+
+% Fit a GLM & GQM after the frames have been projected onto the subunits
+mdllin1 =  fitglm(lingen,resp,'linear','Distribution','binomial','Link','logit');
+mdlquad1 =  fitglm(lingen,resp,'quadratic','Distribution','binomial','Link','logit');
+predlin1 = predict(mdllin1,lingen); % perdiction from GLM
+predquad1 = predict(mdlquad1,lingen); % perdiction from GQM
+Error_lin1 = 1-rocN(predlin1(resp),predlin(~resp));
+Error_quad1 = 1- rocN(predquad1(resp),predquad(~resp)); 
+WhiteNoise_NLI_1 = log10(Error_lin1/Error_quad1);
+
+
  
 % Simulation 2
 % Conversely: Two subunits with a halfwave rectified response to one color
@@ -1021,5 +1031,16 @@ imagesc(spikestim_hist./allstim_hist*255); colormap(gray(255))
 axis square;
 set(gca,'Xtick',[],'Ytick',[]);
 
+% Fit a GLM & GQM after the frames have been projected onto the subunits
+mdllin2 =  fitglm(lingen,resp,'linear','Distribution','binomial','Link','logit');
+mdlquad2 =  fitglm(lingen,resp,'quadratic','Distribution','binomial','Link','logit');
+predlin2 = predict(mdllin2,lingen); % perdiction from GLM
+predquad2 = predict(mdlquad2,lingen); % perdiction from GQM
+Error_lin2 = 1-rocN(predlin2(resp),predlin(~resp));
+Error_quad2 = 1- rocN(predquad2(resp),predquad(~resp)); 
+WhiteNoise_NLI_2 = log10(Error_lin2/Error_quad2);
 
+
+    
+    
 
