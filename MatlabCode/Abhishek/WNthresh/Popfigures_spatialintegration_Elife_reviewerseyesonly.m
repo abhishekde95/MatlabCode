@@ -446,7 +446,8 @@ for ii = 1:N
     spikecountsduringstimpresent = []; % from stimon to stimoff
     spikecountsafter = []; % from stimoff to stimoff + 150ms
     idxs = neurothresh_startidx:1:size(stro.trial,1);
-    t_offset = stro.trial(end,latencyidx)/1000;
+    %t_offset = stro.trial(end,latencyidx)/1000;
+    t_offset = 0.05; % hardocding it to 50 ms
     
     num_dur = [];
     for jj = 1:numel(idxs)
@@ -993,8 +994,8 @@ mdllin1 =  fitglm(lingen,resp,'linear','Distribution','binomial','Link','logit')
 mdlquad1 =  fitglm(lingen,resp,'quadratic','Distribution','binomial','Link','logit');
 predlin1 = predict(mdllin1,lingen); % perdiction from GLM
 predquad1 = predict(mdlquad1,lingen); % perdiction from GQM
-Error_lin1 = 1-rocN(predlin1(resp),predlin(~resp));
-Error_quad1 = 1- rocN(predquad1(resp),predquad(~resp)); 
+Error_lin1 = 1-rocN(predlin1(resp),predlin1(~resp));
+Error_quad1 = 1- rocN(predquad1(resp),predquad1(~resp)); 
 WhiteNoise_NLI_1 = log10(Error_lin1/Error_quad1);
 
 
@@ -1036,11 +1037,184 @@ mdllin2 =  fitglm(lingen,resp,'linear','Distribution','binomial','Link','logit')
 mdlquad2 =  fitglm(lingen,resp,'quadratic','Distribution','binomial','Link','logit');
 predlin2 = predict(mdllin2,lingen); % perdiction from GLM
 predquad2 = predict(mdlquad2,lingen); % perdiction from GQM
-Error_lin2 = 1-rocN(predlin2(resp),predlin(~resp));
-Error_quad2 = 1- rocN(predquad2(resp),predquad(~resp)); 
+Error_lin2 = 1-rocN(predlin2(resp),predlin2(~resp));
+Error_quad2 = 1- rocN(predquad2(resp),predquad2(~resp)); 
 WhiteNoise_NLI_2 = log10(Error_lin2/Error_quad2);
 
 
+%% Scatterplot of firing rates between the pixel WN and hyperpixel WN noise
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
+% Classifying cells into simple, DO and hardtoclassify cells
+load conewts_svd.mat
+load vals.mat
+
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
+
+% Matrix for storing the firing rates (mean and std)
+mean_firing_rates = zeros(2, numel(filename));
+std_firig_rates = zeros(2, numel(filename));
+for ii= 1:numel(filename)
+    fileofinterest = char(filename(ii,:));
+    disp(fileofinterest);
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
+    parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ngammasteps = 2^16; % 65536
+    linepredtol = stro.sum.exptParams.linepredtol;
+    stepsizescale = stro.sum.exptParams.stepsizescale;
+    stepsize = stro.sum.exptParams.stepsize;
+    nreversals = stro.sum.exptParams.nreversals;
+    oogscale = stro.sum.exptParams.oogscale;
+    seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+    nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    fponidx = strcmp(stro.sum.trialFields(1,:),'fp_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    basisvecdiridx = strcmp(stro.sum.trialFields(1,:),'weights_idx');
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh'); % when exactly the neurothresh trials started
+    targetspikerateidx = strcmp(stro.sum.trialFields(1,:),'targetspikerate');
+    correctidx = strcmp(stro.sum.trialFields(1,:),'correct');
+    muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+    sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    reversalflagidx = strcmp(stro.sum.trialFields(1,:),'reversalflag');
+    msperframe = 1000/stro.sum.exptParams.framerate;
+    ntrials = size(stro.trial,1);
+    maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+    xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+    yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+
+    
+    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+    M = inv(M');
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
     
     
+    last_wntrial =  inds(1)-1;
+    for k = 3:last_wntrial
+        if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+            continue
+        else
+            mask_changes = [mask_changes k-1 k]; %#ok<AGROW>
+        end
+    end
+    if mask_changes(end) == last_wntrial
+        mask_changes(end) = [];
+    else
+        mask_changes = [mask_changes  last_wntrial];
+    end
+    mask_changes = reshape(mask_changes , 2, []);
+    
+    % Calculate Firing rates in pixel WN and hyperpixel WN
+    for index = 1:2
+        num_spikes =[];
+        num_dur = [];
+        for jj = mask_changes(1,index):mask_changes(2,index)
+            nframes = stro.trial(jj,nframesidx);
+            
+            if nframes >0
+                t_stimon = stro.trial(jj, stimonidx);
+                num_spikes = [num_spikes; numel((stro.ras{jj,spikeidx}-t_stimon)*1000)];
+
+                frametimes = linspace(0, nframes*msperframe, nframes)+(msperframe/2)';
+                num_dur = [num_dur; range(frametimes)/1000];
+            end
+
+        end
+        
+        % Storing the mean and standard deviation of firing rates
+        fr = num_spikes./num_dur;
+        mean_firing_rates(index,ii) = mean(fr);
+        std_firig_rates(index,ii) = sem(fr);
+        
+    end
+    
+end
+    
+
+% Comparing the Firing rates from pixel and hyperpixel WN 
+FR_max = 1000;
+FR_min = 0.3;
+figure(plot_counter), hold on;
+errorbar(mean_firing_rates(1,LUMidx), mean_firing_rates(2,LUMidx),std_firig_rates(2,LUMidx), std_firig_rates(2,LUMidx), std_firig_rates(1,LUMidx), std_firig_rates(1,LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(mean_firing_rates(1,DOidx), mean_firing_rates(2,DOidx),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(mean_firing_rates(1,hardtoclassifyidx), mean_firing_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
+set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+xlabel('Pixel WN firing rates'); ylabel('Hyperpixel WN firing rates'); axis square; hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
 
