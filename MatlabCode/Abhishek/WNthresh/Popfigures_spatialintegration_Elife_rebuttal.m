@@ -1769,10 +1769,28 @@ resp = (resp-min(resp))./(max(resp)-min(resp));
 resp = resp>unifrnd(zeros(n,1),ones(n,1));
  
 STA = resp'*stim;
-[v,d] = eig(cov(stim(resp,:)));
+[~,d] = eig(cov(stim(resp,:)));
 figure; subplot(2,1,1);
 plot(flipud(diag(d)),'ko','MarkerFaceColor','black')
+PC_orig = diag(d);
+
+% Permutation test
+PC_vals = [];
+for iter=1:1000
+    resp_mod = circshift(resp,randi(numel(resp)));
+    STA_mod = resp_mod'*stim;
+    [~,d1] = eig(cov(stim(resp_mod,:)));
+    PCs = diag(d1);
+    PC_vals = [PC_vals; PCs(end)];
+end
+PC_prctile1 = (find(sort(PC_vals)>PC_orig(end),1)/1000)*100;
+PC_prctile1 = (find(sort(PC_vals)>PC_orig(end),1)/1000)*100;
+if isempty(PC_prctile1)
+    PC_prctile1 = 100;
+end
  
+
+
 clear allstim spikestim
 allstim(:,1)=stim*[STA(1:3),0 0 0]';
 allstim(:,2)=stim*[0 0 0 STA(4:6)]';
@@ -1798,7 +1816,7 @@ Error_quad1 = 1- rocN(predquad1(resp),predquad1(~resp));
 WhiteNoise_NLI_1 = log10(Error_lin1/Error_quad1);
 
 
- 
+%
 % Simulation 2
 % Conversely: Two subunits with a halfwave rectified response to one color
 % channel and a fullwave rectified response to another. Added linearly.
@@ -1815,6 +1833,21 @@ STA = resp'*stim;
 [v,d] = eig(cov(stim(resp,:)));
 figure; subplot(2,1,1);
 plot(flipud(diag(d)),'ko','MarkerFaceColor','black')
+PC_orig = diag(d);
+
+% Permutation test
+PC_vals = [];
+for iter=1:1000
+    resp_mod = circshift(resp,randi(numel(resp)));
+    STA_mod = resp_mod'*stim;
+    [~,d1] = eig(cov(stim(resp_mod,:)));
+    PCs = diag(d1);
+    PC_vals = [PC_vals; PCs(end)];
+end
+PC_prctile2 = (find(sort(PC_vals)>PC_orig(end),1)/1000)*100;
+if isempty(PC_prctile2)
+    PC_prctile2 = 100;
+end
  
 clear allstim spikestim
 allstim(:,1)=stim*[STA(1:3),0 0 0]';

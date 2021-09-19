@@ -503,7 +503,7 @@ newhardtoclassifyidx = hardtoclassifyidx(baselineFR(hardtoclassifyidx)>0);
 [r2,p2] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),OFF_FR([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman', 'rows','complete');
 [r3,p3] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),OFF_FR([LUMidx, DOidx, hardtoclassifyidx]),'type','Pearson', 'rows','complete');
 
-% Only considering cells where the baseline FR is 0
+% Only considering cells where the baseline FR is > 0
 [r4,p4] = corr(Isoresponse_NLI([newLUMidx, newDOidx, newhardtoclassifyidx]),OFF_FR([newLUMidx, newDOidx, newhardtoclassifyidx]),'type','Spearman', 'rows','complete');
 
 
@@ -675,7 +675,7 @@ plot_counter = plot_counter + 1;
 
 
 
-%% 4. Reviewer analysis: Reliability of NLI
+%% 4. Reviewer analysis: Reliability of NLI, using Jacknife procedure
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -723,14 +723,13 @@ load AUROCquadsubunits_CV.mat
 load RSSE_linearmodel_CV.mat % Robust regression
 load RSSE_quadmodel_CV.mat
 
-% Storing the within subunit NLI
-Within_subunit_NLI = [];
 
-% For storing the Isoresponse NLI
-Isoresponse_NLI = [];
+Within_subunit_NLI = []; % Storing the within subunit NLI
+Isoresponse_NLI = []; % For storing the Isoresponse NLI
+Whitenoise_NLI = []; % For storing the white noise NLI
 
-% For storing the white noise NLI
-Whitenoise_NLI = [];
+JK_error_whitenoise = [];
+JK_error_isoresponse = [];
 
 for ii = 1:numel(AUROClin1) 
     
@@ -754,8 +753,16 @@ for ii = 1:numel(AUROClin1)
     Error_lin = 1-(AUROClinsubunits{ii}); 
     Whitenoise_NLI = [Whitenoise_NLI; log10(median(Error_lin./Error_quad))];
     
+    % Jackknife White noise error
+    X1 = log10(jackknife(@median, Error_lin./Error_quad));
+    JK_error_whitenoise = [JK_error_whitenoise; std(X1)];
+    
     % Isoresponse NLI
     Isoresponse_NLI = [Isoresponse_NLI; log10(median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii}))];
+    
+    % Jackknife Isoresponse error
+    X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
+    JK_error_isoresponse = [JK_error_isoresponse; std(X2)];
 end
 
 
@@ -1042,7 +1049,7 @@ Error_quad2 = 1- rocN(predquad2(resp),predquad2(~resp));
 WhiteNoise_NLI_2 = log10(Error_lin2/Error_quad2);
 
 
-%% Scatterplot of firing rates between the pixel WN and hyperpixel WN noise
+%% 8. Scatterplot of firing rates between the pixel WN and hyperpixel WN noise
 
 if ~exist('plot_counter')
     plot_counter = 1;
