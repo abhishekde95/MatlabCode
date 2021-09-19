@@ -163,6 +163,7 @@ for aa= 1:numel(filename)
     oog2 = min(abs((1-bkgnd_monitor(:))./basisvec2(:)));
     tmp = basisvec1 + basisvec2;
     subunitbasisvec{aa} = (0.5 * tmp./(max(abs(tmp(:))) + 0.01)) + 0.5;
+    
     % Calculate baselineFR
     num_spikes =[];
     num_dur = [];
