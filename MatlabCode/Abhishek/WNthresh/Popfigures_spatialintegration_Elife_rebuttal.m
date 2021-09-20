@@ -1106,11 +1106,11 @@ load RSSE_quadmodel_CV.mat
 load AUROClinsubunits_CV.mat
 load AUROCquadsubunits_CV.mat
 
-% For storing the Isoresponse NLI
-Isoresponse_NLI = [];
 
-% For storing the white noise NLI
-Whitenoise_NLI = [];
+Isoresponse_NLI = []; % For storing the Isoresponse NLI
+Whitenoise_NLI = []; % For storing the white noise NLI
+JK_error_whitenoise = []; % Storing Jackknife based error estimates
+JK_error_isoresponse = []; % Storing Jackknife based error estimates
 
 indices = [109 24 74];
 for ii = 1:numel(AUROClinsubunits) 
@@ -1122,6 +1122,15 @@ for ii = 1:numel(AUROClinsubunits)
     
     % Isoresponse NLI
     Isoresponse_NLI = [Isoresponse_NLI; log10(median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii}))];
+    
+    % Computing error via Jackknife resampling
+    % Jackknife White noise error
+    X1 = log10(jackknife(@median, Error_lin./Error_quad));
+    JK_error_whitenoise = [JK_error_whitenoise; std(X1)];
+    
+    % Jackknife Isoresponse error
+    X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
+    JK_error_isoresponse = [JK_error_isoresponse; std(X2)];
 end
 
 figure(plot_counter); hold on;
@@ -1141,6 +1150,20 @@ plot_counter = plot_counter + 1;
 [r2,p2] = corr(Isoresponse_NLI(DOidx),Whitenoise_NLI(DOidx),'type','Spearman');
 [r3,p3] = corr(Isoresponse_NLI(hardtoclassifyidx),Whitenoise_NLI(hardtoclassifyidx),'type','Spearman');
 [rc,pc] = corr(Isoresponse_NLI,Whitenoise_NLI,'type','Spearman');
+
+
+% Plotting the same plot as above but with errors
+figure(plot_counter); hold on;
+errorbar(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx),JK_error_whitenoise(LUMidx), JK_error_whitenoise(LUMidx), JK_error_isoresponse(LUMidx), JK_error_isoresponse(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]);
+plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0]);
+errorbar(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), JK_error_whitenoise(DOidx), JK_error_whitenoise(DOidx), JK_error_isoresponse(DOidx), JK_error_isoresponse(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]);
+plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0]);
+errorbar(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]);
+plot(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
+set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',[-1 0 1 2],'Ylim',[-0.02 0.08],'YTick',[-0.02:0.02:0.08]); 
+xlabel('Isoresponse NLI'); ylabel('WhiteNoise NLI'); axis square; hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
 
 
 %% Figure 4: Conceptual model of signal integration within subunits (cone-signal integration)
@@ -1289,7 +1312,8 @@ load ConesignalNLI_LGN.mat
 
 [p10, ~]=  signrank(ConesignalNLI_LGN);
 
-%% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI
+%% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI- 
+%NO LONGER USED AS OF 9/21
 %*********************************************************************************
 
 if ~exist('plot_counter')
@@ -1756,11 +1780,26 @@ plot_counter = plot_counter + 1;
 % PC1 criterion will not be triggered, but white noise NLI will show the
 % nonlinearity. This was a kind of nonlinearity we were concerned about.
  
+close all; clearvars;
+
+
+% Computing cone weights
+% Forming the M matrix 
+load fundamentals.mat
+load mon_spd.mat
+fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]);
+mon_spd = reshape(mon_spd,[length(mon_spd)/3,3]);
+mon_spd = SplineRaw([380:4:780]', mon_spd, [380:5:780]');
+M = fundamentals'*mon_spd;
+
+
 n = 1000000;
 nbins = 20;
 stim = normrnd(0,1,n,6);
 kernel1 = [.5 -.5 .2];
 kernel2 = -kernel1;
+conewts = inv(M)'*kernel1'; 
+conewts = conewts/sum(abs(conewts));
  
 % Simulation 1
 lingen = stim*[[kernel1';0;0;0], [0;0;0;kernel2']];
@@ -1772,6 +1811,7 @@ STA = resp'*stim;
 [~,d] = eig(cov(stim(resp,:)));
 figure; subplot(2,1,1);
 plot(flipud(diag(d)),'ko','MarkerFaceColor','black')
+set(gca, 'Ylim', [0 1.2]);
 PC_orig = diag(d);
 
 % Permutation test
@@ -1798,7 +1838,8 @@ spikestim(:,1)=stim(resp,:)*[STA(1:3),0 0 0]';
 spikestim(:,2)=stim(resp,:)*[0 0 0 STA(4:6)]';
  
 bins = [nbins prctile(allstim(:),5) prctile(allstim(:),95)]';
- 
+
+
 [allstim_hist,~]=hist2(allstim,[bins bins]);
 [spikestim_hist,~]=hist2(spikestim,[bins bins]);
 subplot(2,1,2);
@@ -2113,7 +2154,9 @@ load TFR.mat % Target firing rates
 
 % Error plot representation
 figure(plot_counter);
-indices = [DOidx LUMidx hardtoclassifyidx];
+cell_idx = [DOidx LUMidx hardtoclassifyidx];
+[~, indices] = sort(TFR(1,cell_idx));
+indices = cell_idx(indices);
 TFRprctile = [];
 TFRzscore = []; % for storing the z-scores
 for iter = 1:numel(indices)
@@ -2131,58 +2174,29 @@ for iter = 1:numel(indices)
     
     TFRprctile = [TFRprctile; invprctile(baselineFR, TFR(1,ii))];
     TFRzscore = [TFRzscore; (TFR(1,ii)-mean(baselineFR))/std(baselineFR)];
-    for jj = 1:2
-        if TFR(jj,ii)>0
-            plot(iter, TFR(jj,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
-        end
-    end
+   
+    plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
+       
     
 end
-axis square; set(gca,'Tickdir','out', 'Xlim',[1 numel(baselineFRstats)], 'Ylim', [0 120], 'YTick', 0:20:120);
+axis square; set(gca,'Tickdir','out', 'Ylim',[0 100], 'YTick',0:20:100, 'Xlim', [0 98], 'XTick', [0 98]);
 xlabel('Cell number'); ylabel('Firing rate'); 
 set(gcf,'renderer','painters'); hold off
 plot_counter = plot_counter + 1;
 
 % Doing some stats on the target firing rates 
-TFR_DO = TFR(:,DOidx);
+TFR_DO = TFR(1,DOidx);
 TFR_DO = TFR_DO(:); TFR_DO = TFR_DO(TFR_DO>0);
 
-TFR_LUM = TFR(:,LUMidx);
+TFR_LUM = TFR(1,LUMidx);
 TFR_LUM = TFR_LUM(:); TFR_LUM = TFR_LUM(TFR_LUM>0);
 
-TFR_htc = TFR(:, hardtoclassifyidx);
+TFR_htc = TFR(1, hardtoclassifyidx);
 TFR_htc = TFR_htc(:); TFR_htc = TFR_htc(TFR_htc>0);
 
 group = [ones(size(TFR_DO)); 2*ones(size(TFR_LUM)); 3*ones(size(TFR_htc))];
 data = [TFR_DO; TFR_LUM; TFR_htc]; 
 p2 = kruskalwallis(data,group,'off');
-
-
-% Trying a scatterplot representation- not a good representation
-figure(plot_counter);
-indices = [DOidx LUMidx hardtoclassifyidx];
-TFRprctile = [];
-for iter = 1:numel(indices)
-    ii = indices(iter);
-    baselineFR = baselineFRstats{ii};
-    if ismember(ii,DOidx)
-        c = [1 0 0];
-    elseif ismember(ii, LUMidx)
-        c = [0 0 0];
-    else
-        c = [0.5 0.5 0.5];
-    end
-    
-    plot(median(baselineFR), TFR(1,ii), 'o', 'MarkerFaceColor',c, 'MarkerEdgeColor', [1 1 1]);
-    plot([prctile(baselineFR,5) prctile(baselineFR,95)], [TFR(1,ii) TFR(1,ii)],'color',c); hold on 
-    
-end
-
-plot([0, 120], [0 120], 'color', [0 0 0]);
-axis square; set(gca,'Tickdir','out', 'Xlim', [0 120], 'XTick', 0:20:120, 'Ylim', [0 120], 'YTick', 0:20:120);
-xlabel('Baseline Firing rate'); ylabel('Target Firing rate'); 
-set(gcf,'renderer','painters'); hold off
-plot_counter = plot_counter + 1;
 
 
 
