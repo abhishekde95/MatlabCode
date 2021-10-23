@@ -1491,6 +1491,7 @@ Whitenoise_NLI = []; % For storing the white noise NLI
 
 JK_error_whitenoise = []; % For storing jacknife whitenoise error
 JK_error_isoresponse = []; % For storing jackknife isorespone error
+JK_error_withinsubunit = []; % For storing the cone isoresponse NLI error
 
 for ii = 1:numel(AUROClin1) 
     
@@ -1521,42 +1522,54 @@ for ii = 1:numel(AUROClin1)
     %%%% Computing jackknife errors %%%%
     
     % Jackknife White noise error
+    N1 = numel(Error_quad);
     X1 = log10(jackknife(@median, Error_lin./Error_quad));
-    JK_error_whitenoise = [JK_error_whitenoise; std(X1)];
+    error_WN = sqrt(sum((X1-mean(X1)).^2)*(N1-1)/N1);
+    JK_error_whitenoise = [JK_error_whitenoise; error_WN];
     
     % Jackknife Isoresponse error
+    N2 = numel(RSSE_linearmodel{ii});
     X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
-    JK_error_isoresponse = [JK_error_isoresponse; std(X2)];
+    error_Iso = sqrt(sum((X2-mean(X2)).^2)*(N2-1)/N2);
+    JK_error_isoresponse = [JK_error_isoresponse; error_Iso];
+    
+    % Jackknife cone isoresponse error 
+    N3 = numel(Error_lin_subunit1);
+    subunit_1_NLI = Error_lin_subunit1./ Error_quad_subunit1;
+    subunit_2_NLI = Error_lin_subunit2./ Error_quad_subunit2;
+    X3 = median([log10(jackknife(@median, subunit_1_NLI)) log10(jackknife(@median, subunit_2_NLI))],2);
+    error_subunit = sqrt(sum((X3-mean(X3)).^2)*(N3-1)/N3);
+    JK_error_withinsubunit = [JK_error_withinsubunit; error_subunit];
 end
 
 
 indices = [109 24 74];
 figure(plot_counter); 
-subplot(311); plot(Within_subunit_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+subplot(311); errorbar(Within_subunit_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_withinsubunit(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
 plot(Within_subunit_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Within_subunit_NLI(DOidx),abs(conewts_svd(3,DOidx)),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+errorbar(Within_subunit_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_withinsubunit(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
 plot(Within_subunit_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Within_subunit_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+errorbar(Within_subunit_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_withinsubunit(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
 plot(Within_subunit_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
-axis square; set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 0.6],'YTick',0:0.2:0.6); 
+axis square; set(gca,'Tickdir','out','Xlim',[-0.04 0.08],'XTick',-0.04:0.02:0.08,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('Cone signal NLI'); ylabel('S cone input');
 
-subplot(312); plot(Whitenoise_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+subplot(312); errorbar(Whitenoise_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_whitenoise(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
 plot(Whitenoise_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Whitenoise_NLI(DOidx),abs(conewts_svd(3,DOidx)),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+errorbar(Whitenoise_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_whitenoise(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
 plot(Whitenoise_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Whitenoise_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+errorbar(Whitenoise_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_whitenoise(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
 plot(Whitenoise_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
-axis square; set(gca,'Tickdir','out','Xlim',[-0.02 0.08],'XTick',-0.02:0.02:0.08,'Ylim',[0 0.6],'YTick',0:0.2:0.6); 
+axis square; set(gca,'Tickdir','out','Xlim',[-0.04 0.14],'XTick',-0.04:0.02:0.14,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('White noise NLI'); ylabel('S cone input');
 
-subplot(313); plot(Isoresponse_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+subplot(313); errorbar(Isoresponse_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_isoresponse(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
 plot(Isoresponse_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Isoresponse_NLI(DOidx),abs(conewts_svd(3,DOidx)),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
+errorbar(Isoresponse_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_isoresponse(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
 plot(Isoresponse_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-plot(Isoresponse_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+errorbar(Isoresponse_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_isoresponse(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
 plot(Isoresponse_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
-axis square; set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',-1:1:2,'Ylim',[0 0.6],'YTick',0:0.2:0.6); 
+axis square; set(gca,'Tickdir','out','Xlim',[-4 3],'XTick',-4:1:4,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('Isoresponse NLI'); ylabel('S cone input');
 set(gcf,'renderer', 'painters');
 plot_counter = plot_counter + 1;
@@ -2255,109 +2268,58 @@ hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 load RSSE_linearmodel_CV.mat % Robust regression
 load RSSE_quadmodel_CV.mat
 
-% For storing median of differences/ratios
-RSSEisoresp_medianofratios = [];
-RSSEisoresp_lin_median = []; RSSEisoresp_quad_median = []; % Isoresponse data
+% For storing median linear and quadratic errors and their standard errors
+RSSEisoresp_lin_median = [];  % Isoresponse data-linear error
+RSSEisoresp_quad_median = []; % Isoresponse data-quadratic error
 
-for ii = 1:numel(RSSE_linearmodel)   
-    % computation for calculating median of differences/ratios
-    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
-    
+% Jackknife error 
+lin_std_error = []; 
+quad_std_error = [];
+
+for ii = 1:numel(RSSE_linearmodel)       
     
     RSSEisoresp_lin_median = [RSSEisoresp_lin_median; median(RSSE_linearmodel{ii})];
     RSSEisoresp_quad_median = [RSSEisoresp_quad_median; median(RSSE_quadmodel{ii})];
+    
+    % Computing estimate of errors
+    % Linear error
+    N1 = numel(RSSE_linearmodel{ii});
+    X1 = jackknife(@median, RSSE_linearmodel{ii});
+    lin_std_error = [lin_std_error; sqrt(sum((X1-mean(X1)).^2)*(N1-1)/N1)];
+    
+    % Quadratic error
+    N2 = numel(RSSE_quadmodel{ii});
+    X2 = jackknife(@median, RSSE_quadmodel{ii});
+    quad_std_error = [quad_std_error; sqrt(sum((X2-mean(X2)).^2)*(N2-1)/N2)];
+    
 end
-RSSEisoresp_medianofratios(RSSEisoresp_medianofratios<0.1) = 0.1;
-indices = [109 24 74];
+
 % Plotting the results for SVD based cone weight classification including the PC1 z-scores 
-figure(plot_counter);
-plot(RSSEisoresp_lin_median(hardtoclassifyidx),RSSEisoresp_quad_median(hardtoclassifyidx),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(indices(1)),RSSEisoresp_quad_median(indices(1)),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
-plot(RSSEisoresp_lin_median(indices(2)),RSSEisoresp_quad_median(indices(2)),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(RSSEisoresp_lin_median(indices(3)),RSSEisoresp_quad_median(indices(3)),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
+indices = [109 24 74]; % example cells
+% figure(plot_counter);
+% plot(RSSEisoresp_lin_median(hardtoclassifyidx),RSSEisoresp_quad_median(hardtoclassifyidx),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
+% plot(RSSEisoresp_lin_median(indices(1)),RSSEisoresp_quad_median(indices(1)),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]);
+% plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
+% plot(RSSEisoresp_lin_median(indices(2)),RSSEisoresp_quad_median(indices(2)),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]);
+% plot(RSSEisoresp_lin_median(indices(3)),RSSEisoresp_quad_median(indices(3)),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
+
+
+figure(plot_counter); hold on;
+errorbar(RSSEisoresp_lin_median(hardtoclassifyidx), RSSEisoresp_quad_median(hardtoclassifyidx), lin_std_error(hardtoclassifyidx), lin_std_error(hardtoclassifyidx), quad_std_error(hardtoclassifyidx), quad_std_error(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]);
+plot(RSSEisoresp_lin_median(indices(3)), RSSEisoresp_quad_median(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
+errorbar(RSSEisoresp_lin_median(LUMidx), RSSEisoresp_quad_median(LUMidx),lin_std_error(LUMidx), lin_std_error(LUMidx), quad_std_error(LUMidx), quad_std_error(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]);
+plot(RSSEisoresp_lin_median(indices(1)), RSSEisoresp_quad_median(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
+errorbar(RSSEisoresp_lin_median(DOidx), RSSEisoresp_quad_median(DOidx), lin_std_error(DOidx), lin_std_error(DOidx), quad_std_error(DOidx), quad_std_error(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]);
+plot(RSSEisoresp_lin_median(indices(2)), RSSEisoresp_quad_median(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
+plot([0.0001 10],[0.0001 10],'k');
+axis square; 
+set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
 xlabel('Linear error'); ylabel('Quadratic error'); title('Isoresponse'); hold off;
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
-%% Figure 3?Figure Supplement 3 - Cross-validated errors from linear and non-linear fits to data from Phase 3
 
-if ~exist('plot_counter')
-    plot_counter = 1;
-end
-
-load conewts_svd.mat
-load vals.mat
-load vals.mat
-load S1RGB_svd.mat
-load S2RGB_svd.mat
-load angulardifferences_RGB.mat
-anglebwvectors = angulardifference_RGB;
-S1RGB = S1RGB_svd;
-S2RGb = S2RGB_svd;
-% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
-SpatiallyOpponent = anglebwvectors'>90;
-
-thresh = 0.8;
-LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
-ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
-Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
-Sconesensitive = conewts_svd(:,Sconedominated_conewts);
-Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
-Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
-
-LUMidx = LumIds_conewts;
-DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
-hardtoclassifyidx = [Other_conewts];
-hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
-LUMidx = LUMidx(vals(LUMidx)<95);
-DOidx = DOidx(vals(DOidx)<95);
-
-% Considering only the spatially opponent subunits
-LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
-DOidx = DOidx(SpatiallyOpponent(DOidx));
-hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
-
-% Checking the correlation with non-linearity indices 
-% Load the isoresponse data
-load RSSE_linearmodel_CV.mat % Robust regression
-load RSSE_quadmodel_CV.mat
-
-% Checking the correlation with non-linearity indices 
-% Load the isoresponse data
-load RSSE_linearmodel_CV.mat % Robust regression
-load RSSE_quadmodel_CV.mat
-
-% For storing median of differences/ratios
-RSSEisoresp_medianofratios = [];
-RSSEisoresp_lin_median = []; RSSEisoresp_quad_median = []; % Isoresponse data
-
-for ii = 1:numel(RSSE_linearmodel)   
-    % computation for calculating median of differences/ratios
-    RSSEisoresp_medianofratios = [RSSEisoresp_medianofratios; median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii})];  
-    
-    
-    RSSEisoresp_lin_median = [RSSEisoresp_lin_median; median(RSSE_linearmodel{ii})];
-    RSSEisoresp_quad_median = [RSSEisoresp_quad_median; median(RSSE_quadmodel{ii})];
-end
-RSSEisoresp_medianofratios(RSSEisoresp_medianofratios<0.1) = 0.1;
-
-indices = [109 24 74];
-% Plotting the results for SVD based cone weight classification including the PC1 z-scores 
-figure(plot_counter);
-plot(RSSEisoresp_lin_median(hardtoclassifyidx),RSSEisoresp_quad_median(hardtoclassifyidx),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(indices(1)),RSSEisoresp_quad_median(indices(1)),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
-plot(RSSEisoresp_lin_median(indices(2)),RSSEisoresp_quad_median(indices(2)),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(RSSEisoresp_lin_median(indices(3)),RSSEisoresp_quad_median(indices(3)),'o','MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
-xlabel('Linear error'); ylabel('Quadratic error'); title('Isoresponse'); hold off;
-set(gcf,'renderer','painters');
-
-plot_counter = plot_counter + 1;
 
 %% Figure 3?Figure Supplement 4 - Robustness of classification
 if ~exist('plot_counter')
