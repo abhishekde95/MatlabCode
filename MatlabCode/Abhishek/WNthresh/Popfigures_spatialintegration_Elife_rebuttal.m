@@ -2,14 +2,12 @@
 % paper
 % Author - Abhishek De, 05/30/2020
 
-
 close all; clearvars;
 plot_counter = 1;
 
 %% Figure 1: Impact of linear and non-linear spatial filtering in image processing 
 % This code has been derived from Abhishek/Physiology_modeling/Edge_processing_linear_nonlinear
 %*********************************************************************************
-
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -1125,25 +1123,29 @@ for ii = 1:numel(AUROClinsubunits)
     
     % Computing error via Jackknife resampling
     % Jackknife White noise error
+    N1 = numel(Error_quad);
     X1 = log10(jackknife(@median, Error_lin./Error_quad));
-    JK_error_whitenoise = [JK_error_whitenoise; std(X1)];
+    error_WN = sqrt(sum((X1-mean(X1)).^2)*(N1-1)/N1);
+    JK_error_whitenoise = [JK_error_whitenoise; error_WN];
     
     % Jackknife Isoresponse error
+    N2 = numel(RSSE_linearmodel{ii});
     X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
-    JK_error_isoresponse = [JK_error_isoresponse; std(X2)];
+    error_Iso = sqrt(sum((X2-mean(X2)).^2)*(N2-1)/N2);
+    JK_error_isoresponse = [JK_error_isoresponse; error_Iso];
 end
 
-figure(plot_counter); hold on;
-plot(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0]);
-plot(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
-plot(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
-set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',[-1 0 1 2],'Ylim',[-0.02 0.08],'YTick',[-0.02:0.02:0.08]); 
-xlabel('Isoresponse NLI'); ylabel('WhiteNoise NLI'); axis square; hold off;
-set(gcf,'renderer','painters');
-plot_counter = plot_counter + 1;
+% figure(plot_counter); hold on;
+% plot(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1]);
+% plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0]);
+% plot(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1]);
+% plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0]);
+% plot(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1]);
+% plot(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
+% set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',[-1 0 1 2],'Ylim',[-0.02 0.08],'YTick',[-0.02:0.02:0.08]); 
+% xlabel('Isoresponse NLI'); ylabel('WhiteNoise NLI'); axis square; hold off;
+% set(gcf,'renderer','painters');
+% plot_counter = plot_counter + 1;
 
 % Some basic stats
 [r1,p1] = corr(Isoresponse_NLI(LUMidx),Whitenoise_NLI(LUMidx),'type','Spearman');
@@ -1154,13 +1156,13 @@ plot_counter = plot_counter + 1;
 
 % Plotting the same plot as above but with errors
 figure(plot_counter); hold on;
-errorbar(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx),JK_error_whitenoise(LUMidx), JK_error_whitenoise(LUMidx), JK_error_isoresponse(LUMidx), JK_error_isoresponse(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]);
-plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0]);
-errorbar(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), JK_error_whitenoise(DOidx), JK_error_whitenoise(DOidx), JK_error_isoresponse(DOidx), JK_error_isoresponse(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]);
-plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0]);
-errorbar(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]);
+errorbar(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5], 'MarkerSize', 8);
 plot(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
-set(gca,'Tickdir','out','Xlim',[-1 2],'XTick',[-1 0 1 2],'Ylim',[-0.02 0.08],'YTick',[-0.02:0.02:0.08]); 
+errorbar(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx),JK_error_whitenoise(LUMidx), JK_error_whitenoise(LUMidx), JK_error_isoresponse(LUMidx), JK_error_isoresponse(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0], 'MarkerSize', 8);
+plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
+errorbar(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), JK_error_whitenoise(DOidx), JK_error_whitenoise(DOidx), JK_error_isoresponse(DOidx), JK_error_isoresponse(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0], 'MarkerSize', 8);
+plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
+set(gca,'Tickdir','out','Xlim',[-4 3],'XTick',-4:3,'Ylim',[-0.04 0.14],'YTick',-0.04:0.02:0.14); 
 xlabel('Isoresponse NLI'); ylabel('WhiteNoise NLI'); axis square; hold off;
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
@@ -1482,14 +1484,13 @@ load AUROCquadsubunits_CV.mat
 load RSSE_linearmodel_CV.mat % Robust regression
 load RSSE_quadmodel_CV.mat
 
-% Storing the within subunit NLI
-Within_subunit_NLI = [];
 
-% For storing the Isoresponse NLI
-Isoresponse_NLI = [];
+Within_subunit_NLI = []; % Storing the within subunit NLI
+Isoresponse_NLI = []; % For storing the Isoresponse NLI
+Whitenoise_NLI = []; % For storing the white noise NLI
 
-% For storing the white noise NLI
-Whitenoise_NLI = [];
+JK_error_whitenoise = []; % For storing jacknife whitenoise error
+JK_error_isoresponse = []; % For storing jackknife isorespone error
 
 for ii = 1:numel(AUROClin1) 
     
@@ -1515,6 +1516,17 @@ for ii = 1:numel(AUROClin1)
     
     % Isoresponse NLI
     Isoresponse_NLI = [Isoresponse_NLI; log10(median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii}))];
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%% Computing jackknife errors %%%%
+    
+    % Jackknife White noise error
+    X1 = log10(jackknife(@median, Error_lin./Error_quad));
+    JK_error_whitenoise = [JK_error_whitenoise; std(X1)];
+    
+    % Jackknife Isoresponse error
+    X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
+    JK_error_isoresponse = [JK_error_isoresponse; std(X2)];
 end
 
 

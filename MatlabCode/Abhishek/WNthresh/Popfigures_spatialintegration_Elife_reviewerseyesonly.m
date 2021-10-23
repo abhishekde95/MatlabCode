@@ -1225,3 +1225,77 @@ xlabel('Pixel WN firing rates'); ylabel('Hyperpixel WN firing rates'); axis squa
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
+%% 9. Testing Jacknife estimation procedure
+close all; clearvars;
+
+T = round(logspace(1,4,10)); % # of samples to be tested
+sem_original = [];
+jackknife_std = [];
+
+for j=1:numel(T)
+    
+    % selecting N random values from a normal distribution
+    N = T(j);
+    nums = randn(N,1); 
+    
+    % comuting the standard error of mean
+    sem_original = [sem_original; std(nums)/sqrt(N)]; 
+    
+    % Computing the jackknife estimate
+    jackknife_mean = jackknife(@mean, nums);
+    n = numel(jackknife_mean);
+    tmp_se = sqrt(sum((jackknife_mean - mean(nums)).^2)*(n-1)/n);
+    jackknife_std = [jackknife_std; tmp_se];
+
+end
+
+figure(1); 
+scatter(sem_original, jackknife_std, 50, 1:numel(sem_original), 'filled'); 
+hold on;
+plot([0 0.35], [0 0.35], 'k');
+xlabel('SEM');
+ylabel('Jacknife error estimate');
+set(gca, 'Xlim', [0 0.35], 'Ylim', [0 0.35]);
+hold off;
+
+% Some more info on the sample size
+disp('Printing the Jacknife error for the following sample size');
+disp(T)
+
+%%
+close all; clearvars;
+
+T = round(logspace(1,4,10)); % # of samples to be tested
+sem_original = [];
+jackknife_std = [];
+jackknife_std2 = [];
+
+for j=1:numel(T)
+    
+    % selecting N random values from a normal distribution
+    N = T(j);
+    nums = randn(N,1); 
+    
+    % comuting the standard error of mean
+    sem_original = [sem_original; std(nums)/sqrt(N)]; 
+    
+    % Computing the jackknife estimate
+    jackknife_mean = jackknife(@mean, nums);
+    jackknife_std = [jackknife_std; std(jackknife_mean)];
+    tmp = sqrt(sum((jackknife_mean-mean(nums)).^2)*(N-1)/N);
+    jackknife_std2 = [jackknife_std2; tmp];
+
+end
+
+figure(1); 
+scatter(sem_original, jackknife_std2, 50, 1:numel(sem_original), 'filled'); 
+hold on;
+plot([0 0.35], [0 0.35], 'k');
+xlabel('SEM');
+ylabel('Jacknife error estimate' );
+set(gca, 'Xlim', [0 0.35], 'Ylim', [0 0.35]);
+hold off;
+
+% Some more info on the sample size
+disp('Printing the Jacknife error for the following sample size');
+disp(T)
