@@ -1157,11 +1157,12 @@ end
 % Plotting the same plot as above but with errors
 figure(plot_counter); hold on;
 errorbar(Isoresponse_NLI(hardtoclassifyidx), Whitenoise_NLI(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_whitenoise(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), JK_error_isoresponse(hardtoclassifyidx), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5], 'MarkerSize', 8);
-plot(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]);
 errorbar(Isoresponse_NLI(LUMidx), Whitenoise_NLI(LUMidx),JK_error_whitenoise(LUMidx), JK_error_whitenoise(LUMidx), JK_error_isoresponse(LUMidx), JK_error_isoresponse(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0], 'MarkerSize', 8);
-plot(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
 errorbar(Isoresponse_NLI(DOidx), Whitenoise_NLI(DOidx), JK_error_whitenoise(DOidx), JK_error_whitenoise(DOidx), JK_error_isoresponse(DOidx), JK_error_isoresponse(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0], 'MarkerSize', 8);
-plot(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0], 'MarkerSize', 8);
+
+errorbar(Isoresponse_NLI(indices(3)), Whitenoise_NLI(indices(3)), JK_error_whitenoise(indices(3)), JK_error_whitenoise(indices(3)), JK_error_isoresponse(indices(3)), JK_error_isoresponse(indices(3)), 'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0], 'color', [0.5 0.5 0.5], 'MarkerSize', 8);
+errorbar(Isoresponse_NLI(indices(1)), Whitenoise_NLI(indices(1)), JK_error_whitenoise(indices(1)), JK_error_whitenoise(indices(1)), JK_error_isoresponse(indices(1)), JK_error_isoresponse(indices(1)), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[0 1 0], 'color', [0 0 0], 'MarkerSize', 8);
+errorbar(Isoresponse_NLI(indices(2)), Whitenoise_NLI(indices(2)), JK_error_whitenoise(indices(2)), JK_error_whitenoise(indices(2)), JK_error_isoresponse(indices(2)), JK_error_isoresponse(indices(2)), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[0 1 0], 'color', [1 0 0], 'MarkerSize', 8);
 set(gca,'Tickdir','out','Xlim',[-4 3],'XTick',-4:3,'Ylim',[-0.04 0.14],'YTick',-0.04:0.02:0.14); 
 xlabel('Isoresponse NLI'); ylabel('WhiteNoise NLI'); axis square; hold off;
 set(gcf,'renderer','painters');
@@ -1305,13 +1306,9 @@ p1 = kruskalwallis(data,group,'off');
 load ConesignalNLI_LGN.mat
 
 [p6, ~]=  ranksum(Within_subunit_NLI([LUMidx]), ConesignalNLI_LGN);
-
 [p7, ~]=  ranksum(Within_subunit_NLI([DOidx]), ConesignalNLI_LGN);
-
 [p8, ~]=  ranksum(Within_subunit_NLI([DOidx LUMidx]), ConesignalNLI_LGN);
-
 [p9, ~] = ranksum(Within_subunit_NLI([hardtoclassifyidx]), ConesignalNLI_LGN);
-
 [p10, ~]=  signrank(ConesignalNLI_LGN);
 
 %% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI- 
@@ -1545,30 +1542,38 @@ end
 
 indices = [109 24 74];
 figure(plot_counter); 
-subplot(311); errorbar(Within_subunit_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_withinsubunit(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
-plot(Within_subunit_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Within_subunit_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_withinsubunit(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
-plot(Within_subunit_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Within_subunit_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_withinsubunit(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
-plot(Within_subunit_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
+markersize= 6;
+
+subplot(311); % Within subunit NLI 
+errorbar(Within_subunit_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_withinsubunit(LUMidx),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
+errorbar(Within_subunit_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_withinsubunit(DOidx),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
+errorbar(Within_subunit_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_withinsubunit(hardtoclassifyidx),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
+
+errorbar(Within_subunit_NLI(indices(1)),abs(conewts_svd(3,indices(1))),JK_error_withinsubunit(indices(1)),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0], 'color', [0 0 0]); hold on;
+errorbar(Within_subunit_NLI(indices(2)),abs(conewts_svd(3,indices(2))),JK_error_withinsubunit(indices(2)),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0], 'color',[1 0 0]);
+errorbar(Within_subunit_NLI(indices(3)),abs(conewts_svd(3,indices(3))), JK_error_withinsubunit(indices(3)),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0], 'color',[0.5 0.5 0.5]);
 axis square; set(gca,'Tickdir','out','Xlim',[-0.04 0.08],'XTick',-0.04:0.02:0.08,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('Cone signal NLI'); ylabel('S cone input');
 
-subplot(312); errorbar(Whitenoise_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_whitenoise(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
-plot(Whitenoise_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Whitenoise_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_whitenoise(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
-plot(Whitenoise_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Whitenoise_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_whitenoise(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
-plot(Whitenoise_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
+subplot(312); % White noise NLI
+errorbar(Whitenoise_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_whitenoise(LUMidx),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
+errorbar(Whitenoise_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_whitenoise(DOidx),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
+errorbar(Whitenoise_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_whitenoise(hardtoclassifyidx),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
+
+errorbar(Whitenoise_NLI(indices(1)),abs(conewts_svd(3,indices(1))),JK_error_whitenoise(indices(1)),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0], 'color', [0 0 0]); hold on;
+errorbar(Whitenoise_NLI(indices(2)),abs(conewts_svd(3,indices(2))),JK_error_whitenoise(indices(2)),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0], 'color',[1 0 0]);
+errorbar(Whitenoise_NLI(indices(3)),abs(conewts_svd(3,indices(3))), JK_error_whitenoise(indices(3)),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0], 'color',[0.5 0.5 0.5]);
 axis square; set(gca,'Tickdir','out','Xlim',[-0.04 0.14],'XTick',-0.04:0.02:0.14,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('White noise NLI'); ylabel('S cone input');
 
-subplot(313); errorbar(Isoresponse_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_isoresponse(LUMidx),'horizontal', 'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
-plot(Isoresponse_NLI(indices(1)),abs(conewts_svd(3,indices(1))),'o','MarkerSize',5,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Isoresponse_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_isoresponse(DOidx),'horizontal','o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
-plot(Isoresponse_NLI(indices(2)),abs(conewts_svd(3,indices(2))),'o','MarkerSize',5,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0]); hold on;
-errorbar(Isoresponse_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_isoresponse(hardtoclassifyidx),'o','horizontal','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
-plot(Isoresponse_NLI(indices(3)),abs(conewts_svd(3,indices(3))),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
+subplot(313); % Isoresponse NLI
+errorbar(Isoresponse_NLI(LUMidx),abs(conewts_svd(3,LUMidx)),JK_error_isoresponse(LUMidx),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); hold on;
+errorbar(Isoresponse_NLI(DOidx),abs(conewts_svd(3,DOidx)),JK_error_isoresponse(DOidx),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1], 'color',[1 0 0]);
+errorbar(Isoresponse_NLI(hardtoclassifyidx),abs(conewts_svd(3,hardtoclassifyidx)), JK_error_isoresponse(hardtoclassifyidx),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color',[0.5 0.5 0.5]);
+
+errorbar(Isoresponse_NLI(indices(1)),abs(conewts_svd(3,indices(1))),JK_error_isoresponse(indices(1)),'horizontal', 'o','MarkerSize',markersize,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[0 1 0], 'color', [0 0 0]); hold on;
+errorbar(Isoresponse_NLI(indices(2)),abs(conewts_svd(3,indices(2))),JK_error_isoresponse(indices(2)),'horizontal','o','MarkerSize',markersize,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 1 0], 'color',[1 0 0]);
+errorbar(Isoresponse_NLI(indices(3)),abs(conewts_svd(3,indices(3))), JK_error_isoresponse(indices(3)),'o','horizontal','MarkerSize',markersize,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0], 'color',[0.5 0.5 0.5]);
 axis square; set(gca,'Tickdir','out','Xlim',[-4 3],'XTick',-4:1:4,'Ylim',[0 0.4],'YTick',0:0.1:0.4); 
 xlabel('Isoresponse NLI'); ylabel('S cone input');
 set(gcf,'renderer', 'painters');
@@ -2139,6 +2144,25 @@ if ~exist('plot_counter')
     plot_counter = 1;
 end
 
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
 load conewts_svd.mat
 load vals.mat
 load vals.mat
@@ -2172,7 +2196,6 @@ DOidx = DOidx(SpatiallyOpponent(DOidx));
 hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Checking how target firing rates of the DO, simple and unclassified cells
-
 load baselineFRstats.mat % Baseline FR rates
 load TFR.mat % Target firing rates
 
@@ -2185,8 +2208,46 @@ indices = cell_idx(indices);
 TFRprctile = [];
 TFRzscore = []; % for storing the z-scores
 for iter = 1:numel(indices)
+    disp(iter);
+    
     ii = indices(iter);
-    baselineFR = baselineFRstats{ii};
+    
+    % Pulling out the respective file
+    fileofinterest = char(filename(ii,:));
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    last_wntrial =  inds(1)-1;
+    
+    % Separately plotting the baseline firing rates for Phases 1 & 2, and Phase 3
+    num_spikes =[];
+    num_dur = [];
+    for jj = 1:size(stro.ras,1)
+        tmp = stro.ras{jj,1} ;
+        if ~isnan((stro.trial(jj,stimonidx)- stro.trial(jj,fpacqidx)))
+            spikes = tmp(tmp<stro.trial(jj,stimonidx) & tmp>stro.trial(jj,fpacqidx));
+            num_spikes = [num_spikes; numel(spikes)];
+            num_dur = [num_dur; (stro.trial(jj,stimonidx)- stro.trial(jj,fpacqidx))];
+        end
+    end
+    %baselineFRstats{aa} = num_spikes./num_dur;
+    
+    baselineFR = num_spikes./num_dur;
+    baselineFR_phase12 = baselineFR(1:last_wntrial);
+    baselineFR_phase3 = baselineFR(last_wntrial+1:end);
+    
     if ismember(ii,DOidx)
         c = [1 0 0];
     elseif ismember(ii, LUMidx)
@@ -2195,17 +2256,34 @@ for iter = 1:numel(indices)
         c = [0.5 0.5 0.5];
     end
     
-    plot([iter iter],[prctile(baselineFR,5) prctile(baselineFR,95)],'color',c); hold on 
+    % Phase 1 and 2
+    subplot(131); plot([iter iter],[prctile(baselineFR_phase12,5) prctile(baselineFR_phase12,95)],'color',c); hold on 
+    plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
     
+    % Phase 3
+    subplot(132); plot([iter iter],[prctile(baselineFR_phase3,5) prctile(baselineFR_phase3,95)],'color',c); hold on 
+    plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
+    
+    
+     % All phases combined
+    subplot(133); plot([iter iter],[prctile(baselineFR,5) prctile(baselineFR,95)],'color',c); hold on 
+    plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
+    
+    % Saving some data
     TFRprctile = [TFRprctile; invprctile(baselineFR, TFR(1,ii))];
     TFRzscore = [TFRzscore; (TFR(1,ii)-mean(baselineFR))/std(baselineFR)];
-   
-    plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
-       
     
 end
-axis square; set(gca,'Tickdir','out', 'Ylim',[0 100], 'YTick',0:20:100, 'Xlim', [0 98], 'XTick', [0 98]);
-xlabel('Cell number'); ylabel('Firing rate'); 
+
+subplot(131); axis square; set(gca,'Tickdir','out', 'Ylim',[0 100], 'YTick',0:20:100, 'Xlim', [0 98], 'XTick', [0 98]);
+xlabel('Cell number'); ylabel('Firing rate'); title('Phase 1 & 2')
+
+subplot(132); axis square; set(gca,'Tickdir','out', 'Ylim',[0 100], 'YTick',0:20:100, 'Xlim', [0 98], 'XTick', [0 98]);
+xlabel('Cell number'); ylabel('Firing rate'); title('Phase 3')
+
+subplot(133); axis square; set(gca,'Tickdir','out', 'Ylim',[0 100], 'YTick',0:20:100, 'Xlim', [0 98], 'XTick', [0 98]);
+xlabel('Cell number'); ylabel('Firing rate'); title('Phase 1, 2 & 3')
+
 set(gcf,'renderer','painters'); hold off
 plot_counter = plot_counter + 1;
 
@@ -2222,8 +2300,6 @@ TFR_htc = TFR_htc(:); TFR_htc = TFR_htc(TFR_htc>0);
 group = [ones(size(TFR_DO)); 2*ones(size(TFR_LUM)); 3*ones(size(TFR_htc))];
 data = [TFR_DO; TFR_LUM; TFR_htc]; 
 p2 = kruskalwallis(data,group,'off');
-
-
 
 
 

@@ -782,7 +782,6 @@ load angulardifferences_RGB.mat
 anglebwvectors = angulardifference_RGB;
 S1RGB = S1RGB_svd;
 S2RGB = S2RGB_svd;
-% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
 SpatiallyOpponent = anglebwvectors'>90;
 
 thresh = 0.8;
@@ -850,64 +849,29 @@ indices = [109 31 74];
 
 % Isoresponse data: Plotting the results for SVD based cone weight classification including the PC1 z-scores 
 figure(plot_counter);
-subplot(221); plot(RSSEisoresp_lin_median(LUMidx),RSSEisoresp_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(DOidx),RSSEisoresp_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.0001 10],[0.0001 10],'k');
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); 
-xlabel('median Linear error'); ylabel('median Quadratic error'); legend ('LUM','DO'); title('Isoresponse'); hold off;
 
-subplot(222); plot(RSSEisoresp_lin_median(hardtoclassifyidx_woPC1),RSSEisoresp_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(RSSEisoresp_lin_median(hardtoclassifyidx_wPC1),RSSEisoresp_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
-axis square; set(gca,'Tickdir','out','Xlim',[0.0001 10],'Ylim',[0.0001 10],'YScale','log','XScale','log','XTick',[0.0001 0.001 0.01 0.1 1 10],'YTick',[0.0001 0.001 0.01 0.1 1 10]); plot([0.0001 10],[0.0001 10],'k'); 
-xlabel('median Linear error'); ylabel('median Quadratic error'); legend('NSNDO woPC1','NSNDO wPC1'); title('Isoresponse'); hold off;
-
-subplot(223); histogram(log10(RSSEisoresp_medianofratios(LUMidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
-histogram(log10(RSSEisoresp_medianofratios(DOidx)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
-plot(log10(median(RSSEisoresp_medianofratios(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(log10(median(RSSEisoresp_medianofratios(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend ('LUM','DO'); axis square; hold off;
-
-subplot(224); histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
-histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
-plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
-plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
-set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Isoresponse'); xlabel('Isoresponse NLI'); legend('NSNDO woPC1','NSNDO wPC1'); axis square; hold off;
-plot_counter = plot_counter + 1;
-
-
-% WN subunit spatial interaction data 
-figure(plot_counter);
-subplot(221); plot(Acrosssubunits_lin_median(LUMidx),Acrosssubunits_quad_median(LUMidx),'o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(Acrosssubunits_lin_median(DOidx),Acrosssubunits_quad_median(DOidx),'o','MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]); plot([0.08 1],[0.08 1],'k');
-axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend ('LUM','DO'); title('Cone signal integration'); hold off;
-
-subplot(222); plot(Acrosssubunits_lin_median(hardtoclassifyidx_woPC1),Acrosssubunits_quad_median(hardtoclassifyidx_woPC1),'o','MarkerFaceColor',[1 0 0.5],'MarkerEdgeColor',[1 1 1]); hold on;
-plot(Acrosssubunits_lin_median(hardtoclassifyidx_wPC1),Acrosssubunits_quad_median(hardtoclassifyidx_wPC1),'o','MarkerFaceColor',[1 0.5 0],'MarkerEdgeColor',[1 1 1]); hold on;  
-axis square; set(gca,'Tickdir','out','Xlim',[0.08 1],'Ylim',[0.08 1],'YScale','log','XScale','log','XTick',[0.08 0.1 1],'YTick',[0.08 0.1 1]); plot([0.08 1],[0.08 1],'k'); 
-xlabel('median GLM error'); ylabel('median GQM error'); legend('NSNDO woPC1','NSNDO wPC1'); title('Cone signal integration'); hold off;
-
-subplot(223); histogram(log10(Acrosssubunits_medianofdifferences(LUMidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[0 0 0],'Linewidth',2); hold on;
-histogram(log10(Acrosssubunits_medianofdifferences(DOidx)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0],'Linewidth',2); hold on;
-plot(log10(median(Acrosssubunits_medianofdifferences(LUMidx))),14,'v','MarkerSize',8,'MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
-plot(log10(median(Acrosssubunits_medianofdifferences(DOidx))),15,'v','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[1 1 1]);
-set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Cone signal integration'); xlabel('Cone signal NLI'); legend ('LUM','DO'); axis square; hold off;
-
-subplot(224); histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
+subplot(121); histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
 histogram(log10(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1)),-0.02:0.005:0.1,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
 plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
 plot(log10(median(Acrosssubunits_medianofdifferences(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
 set(gca,'Tickdir','out','Xlim',[-0.02 0.1],'XTick',-0.02:0.02:0.1,'Ylim',[0 15],'YTick',[0 5 10 15]); 
-ylabel('Count'); title('Cone signal integration'); xlabel('Cone signal NLI'); legend('NSNDO woPC1','NDNDO wPC1'); axis square; hold off;
+ylabel('# cells'); title('White noise spatial integration'); xlabel('White noise NLI'); legend('OSO woPC1','OSO wPC1'); axis square; hold off;
 
+subplot(122); histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0 0.5],'Linewidth',2); hold on;
+histogram(log10(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1)),-1:0.1:3,'DisplayStyle','stairs','EdgeColor',[1 0.5 0],'Linewidth',2); hold on;
+plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_woPC1))),13,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0 0.5],'MarkerEdgeColor',[1 1 1]); 
+plot(log10(median(RSSEisoresp_medianofratios(hardtoclassifyidx_wPC1))),14,'v','MarkerSize',8,'MarkerFaceColor',[1.0 0.5 0],'MarkerEdgeColor',[1 1 1]); 
+set(gca,'Tickdir','out','Xlim',[-1 3],'XTick',-1.0:0.5:3.0,'Ylim',[0 15],'YTick',[0 5 10 15]); 
+ylabel('# cells'); title('Isoresponse spatial integration'); xlabel('Isoresponse NLI'); legend('OSO woPC1','OSO wPC1'); axis square; hold off;
+set(gcf, 'renderer', 'painters')
 plot_counter = plot_counter + 1;
 
+
+
 % Some more stats
-[p1,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_woPC1));
-[p2,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI(hardtoclassifyidx_wPC1));
-[p3,~] = ranksum(Isoresponse_NLI([LUMidx DOidx]),Isoresponse_NLI([hardtoclassifyidx_woPC1 hardtoclassifyidx_wPC1]));
+[p1,~] = ranksum(Isoresponse_NLI([hardtoclassifyidx_woPC1]),Isoresponse_NLI([hardtoclassifyidx_wPC1])); % Isoresponse NLI
+[p2,~] = ranksum(log10(Acrosssubunits_medianofdifferences([hardtoclassifyidx_woPC1])),log10(Acrosssubunits_medianofdifferences([hardtoclassifyidx_wPC1]))); % Isoresponse NLI
+
 
 %% 6. A nx7 matrix for Greg 
 % L-cone weight subunit 1
@@ -1299,3 +1263,172 @@ hold off;
 % Some more info on the sample size
 disp('Printing the Jacknife error for the following sample size');
 disp(T)
+
+
+
+%% 10. Send the staircases to Greg for Naka-Rushton fitting
+close all; clearvars;
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+% Loading all the files  
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+global reversalflagidx stepsizescale stepsize nreversals
+stro = nex2stro(findfile(char(filename(24))));
+spikename = 'sig001a';
+maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
+parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
+nstixperside = stro.sum.exptParams.nstixperside;
+ngammasteps = 2^16; % 65536
+linepredtol = stro.sum.exptParams.linepredtol;
+stepsizescale = stro.sum.exptParams.stepsizescale;
+stepsize = stro.sum.exptParams.stepsize;
+nreversals = stro.sum.exptParams.nreversals;
+oogscale = stro.sum.exptParams.oogscale;
+seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+fponidx = strcmp(stro.sum.trialFields(1,:),'fp_on');
+fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+basisvecdiridx = strcmp(stro.sum.trialFields(1,:),'weights_idx');
+neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh'); % when exactly the neurothresh trials started
+targetspikerateidx = strcmp(stro.sum.trialFields(1,:),'targetspikerate');
+correctidx = strcmp(stro.sum.trialFields(1,:),'correct');
+muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+    find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+    find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+    find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+    find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+reversalflagidx = strcmp(stro.sum.trialFields(1,:),'reversalflag');
+msperframe = 1000/stro.sum.exptParams.framerate;
+ntrials = size(stro.trial,1);
+maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+
+mask_changes = [2];
+all_masks = stro.ras(:,maskidx);
+Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+if isempty(inds)
+    inds = size(stro.trial,1)-1;
+end
+last_wntrial =  inds(1)-1;
+for k = 3:last_wntrial
+    if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+        continue
+    else
+        mask_changes = [mask_changes k-1 k]; %#ok<AGROW>
+    end
+end
+if mask_changes(end) == last_wntrial
+    mask_changes(end) = [];
+else
+    mask_changes = [mask_changes  last_wntrial];
+end
+mask_changes = reshape(mask_changes , 2, []);
+
+% Determining when Neurothresh mode was active, plotting the basis vector, working correctly
+t_offset = stro.trial(end,latencyidx)/1000;
+neurothreshmode = stro.trial(:,neurothreshidx);
+basisvec_dropidx = inds(end);
+neurothresh_startidx = max(find(neurothreshmode==1,1),basisvec_dropidx+1); % There is possibility of pressing the Neurothresh button multiple times
+num_targetspikerates = unique(stro.trial(neurothresh_startidx:end,targetspikerateidx));
+vect = stro.ras{basisvec_dropidx,basisvecidx};
+basisvec_size = nstixperside*nstixperside*3;
+numvect = (numel(vect)/basisvec_size)-1;
+basisvec = cell(1,numvect);
+
+% Actual basis vec
+bkgnd_monitor = reshape(vect(numvect*basisvec_size+1:basisvec_size*(numvect+1)),[nstixperside nstixperside 3]);
+for ii = 1:numvect
+    tmp_vec = vect((ii-1)*basisvec_size+1:basisvec_size*ii) + vect(numvect*basisvec_size+1:basisvec_size*(numvect+1));
+    basisvec{ii} = reshape(tmp_vec,[nstixperside nstixperside 3]);  
+end
+
+% Extracting and storing the staircases
+cum_flag = []; % to check if I am looking at all the probed directions
+dir = 24; % Good directions: 14, 24, 25, 26
+dirs = unique(stro.trial(:,basisvecdiridx));
+dirs = dirs(2:end); % Because the direction 0 is just the whitenoise phase
+staircase.contrast_1D = cell(1,numel(dirs));
+staircase.firing_rate = cell(1,numel(dirs));
+staircase.contrast_2D = cell(1,numel(dirs));
+staircase.target_firing_rate = num_targetspikerates;
+staircase.gamut_Violation = cell(1,numel(dirs));
+staircase.completely_probed = cell(1,numel(dirs));
+
+for dir_idx = 1:numel(dirs) 
+    dir = dirs(dir_idx);
+    
+    for jj = 1: numel(num_targetspikerates)
+        tmp_n = [];
+        tmp_wts = [];
+        tmp_parentvertices = [];
+        idxs1 = find(stro.trial(:,basisvecdiridx) == dir);
+
+        for jj = 1:numel(idxs1)
+            tmp_wts = [tmp_wts; stro.ras{idxs1(jj),weightsidx}'];
+            tmp_n = [tmp_n; norm(stro.ras{idxs1(jj),weightsidx})];
+        end
+        [flag, gamutViolation] = Check_ifcompletely_probed(stro,basisvec,bkgnd_monitor,idxs1,tmp_wts(end,:));
+        cum_flag = [cum_flag; flag];
+        
+        % flag = 0, incompletely probed
+        % flag = 1, completely probed
+        % gamutViolation = 1, out of gamut point
+        if gamutViolation == 1
+            c = [0 1 0];
+        else
+            c = [0 0 1];
+        end
+                
+        raster_data = stro.ras(idxs1,1);
+        num_dur =[];
+        firing_rate = [];
+
+        for ii = 1:size(raster_data,1)
+            tmp = raster_data{ii} ;
+            spikes = tmp(tmp<stro.trial(idxs1(ii),stimoffidx) & tmp>stro.trial(idxs1(ii),stimonidx)+t_offset);
+            num_dur = [num_dur; (stro.trial(idxs1(ii), stimoffidx)- stro.trial(idxs1(ii),stimonidx))-t_offset];
+            firing_rate = [firing_rate; numel(spikes)/num_dur(end)];
+        end
+        
+    end
+    
+    staircase.contrast_1D{dir_idx} = tmp_n;
+    staircase.firing_rate{dir_idx} = firing_rate;
+    staircase.contrast_2D{dir_idx} = tmp_wts;
+    staircase.gamut_Violation{dir_idx} = gamutViolation;
+    staircase.completely_probed{dir_idx} = flag;
+    
+end
+
+plot_counter = plot_counter + 1;
+
+
+%% 11. Compare the firing rates between Phase 2 and 3
