@@ -522,7 +522,6 @@ set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
 
-
 %% 3. Reviewer analysis: Eye movement (median eye displacement) vs. Isoresponse NLIs
 % This part is similar to the Figure 9 of Jneurophysiology paper
 % The code of computing the median eye displacement can be found in 
@@ -596,16 +595,18 @@ catch
 end
 
 % Measuring the OFF-rebound responses from the Isoresponse phase
-
 N = numel(filename);
 plotrasters = 0;
 median_eye_displacement = [];
+subject_ID  = [];
 for ii = 1:N
     disp(ii);
+    
+    subject_ID = [subject_ID; filename{ii}(1)];
     % Extracting parameters from the stro structure
     fileofinterest = char(filename(ii,:));
     stro = nex2stro(findfile(fileofinterest));
-    spikename = 'sig001a';%getSpikenum(stro);
+    spikename = 'sig001a';
     neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh');
     maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
     basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
@@ -664,14 +665,22 @@ plot(median_eye_displacement(hardtoclassifyidx),Isoresponse_NLI(hardtoclassifyid
 plot(median_eye_displacement(indices(3)),Isoresponse_NLI(indices(3)),'o','MarkerSize',5,'MarkerFaceColor',[0.5 0.5 0.5],'MarkerEdgeColor',[0 1 0]); hold on;
 axis square; set(gca,'Tickdir','out','Ylim',[-1 2],'YTick',-1:1:2,'Xlim',[0.05 0.20],'XTick',0.05:0.05:0.20); 
 ylabel('Isoresponse NLI'); xlabel('Median eye displacement');
-
 plot_counter = plot_counter + 1;
 
+
+%  Spearman's correlation coefficient between Isoresponse NLI and median eye displacement
 [r,p] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]), median_eye_displacement([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
-
 [r1,p1] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]), num_isoresponse_pts([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
-
 [r2,p2] = corr(median_eye_displacement([LUMidx, DOidx, hardtoclassifyidx]), num_isoresponse_pts([LUMidx, DOidx, hardtoclassifyidx]), 'type', 'Spearman');
+
+
+% Files for Pangu
+ind_interest = logical(zeros(numel(Isoresponse_NLI),1));
+ind_interest([LUMidx, DOidx, hardtoclassifyidx]) = 1;
+[r3,p3] = corr(Isoresponse_NLI(ind_interest & subject_ID=='P'), median_eye_displacement(ind_interest & subject_ID=='P'), 'type', 'Spearman');
+[r4,p4] = corr(Isoresponse_NLI(ind_interest & subject_ID=='M'), median_eye_displacement(ind_interest & subject_ID=='M'), 'type', 'Spearman');
+
+
 
 
 
@@ -1433,7 +1442,6 @@ plot_counter = plot_counter + 1;
 
 %% 11. Compare the firing rates between Phase 2 (hyperpixel WN) and Phase 3 (isoresponse)
 
-
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -1494,7 +1502,7 @@ hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 % Matrix for storing the firing rates (mean and std)
 mean_firing_rates_Phase2 = zeros(numel(filename),1);
-std_firig_rates_Phase2 = zeros(numel(filename),1);
+std_firing_rates_Phase2 = zeros(numel(filename),1);
 mean_firing_rates_Phase3 = zeros(numel(filename),1);
 std_firing_rates_Phase3 = zeros(numel(filename),1);
 
@@ -1593,7 +1601,7 @@ for ii= 1:numel(filename)
     % Storing the mean and standard deviation of firing rates
     fr = num_spikes./num_dur;
     mean_firing_rates_Phase2(ii) = mean(fr);
-    std_firig_rates_Phase2(ii) = sem(fr);
+    std_firing_rates_Phase2(ii) = sem(fr);
     
     
     % Phase 3: Calculating firing rates for Isoresponse phase 
@@ -1613,14 +1621,14 @@ for ii= 1:numel(filename)
 end
 
 
-% Plotting the data
+%% Plotting the data
 FR_min = 0.3;
 FR_max = 300;
 
 figure(plot_counter), hold on;
-errorbar(mean_firing_rates_Phase2(LUMidx), mean_firing_rates_Phase3(LUMidx),std_firig_rates_Phase2(LUMidx), std_firig_rates_Phase2(LUMidx), std_firig_rates_Phase3(LUMidx), std_firig_rates_Phase3(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
-errorbar(mean_firing_rates_Phase2(DOidx), mean_firing_rates_Phase3(DOidx),std_firig_rates_Phase2(DOidx), std_firig_rates_Phase2(DOidx),std_firig_rates_Phase3(DOidx), std_firig_rates_Phase3(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
-errorbar(mean_firing_rates_Phase2(hardtoclassifyidx), mean_firing_rates_Phase3(hardtoclassifyidx), std_firig_rates_Phase2(hardtoclassifyidx), std_firig_rates_Phase2(hardtoclassifyidx),  std_firig_rates_Phase3(hardtoclassifyidx), std_firig_rates_Phase3(hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+errorbar(mean_firing_rates_Phase2(LUMidx), mean_firing_rates_Phase3(LUMidx),std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase3(LUMidx), std_firing_rates_Phase3(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(mean_firing_rates_Phase2(DOidx), mean_firing_rates_Phase3(DOidx),std_firing_rates_Phase2(DOidx), std_firing_rates_Phase2(DOidx),std_firing_rates_Phase3(DOidx), std_firing_rates_Phase3(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(mean_firing_rates_Phase2(hardtoclassifyidx), mean_firing_rates_Phase3(hardtoclassifyidx), std_firing_rates_Phase2(hardtoclassifyidx), std_firing_rates_Phase2(hardtoclassifyidx),  std_firing_rates_Phase3(hardtoclassifyidx), std_firing_rates_Phase3(hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
 plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
 set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
 xlabel('Phase 2 firing rates'); ylabel('Phase 3 firing rates'); title('Phase 2 vs. Phase 3 FR'); 
@@ -1629,5 +1637,88 @@ set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
 
-%% 12.  Measuring reliability 
+%% 12. Extracting the phosphor emission spectra
+
+
+
+
+
+
+%% 13.  Comparing reliability between Whitenoise and Isoresponse NLI
+close all; clearvars
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load conewts_svd.mat
+load vals.mat
+
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
+% Checking the correlation with non-linearity indices 
+% Load the isoresponse data
+load RSSE_linearmodel_CV.mat % Robust regression
+load RSSE_quadmodel_CV.mat
+% Load the integration within the subunit data
+load AUROClinsubunits_CV.mat
+load AUROCquadsubunits_CV.mat
+
+
+Isoresponse_NLI = []; % For storing the Isoresponse NLI
+Whitenoise_NLI = []; % For storing the white noise NLI
+JK_error_whitenoise = []; % Storing Jackknife based error estimates
+JK_error_isoresponse = []; % Storing Jackknife based error estimates
+
+for ii = 1:numel(AUROClinsubunits) 
+  
+    % White noise NLI 
+    Error_quad = 1-(AUROCquadsubunits{ii});
+    Error_lin = 1-(AUROClinsubunits{ii});
+    Whitenoise_NLI = [Whitenoise_NLI; log10(median(Error_lin./Error_quad))];
+    
+    % Isoresponse NLI
+    Isoresponse_NLI = [Isoresponse_NLI; log10(median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii}))];
+    
+    % Computing error via Jackknife resampling
+    % Jackknife White noise error
+    N1 = numel(Error_quad);
+    X1 = log10(jackknife(@median, Error_lin./Error_quad));
+    var_WN = sum((X1-mean(X1)).^2)*(N1-1);
+    JK_error_whitenoise = [JK_error_whitenoise; var_WN];
+    
+    % Jackknife Isoresponse error
+    N2 = numel(RSSE_linearmodel{ii});
+    X2 = log10(jackknife(@median, RSSE_linearmodel{ii}./RSSE_quadmodel{ii}));
+    var_Iso = sum((X2-mean(X2)).^2)*(N2-1);
+    JK_error_isoresponse = [JK_error_isoresponse; var_Iso];
+end
+
     
