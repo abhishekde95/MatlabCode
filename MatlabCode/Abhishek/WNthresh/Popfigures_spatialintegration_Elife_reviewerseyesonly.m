@@ -1292,7 +1292,7 @@ catch
 end
 
 global reversalflagidx stepsizescale stepsize nreversals
-stro = nex2stro(findfile(char(filename(24))));
+stro = nex2stro(findfile(char(filename(74))));
 spikename = 'sig001a';
 maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
 spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
@@ -1385,7 +1385,7 @@ staircase.completely_probed = cell(1,numel(dirs));
 for dir_idx = 1:numel(dirs) 
     dir = dirs(dir_idx);
     
-    for jj = 1: numel(num_targetspikerates)
+    for kk = 1: numel(num_targetspikerates)
         tmp_n = [];
         tmp_wts = [];
         tmp_parentvertices = [];
@@ -1407,7 +1407,7 @@ for dir_idx = 1:numel(dirs)
             c = [0 0 1];
         end
                 
-        raster_data = stro.ras(idxs1,1);
+        raster_data = stro.ras(idxs1,spikeidx);
         num_dur =[];
         firing_rate = [];
 
@@ -1431,4 +1431,203 @@ end
 plot_counter = plot_counter + 1;
 
 
-%% 11. Compare the firing rates between Phase 2 and 3
+%% 11. Compare the firing rates between Phase 2 (hyperpixel WN) and Phase 3 (isoresponse)
+
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
+% Classifying cells into simple, DO and hardtoclassify cells
+load conewts_svd.mat
+load vals.mat
+
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+anglebwvectors = angulardifference_RGB;
+S1RGB = S1RGB_svd;
+S2RGb = S2RGB_svd;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
+
+
+% Matrix for storing the firing rates (mean and std)
+mean_firing_rates_Phase2 = zeros(numel(filename),1);
+std_firig_rates_Phase2 = zeros(numel(filename),1);
+mean_firing_rates_Phase3 = zeros(numel(filename),1);
+std_firing_rates_Phase3 = zeros(numel(filename),1);
+
+for ii= 1:numel(filename)
+    fileofinterest = char(filename(ii,:));
+    disp(fileofinterest);
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
+    weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
+    parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
+    nstixperside = stro.sum.exptParams.nstixperside;
+    ngammasteps = 2^16; % 65536
+    linepredtol = stro.sum.exptParams.linepredtol;
+    stepsizescale = stro.sum.exptParams.stepsizescale;
+    stepsize = stro.sum.exptParams.stepsize;
+    nreversals = stro.sum.exptParams.nreversals;
+    oogscale = stro.sum.exptParams.oogscale;
+    seedidx = strcmp(stro.sum.trialFields(1,:),'seed');
+    nframesidx = strcmp(stro.sum.trialFields(1,:),'num_frames');
+    stimonidx = strcmp(stro.sum.trialFields(1,:),'stim_on');
+    stimoffidx = strcmp(stro.sum.trialFields(1,:),'stim_off');
+    fponidx = strcmp(stro.sum.trialFields(1,:),'fp_on');
+    fpacqidx = strcmp(stro.sum.trialFields(1,:),'fpacq');
+    basisvecdiridx = strcmp(stro.sum.trialFields(1,:),'weights_idx');
+    neurothreshidx = strcmp(stro.sum.trialFields(1,:),'neurothresh'); % when exactly the neurothresh trials started
+    targetspikerateidx = strcmp(stro.sum.trialFields(1,:),'targetspikerate');
+    correctidx = strcmp(stro.sum.trialFields(1,:),'correct');
+    muidxs = [find(strcmp(stro.sum.trialFields(1,:),'mu1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'mu3'))];
+    sigmaidxs = [find(strcmp(stro.sum.trialFields(1,:),'sigma1')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma2')), ...
+        find(strcmp(stro.sum.trialFields(1,:),'sigma3'))];
+    latencyidx = strcmp(stro.sum.trialFields(1,:),'latency');
+    reversalflagidx = strcmp(stro.sum.trialFields(1,:),'reversalflag');
+    msperframe = 1000/stro.sum.exptParams.framerate;
+    ntrials = size(stro.trial,1);
+    maxT = 15; % this represents the temporal part in the spatiotemporal receptive field
+    xx = linspace(stro.sum.exptParams.gauss_locut/1000, stro.sum.exptParams.gauss_hicut/1000,ngammasteps); % xx represents the probabilities. For more info, have a look at the MATLAB 'norminv' function.
+    yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
+
+    
+    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+    M = inv(M');
+    mask_changes = [2];
+    all_masks = stro.ras(:,maskidx);
+    Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
+    inds = find(cellfun(Fx,stro.ras(:,basisvecidx))==0);
+    if isempty(inds)
+        inds = size(stro.trial,1)-1;
+    end
+    
+    
+    last_wntrial =  inds(1)-1;
+    for k = 3:last_wntrial
+        if isequal(all_masks{k}, all_masks{k-1}) %|| all(all_masks{k} == 0) && any(isnan(all_masks{k-1}))
+            continue
+        else
+            mask_changes = [mask_changes k-1 k]; %#ok<AGROW>
+        end
+    end
+    if mask_changes(end) == last_wntrial
+        mask_changes(end) = [];
+    else
+        mask_changes = [mask_changes  last_wntrial];
+    end
+    mask_changes = reshape(mask_changes , 2, []);
+    
+    
+    
+    % Phase 2: Calculate Firing rates hyperpixel WN
+    index = 2;
+    num_spikes =[];
+    num_dur = [];
+    for jj = mask_changes(1,index):mask_changes(2,index)
+        nframes = stro.trial(jj,nframesidx);
+
+        if nframes >0
+            t_stimon = stro.trial(jj, stimonidx);
+            num_spikes = [num_spikes; numel((stro.ras{jj,spikeidx}-t_stimon)*1000)];
+
+            frametimes = linspace(0, nframes*msperframe, nframes)+(msperframe/2)';
+            num_dur = [num_dur; range(frametimes)/1000];
+        end
+
+    end
+
+    % Storing the mean and standard deviation of firing rates
+    fr = num_spikes./num_dur;
+    mean_firing_rates_Phase2(ii) = mean(fr);
+    std_firig_rates_Phase2(ii) = sem(fr);
+    
+    
+    % Phase 3: Calculating firing rates for Isoresponse phase 
+    spikerates = [];
+    for jj = last_wntrial+2:size(stro.trial,1)
+        stimont = stro.trial(jj,stimonidx);
+        stimofft = stro.trial(jj,stimoffidx);
+        t = stimofft-stimont;
+        spiketimes = stro.ras{jj,spikeidx};
+        nspikes = sum(spiketimes > stimont & spiketimes < stimofft);
+        spikerates = [spikerates; nspikes/t];
+    end
+    
+    mean_firing_rates_Phase3(ii) = mean(spikerates);
+    std_firing_rates_Phase3(ii) = sem(spikerates);
+    
+end
+
+
+% Plotting the data
+FR_min = 0.3;
+FR_max = 300;
+
+figure(plot_counter), hold on;
+errorbar(mean_firing_rates_Phase2(LUMidx), mean_firing_rates_Phase3(LUMidx),std_firig_rates_Phase2(LUMidx), std_firig_rates_Phase2(LUMidx), std_firig_rates_Phase3(LUMidx), std_firig_rates_Phase3(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(mean_firing_rates_Phase2(DOidx), mean_firing_rates_Phase3(DOidx),std_firig_rates_Phase2(DOidx), std_firig_rates_Phase2(DOidx),std_firig_rates_Phase3(DOidx), std_firig_rates_Phase3(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(mean_firing_rates_Phase2(hardtoclassifyidx), mean_firing_rates_Phase3(hardtoclassifyidx), std_firig_rates_Phase2(hardtoclassifyidx), std_firig_rates_Phase2(hardtoclassifyidx),  std_firig_rates_Phase3(hardtoclassifyidx), std_firig_rates_Phase3(hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
+set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+xlabel('Phase 2 firing rates'); ylabel('Phase 3 firing rates'); title('Phase 2 vs. Phase 3 FR'); 
+axis square; hold off;
+set(gcf,'renderer','painters');
+plot_counter = plot_counter + 1;
+
+
+%% 12.  Measuring reliability 
+    
