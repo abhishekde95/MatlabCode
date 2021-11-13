@@ -1311,7 +1311,7 @@ load ConesignalNLI_LGN.mat
 [p9, ~] = ranksum(Within_subunit_NLI([hardtoclassifyidx]), ConesignalNLI_LGN);
 [p10, ~]=  signrank(ConesignalNLI_LGN);
 
-%% Figure 6: Relationship between cone signal NLI to white noise NLI and Isoresponse NLI- 
+%% Figure 6 (OLD): Relationship between cone signal NLI to white noise NLI and Isoresponse NLI- 
 %NO LONGER USED AS OF 9/21
 %*********************************************************************************
 
@@ -1429,7 +1429,7 @@ plot_counter = plot_counter + 1;
 [r1,p1] = corr(Whitenoise_NLI([LUMidx, DOidx, hardtoclassifyidx]),Within_subunit_NLI([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman');
 [r2,p2] = corr(Isoresponse_NLI([LUMidx, DOidx, hardtoclassifyidx]),Within_subunit_NLI([LUMidx, DOidx, hardtoclassifyidx]),'type','Spearman');
 
-%% Figure 7: Relationship between S-cone strength and NLIs 
+%% Figure 6: Relationship between S-cone strength and NLIs 
 
 if ~exist('plot_counter')
     plot_counter = 1;
@@ -1599,7 +1599,7 @@ X = [LUMidx, DOidx, hardtoclassifyidx];
 group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx))];
 data = abs(conewts_svd([LUMidx'; DOidx'; hardtoclassifyidx'])); 
 p13 = kruskalwallis(data,group,'off');
-%% Figure 8: Downstream circuitry of simple and DO cells
+%% Figure 7: Downstream circuitry of simple and DO cells
 % No code for this part
 % The figure was provided by Greg
 
@@ -1784,9 +1784,10 @@ errorbar(mean_firing_rates(1,LUMidx), mean_firing_rates(2,LUMidx),std_firig_rate
 errorbar(mean_firing_rates(1,DOidx), mean_firing_rates(2,DOidx),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
 errorbar(mean_firing_rates(1,hardtoclassifyidx), mean_firing_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
 plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
-set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+%set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
 xlabel('Pixel WN firing rates'); ylabel('Hyperpixel WN firing rates'); axis square; hold off;
 set(gcf,'renderer','painters');
+set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max]);
 plot_counter = plot_counter + 1;
 
 
@@ -2096,9 +2097,9 @@ end
 figure(plot_counter);
 cum_flag = []; % to check if I am looking at all the probed directions
 
-%%
+
 figure(plot_counter);
-dir = 14; % Good directions: 14, 24, 25, 26
+dir = 24; % Good directions: 14, 24, 25, 26
 for jj = 1: numel(num_targetspikerates)
     tmp_n = [];
     tmp_wts = [];
@@ -2219,6 +2220,8 @@ cell_idx = [DOidx LUMidx hardtoclassifyidx];
 indices = cell_idx(indices);
 TFRprctile = [];
 TFRzscore = []; % for storing the z-scores
+TFRprctile_phase3 = [];
+TFRzscore_phase3 = []; % for storing the z-scores
 for iter = 1:numel(indices)
     disp(iter);
     
@@ -2281,9 +2284,16 @@ for iter = 1:numel(indices)
     subplot(133); plot([iter iter],[prctile(baselineFR,5) prctile(baselineFR,95)],'color',c); hold on 
     plot(iter, TFR(1,ii), 'o', 'MarkerFaceColor',c,'MarkerEdgeColor',[1 1 1]);
     
-    % Saving some data
+    % Prctile for target firing rate as a function of baseline FRs from all
+    % phases 
     TFRprctile = [TFRprctile; invprctile(baselineFR, TFR(1,ii))];
     TFRzscore = [TFRzscore; (TFR(1,ii)-mean(baselineFR))/std(baselineFR)];
+    
+    % Prctile for target firing rate as a function of baseline FRs from all
+    % phases 
+    TFRprctile_phase3 = [TFRprctile_phase3; invprctile(baselineFR_phase3, TFR(1,ii))];
+    TFRzscore_phase3 = [TFRzscore_phase3; (TFR(1,ii)-mean(baselineFR_phase3))/std(baselineFR_phase3)];
+  
     
 end
 
