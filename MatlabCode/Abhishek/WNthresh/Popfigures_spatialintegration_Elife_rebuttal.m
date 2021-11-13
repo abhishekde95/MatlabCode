@@ -1615,8 +1615,6 @@ p13 = kruskalwallis(data,group,'off');
 
 %% Figure 2-Figure Supplement 2: Scatterplot of firing rates between the pixel WN and hyperpixel WN noise
 
-
-  
 if ~exist('plot_counter')
     plot_counter = 1;
 end
@@ -1952,23 +1950,32 @@ if ~exist('plot_counter')
 end
 
 % Loading all the files 
-conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
-filename = fetch(conn,'SELECT filename FROM WNthresh');
-NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
-spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
-close(conn);
-filename = filename(strcmp(string(NTmode),"subunit"));
-NTmode = NTmode(strcmp(string(NTmode),"subunit"));
-spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
 
 stro = nex2stro(findfile(char(filename(24))));
 global spikename maskidx spikeidx neurothreshidx nstixperside ngammasteps seedidx nframesidx correctidx
 global fponidx stimoffidx stimonidx muidxs sigmaidxs basisvecidx weightsidx fpacqidx targetspikerateidx basisvecdiridx latencyidx reversalflagidx parentverticesidx
 global msperframe ntrials maxT xx yy M linepredtol stepsizescale stepsize nreversals oogscale
 
-spikename = getSpikenum(stro);
-maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
+
+spikename = 'sig001a';
 spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+maskidx = strcmp(stro.sum.rasterCells(1,:),'subunit_mask');
 basisvecidx = strcmp(stro.sum.rasterCells(1,:),'basis_vec');
 weightsidx = strcmp(stro.sum.rasterCells(1,:),'weights');
 parentverticesidx = strcmp(stro.sum.rasterCells(1,:),'parentvertices');
@@ -2068,7 +2075,7 @@ for jj = 1: numel(num_targetspikerates)
     for kk = 1:numel(different_weights)
         idxs1 = find(stro.trial(:,basisvecdiridx) == different_weights(kk));
         idxs1(idxs1<neurothresh_startidx) = [];
-        raster_data = stro.ras(idxs1,1);
+        raster_data = stro.ras(idxs1,spikeidx);
         tmp_norm = [tmp_norm; stro.ras{idxs1(end),weightsidx}'];
         for ii = 1:size(raster_data,1)
             tmp = raster_data{ii} ;
@@ -2089,9 +2096,9 @@ end
 figure(plot_counter);
 cum_flag = []; % to check if I am looking at all the probed directions
 
-t_offset1 = -0.2;
+%%
 figure(plot_counter);
-dir = 24; % Good directions: 14, 24, 25, 26
+dir = 14; % Good directions: 14, 24, 25, 26
 for jj = 1: numel(num_targetspikerates)
     tmp_n = [];
     tmp_wts = [];
@@ -2114,27 +2121,32 @@ for jj = 1: numel(num_targetspikerates)
     set(gca,'Tickdir','out','YScale','log','Ylim',[0.1 1],'YTick',[0.1 0.3 1]); axis square;
     img = tmp_wts(end,1)*(basisvec{1}-bkgnd_monitor) + tmp_wts(end,2)*(basisvec{2}-bkgnd_monitor);
     subplot(2,2,2),imagesc(0.5*img/(max(abs(img(:)))+0.01) + 0.5); set(gca,'XTick',[],'YTick',[]); axis image; colormap('gray');
-    raster_data = stro.ras(idxs1,1);
+    raster_data = stro.ras(idxs1,spikeidx);
     num_dur =[];
     firing_rate = [];
     
     for ii = 1:size(raster_data,1)
         tmp = raster_data{ii} ;
-        spikes = tmp(tmp<stro.trial(idxs1(ii),stimoffidx) & tmp>stro.trial(idxs1(ii),stimonidx)+t_offset);
+        %t_offset=0;
+        %spikes = tmp(tmp<stro.trial(idxs1(ii),stimoffidx) & tmp>stro.trial(idxs1(ii),stimonidx)+t_offset);
+        spikes = sum(tmp<stro.trial(idxs1(ii),stimoffidx) & tmp>(stro.trial(idxs1(ii),stimonidx)+t_offset));
         num_dur = [num_dur; (stro.trial(idxs1(ii), stimoffidx)- stro.trial(idxs1(ii),stimonidx))-t_offset];
-        firing_rate = [firing_rate; numel(spikes)/num_dur(end)];
+        firing_rate = [firing_rate; spikes/num_dur(end)];
     end
+    
     subplot(2,2,4); plot(tmp_n,firing_rate,'-o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]);
     xlabel('Contrast'); ylabel('Firing rate '); axis square;
     set(gca,'Tickdir','out','XScale','log')
     hold off;
+    
     subplot(2,2,3),plot(firing_rate,'-o','MarkerFaceColor',[0 0 0],'MarkerEdgeColor',[1 1 1]); 
     set(gca,'Tickdir','out','Ylim',[0 120],'YTick',[0 30 60 90 120]); axis square; xlabel('Trials'), ylabel('FR');
+    
 end
 
 
 subplot(2,2,4); hold on; set(gca,'Xlim',[0.1 1],'XTick',[0.1 0.3 1],'Ylim',[0 120],'YTick',[0 30 60 90 120]);
-subplot(2,2,3); hold on; plot([0 20],[30 30],'k'); hold off;
+subplot(2,2,3); hold on; plot([0 20],[num_targetspikerates num_targetspikerates],'k'); hold off;
 
 plot_counter = plot_counter + 1;
 
@@ -2235,7 +2247,7 @@ for iter = 1:numel(indices)
     num_spikes =[];
     num_dur = [];
     for jj = 1:size(stro.ras,1)
-        tmp = stro.ras{jj,1} ;
+        tmp = stro.ras{jj,spikeidx} ;
         if ~isnan((stro.trial(jj,stimonidx)- stro.trial(jj,fpacqidx)))
             spikes = tmp(tmp<stro.trial(jj,stimonidx) & tmp>stro.trial(jj,fpacqidx));
             num_spikes = [num_spikes; numel(spikes)];
