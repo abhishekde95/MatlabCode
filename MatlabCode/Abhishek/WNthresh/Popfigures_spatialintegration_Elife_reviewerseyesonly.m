@@ -682,8 +682,6 @@ ind_interest([LUMidx, DOidx, hardtoclassifyidx]) = 1;
 
 
 
-
-
 %% 4. Reviewer analysis: Reliability of NLI, using Jacknife procedure
 
 if ~exist('plot_counter')
@@ -1621,7 +1619,7 @@ for ii= 1:numel(filename)
 end
 
 
-%% Plotting the data
+% Plotting the data
 FR_min = 0.3;
 FR_max = 300;
 
@@ -1637,14 +1635,90 @@ set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
 
 
-%% 12. Extracting the phosphor emission spectra
+%% 12. Extracting the phosphor emission spectra, gamma function, cone fundamentals, and background RGB
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
+for ii= 1:numel(1)
+    
+    fileofinterest = char(filename(ii,:));
+    disp(fileofinterest);
+    
+    stro = nex2stro(findfile(fileofinterest));
+    spikename = 'sig001a';%getSpikenum(stro);
+    spikeidx = strcmp(stro.sum.rasterCells(1,:),spikename);
+    
+    % Calculating the cone fundamentals 
+    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
+    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
+    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
+    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
+    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
+    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
+    
+    % Gamma table
+    gammaTable = stro.sum.exptParams.gamma_table;
+    gammaTable = reshape(gammaTable, length(gammaTable)/3, 3);
+    gammaTable1 = interp1(linspace(0,255,256),gammaTable,linspace(0,255,65536), 'spline');
+    invgamma = InvertGamma(gammaTable1, 0);
+    
+    % background RGB
+    ridx = find(strcmp(stro.sum.trialFields(1,:),'bkgnd_r'));
+    gidx = find(strcmp(stro.sum.trialFields(1,:),'bkgnd_g'));
+    bidx = find(strcmp(stro.sum.trialFields(1,:),'bkgnd_b'));
+    bkgndRGB = [mode(stro.trial(:,ridx)), mode(stro.trial(:,gidx)), mode(stro.trial(:,bidx))];
+    bkgndrgb = [gammaTable(bkgndRGB(1)+1,1); gammaTable(bkgndRGB(2)+1,2); gammaTable(bkgndRGB(3)+1,3)];
+    bkgndlms = M*bkgndrgb;
+    Mrgbtocc = diag(1./bkgndlms)*M; % M can be considered to be in cone excitation differences
+    Mrgbtocc = inv(Mrgbtocc');
+    
+end
+
+% Plotting the emission spectra
+wavelengths = [380:5:780];
+figure(plot_counter);
+plot(wavelengths,mon_spd(1,:)'/5, 'r'); hold on;
+plot(wavelengths,mon_spd(2,:)'/5, 'g')
+plot(wavelengths,mon_spd(3,:)'/5, 'b') 
+set(gca, 'Tickdir', 'out'); axis square;
+xlabel('Wavelength (nm)'); ylabel('watts/sr?m^2?nm');
+plot_counter = plot_counter + 1;
+
+
+monitor_cone_details.background_rgb = bkgndrgb;
+monitor_cone_details.wavelengths = wavelengths;
+monitor_cone_details.blue_phosphor_spd = mon_spd(3,:)'/5;
+monitor_cone_details.green_phosphor_spd = mon_spd(2,:)'/5;
+monitor_cone_details.red_phosphor_spd = mon_spd(1,:)'/5;
+monitor_cone_details.Lcone_fundamentals = fundamentals(:,1);
+monitor_cone_details.Mcone_fundamentals = fundamentals(:,2);
+monitor_cone_details.Scone_fundamentals = fundamentals(:,3);
 
 
 
-
-
-
-%% 13.  Comparing reliability between Whitenoise and Isoresponse NLI
+%% 13.  Comparing reliability between Whitenoise and Isoresponse NLI (Not sure about this analysis)
 close all; clearvars
 
 if ~exist('plot_counter')
@@ -1720,5 +1794,28 @@ for ii = 1:numel(AUROClinsubunits)
     var_Iso = sum((X2-mean(X2)).^2)*(N2-1);
     JK_error_isoresponse = [JK_error_isoresponse; var_Iso];
 end
+
+
+%% 14. Comparison of Naka-Rushton fitted isoresponse points to the actual isoresponse points
+close all; clearvars;
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+% DO cells
+load DO1.fig
+load DO2.fig
+
+% Simple cells
+load Simple1.fig
+load Simple2.fig
+
+% Other spatially opponent cells
+load OSO1.fig
+load OSO2.fig
+
+
+
 
     
