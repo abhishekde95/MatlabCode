@@ -1125,13 +1125,6 @@ for ii= 1:numel(filename)
     yy = norminv(xx'); % defining norminv to extract the values for which the cdf values range between gauss_locut and gauss_hicut
 
     
-    fundamentals = stro.sum.exptParams.fundamentals; % CONE FUNDAMENTALS: L,M,S
-    fundamentals = reshape(fundamentals,[length(fundamentals)/3,3]); %1st column - L, 2nd- M, 3rd- S
-    mon_spd = stro.sum.exptParams.mon_spd; % MONITOR SPECTRAL DISTRIBUTION IN R,G,B
-    mon_spd = reshape(mon_spd,[length(mon_spd)/3, 3]);
-    mon_spd = spline([380:4:780], mon_spd', [380:5:780]); % fitting a cubic spline
-    M = fundamentals'*mon_spd'; % matrix that converts RGB phosphor intensites to L,M,S cone fundamentals
-    M = inv(M');
     mask_changes = [2];
     all_masks = stro.ras(:,maskidx);
     Fx = @(xi) any(isnan(xi)); % function that finds 'NaN' in a cell array
@@ -1176,25 +1169,31 @@ for ii= 1:numel(filename)
         % Storing the mean and standard deviation of firing rates
         fr = num_spikes./num_dur;
         mean_firing_rates(index,ii) = mean(fr);
-        std_firig_rates(index,ii) = sem(fr);
+        %std_firig_rates(index,ii) = sem(fr);
+        
+        M = mean(fr);
+        V = var(fr);
+        n = numel(fr);
+        std_firig_rates(index,ii) = sqrt(V./n./((log(10)*M).^2));
         
     end
     
 end
-    
 
 % Comparing the Firing rates from pixel and hyperpixel WN 
 FR_max = 1000;
 FR_min = 0.3;
+
 figure(plot_counter), hold on;
-errorbar(mean_firing_rates(1,LUMidx), mean_firing_rates(2,LUMidx),std_firig_rates(2,LUMidx), std_firig_rates(2,LUMidx), std_firig_rates(1,LUMidx), std_firig_rates(1,LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
-errorbar(mean_firing_rates(1,DOidx), mean_firing_rates(2,DOidx),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
-errorbar(mean_firing_rates(1,hardtoclassifyidx), mean_firing_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
-plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
-set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+errorbar(log(mean_firing_rates(1,LUMidx)), log(mean_firing_rates(2,LUMidx)),std_firig_rates(2,LUMidx), std_firig_rates(2,LUMidx), std_firig_rates(1,LUMidx), std_firig_rates(1,LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(log(mean_firing_rates(1,DOidx)), log(mean_firing_rates(2,DOidx)),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(log(mean_firing_rates(1,hardtoclassifyidx)), log(mean_firing_rates(2,hardtoclassifyidx)), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+plot(log([FR_min FR_max]), log([FR_min FR_max]), 'color', 'k')
+set(gca,'Tickdir','out','Xlim',[log(FR_min) log(FR_max)],'Ylim',[log(FR_min) log(FR_max)], 'XTick', log([0.3 1 10 100 1000]),'YTick', log([0.3 1 10 100 1000]), 'XTickLabel', [0.3 1 10 100 1000],'YTickLabel', [0.3 1 10 100 1000]); 
 xlabel('Pixel WN firing rates'); ylabel('Hyperpixel WN firing rates'); axis square; hold off;
 set(gcf,'renderer','painters');
 plot_counter = plot_counter + 1;
+
 
 %% 9. Testing Jacknife estimation procedure
 close all; clearvars;
@@ -1599,7 +1598,10 @@ for ii= 1:numel(filename)
     % Storing the mean and standard deviation of firing rates
     fr = num_spikes./num_dur;
     mean_firing_rates_Phase2(ii) = mean(fr);
-    std_firing_rates_Phase2(ii) = sem(fr);
+    M1 = mean(fr);
+    V1 = var(fr);
+    n1 = numel(fr);
+    std_firing_rates_Phase2(ii) = sqrt(V1./n1./((log(10)*M1).^2));
     
     
     % Phase 3: Calculating firing rates for Isoresponse phase 
@@ -1614,7 +1616,10 @@ for ii= 1:numel(filename)
     end
     
     mean_firing_rates_Phase3(ii) = mean(spikerates);
-    std_firing_rates_Phase3(ii) = sem(spikerates);
+    M2 = mean(spikerates);
+    V2 = var(spikerates);
+    n2 = numel(spikerates);
+    std_firing_rates_Phase3(ii) = sqrt(V2./n2./((log(10)*M2).^2));
     
 end
 
@@ -1624,11 +1629,11 @@ FR_min = 0.3;
 FR_max = 300;
 
 figure(plot_counter), hold on;
-errorbar(mean_firing_rates_Phase2(LUMidx), mean_firing_rates_Phase3(LUMidx),std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase3(LUMidx), std_firing_rates_Phase3(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
-errorbar(mean_firing_rates_Phase2(DOidx), mean_firing_rates_Phase3(DOidx),std_firing_rates_Phase2(DOidx), std_firing_rates_Phase2(DOidx),std_firing_rates_Phase3(DOidx), std_firing_rates_Phase3(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
-errorbar(mean_firing_rates_Phase2(hardtoclassifyidx), mean_firing_rates_Phase3(hardtoclassifyidx), std_firing_rates_Phase2(hardtoclassifyidx), std_firing_rates_Phase2(hardtoclassifyidx),  std_firing_rates_Phase3(hardtoclassifyidx), std_firing_rates_Phase3(hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
-plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
-set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+errorbar(log10(mean_firing_rates_Phase2(LUMidx)), log10(mean_firing_rates_Phase3(LUMidx)),std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase2(LUMidx), std_firing_rates_Phase3(LUMidx), std_firing_rates_Phase3(LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(log10(mean_firing_rates_Phase2(DOidx)), log10(mean_firing_rates_Phase3(DOidx)),std_firing_rates_Phase2(DOidx), std_firing_rates_Phase2(DOidx),std_firing_rates_Phase3(DOidx), std_firing_rates_Phase3(DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(log10(mean_firing_rates_Phase2(hardtoclassifyidx)), log10(mean_firing_rates_Phase3(hardtoclassifyidx)), std_firing_rates_Phase2(hardtoclassifyidx), std_firing_rates_Phase2(hardtoclassifyidx),  std_firing_rates_Phase3(hardtoclassifyidx), std_firing_rates_Phase3(hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+plot(log10([FR_min FR_max]), log10([FR_min FR_max]), 'color', 'k')
+set(gca,'Tickdir','out','Xlim',log10([FR_min FR_max]),'Ylim',log10([FR_min FR_max]), 'XTick', log10([0.3 1 10 100 1000]),'YTick', log10([0.3 1 10 100 1000]), 'XTickLabel', [0.3 1 10 100 1000],'YTickLabel', [0.3 1 10 100 1000]); 
 xlabel('Phase 2 firing rates'); ylabel('Phase 3 firing rates'); title('Phase 2 vs. Phase 3 FR'); 
 axis square; hold off;
 set(gcf,'renderer','painters');

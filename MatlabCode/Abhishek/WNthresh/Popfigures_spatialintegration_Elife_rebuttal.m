@@ -1769,7 +1769,12 @@ for ii= 1:numel(filename)
         % Storing the mean and standard deviation of firing rates
         fr = num_spikes./num_dur;
         mean_firing_rates(index,ii) = mean(fr);
-        std_firig_rates(index,ii) = sem(fr);
+        %std_firig_rates(index,ii) = sem(fr);
+        
+        M = mean(fr);
+        V = var(fr);
+        n = numel(fr);
+        std_firig_rates(index,ii) = sqrt(V./n./((log(10)*M).^2));
         
     end
     
@@ -1779,15 +1784,15 @@ end
 % Comparing the Firing rates from pixel and hyperpixel WN 
 FR_max = 1000;
 FR_min = 0.3;
+
 figure(plot_counter), hold on;
-errorbar(mean_firing_rates(1,LUMidx), mean_firing_rates(2,LUMidx),std_firig_rates(2,LUMidx), std_firig_rates(2,LUMidx), std_firig_rates(1,LUMidx), std_firig_rates(1,LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
-errorbar(mean_firing_rates(1,DOidx), mean_firing_rates(2,DOidx),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
-errorbar(mean_firing_rates(1,hardtoclassifyidx), mean_firing_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
-plot([FR_min FR_max], [FR_min FR_max], 'color', 'k')
-%set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max], 'XScale', 'log', 'YScale', 'log', 'XTick', [0.3 1 10 100 1000],'YTick', [0.3 1 10 100 1000]); 
+errorbar(log10(mean_firing_rates(1,LUMidx)), log10(mean_firing_rates(2,LUMidx)),std_firig_rates(2,LUMidx), std_firig_rates(2,LUMidx), std_firig_rates(1,LUMidx), std_firig_rates(1,LUMidx), 'o', 'MarkerFaceColor', [0 0 0],'MarkerEdgeColor',[1 1 1], 'color', [0 0 0]); 
+errorbar(log10(mean_firing_rates(1,DOidx)), log10(mean_firing_rates(2,DOidx)),std_firig_rates(2,DOidx), std_firig_rates(2,DOidx),std_firig_rates(1,DOidx), std_firig_rates(1,DOidx), 'o', 'MarkerFaceColor', [1 0 0],'MarkerEdgeColor',[1 1 1], 'color', [1 0 0]); 
+errorbar(log10(mean_firing_rates(1,hardtoclassifyidx)), log10(mean_firing_rates(2,hardtoclassifyidx)), std_firig_rates(2,hardtoclassifyidx), std_firig_rates(2,hardtoclassifyidx),  std_firig_rates(1,hardtoclassifyidx), std_firig_rates(1,hardtoclassifyidx),'o', 'MarkerFaceColor', [0.5 0.5 0.5],'MarkerEdgeColor',[1 1 1], 'color', [0.5 0.5 0.5]); 
+plot(log10([FR_min FR_max]), log10([FR_min FR_max]), 'color', 'k')
+set(gca,'Tickdir','out','Xlim',[log10(FR_min) log10(FR_max)],'Ylim',[log10(FR_min) log10(FR_max)], 'XTick', log10([0.3 1 10 100 1000]),'YTick', log10([0.3 1 10 100 1000]), 'XTickLabel', [0.3 1 10 100 1000],'YTickLabel', [0.3 1 10 100 1000]); 
 xlabel('Pixel WN firing rates'); ylabel('Hyperpixel WN firing rates'); axis square; hold off;
 set(gcf,'renderer','painters');
-set(gca,'Tickdir','out','Xlim',[FR_min FR_max],'Ylim',[FR_min FR_max]);
 plot_counter = plot_counter + 1;
 
 
