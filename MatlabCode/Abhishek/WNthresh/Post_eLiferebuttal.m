@@ -349,10 +349,7 @@ for zz = 1:numel(indices)
 end
 
 
-%%  RF as a function of cell types
-
-
-close all; clearvars;
+%% 4. RF as a function of cell types
 
 
 if ~exist('plot_counter')
@@ -361,6 +358,16 @@ end
 
 load conewts_svd.mat
 load vals.mat
+load S1RGB_svd.mat
+load S2RGB_svd.mat
+load angulardifferences_RGB.mat
+S1RGB = S1RGB_svd;
+S2RGB = S2RGB_svd;
+anglebwvectors = angulardifference_RGB;
+% SpatiallyOpponent = sum(sign(S1RGB).*sign(S2RGB),1)<3;
+SpatiallyOpponent = anglebwvectors'>90;
+
+
 thresh = 0.8;
 LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
 ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
@@ -369,13 +376,17 @@ Sconesensitive = conewts_svd(:,Sconedominated_conewts);
 Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
 Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
 
-% Classifying cells 
 LUMidx = LumIds_conewts;
 DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
 hardtoclassifyidx = [Other_conewts];
 hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
 LUMidx = LUMidx(vals(LUMidx)<95);
 DOidx = DOidx(vals(DOidx)<95);
+
+% Considering only the spatially opponent subunits
+LUMidx = LUMidx(SpatiallyOpponent(LUMidx));
+DOidx = DOidx(SpatiallyOpponent(DOidx));
+hardtoclassifyidx = hardtoclassifyidx(SpatiallyOpponent(hardtoclassifyidx));
 
 
 % Loading all the files 
