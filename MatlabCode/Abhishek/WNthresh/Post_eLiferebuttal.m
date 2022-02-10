@@ -73,17 +73,19 @@ load RSSE_quadmodel_CV.mat
 
 % For storing the Isoresponse NLI
 Isoresponse_NLI = [];
-
+BaselineFR = [];
 
 for ii = 1:numel(RSSE_linearmodel) 
    
     % Isoresponse NLI
     Isoresponse_NLI = [Isoresponse_NLI; log10(median(RSSE_linearmodel{ii}./RSSE_quadmodel{ii}))];
+    BaselineFR = [BaselineFR; mean(baselineFRstats{ii})];
 end
 
 % Measuring correlation between TFR and NLI
 idx = [LUMidx, DOidx, hardtoclassifyidx];
 [r, p] = corr(Isoresponse_NLI(idx), TFR(1,idx)', 'type', 'Spearman');
+[r2, p2] = corr(Isoresponse_NLI(idx), TFR(1,idx)'-BaselineFR(idx), 'type', 'Spearman');  % Baseline subtracted
 
 
 %% 2. z-scores of Target firing rates w.r.t Baseline firing rates
@@ -220,6 +222,8 @@ for iter = 1:numel(indices)
     
 end
 
+%%
+
 
 
 %% 3. Data points and model fits for example cells in R-theta space
@@ -344,3 +348,68 @@ for zz = 1:numel(indices)
    
 end
 
+
+%%  RF as a function of cell types
+
+
+close all; clearvars;
+
+
+if ~exist('plot_counter')
+    plot_counter = 1;
+end
+
+load conewts_svd.mat
+load vals.mat
+thresh = 0.8;
+LumIds_conewts = find(conewts_svd(1,:) + conewts_svd(2,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==2 & conewts_svd(1,:)>0.1 & conewts_svd(2,:)>0.1);
+ColorOpponentIds_conewts = find(conewts_svd(2,:) - conewts_svd(1,:) >thresh & sum(sign(conewts_svd(1:2,:)),1)==0 & sqrt((conewts_svd(2,:)-0.5).^2 + (conewts_svd(1,:)+0.5).^2)<0.3);
+Sconedominated_conewts = find(abs(conewts_svd(3,:))>1-thresh);
+Sconesensitive = conewts_svd(:,Sconedominated_conewts);
+Sconedominated_conewts(sign(Sconesensitive(1,:))==1 & sign(Sconesensitive(3,:))==1) = [];
+Other_conewts = 1:size(conewts_svd,2); Other_conewts([LumIds_conewts ColorOpponentIds_conewts Sconedominated_conewts]) = [];
+
+% Classifying cells 
+LUMidx = LumIds_conewts;
+DOidx = [ColorOpponentIds_conewts Sconedominated_conewts];
+hardtoclassifyidx = [Other_conewts];
+hardtoclassifyidx = [hardtoclassifyidx LUMidx(vals(LUMidx)>=95) DOidx(vals(DOidx)>=95)];
+LUMidx = LUMidx(vals(LUMidx)<95);
+DOidx = DOidx(vals(DOidx)<95);
+
+
+% Loading all the files 
+try 
+    % Using the JDBC connection
+    conn = database('Abhishek','horwitzlab','vector','Vendor','MySql','Server','128.95.153.12');
+    filename = fetch(conn,'SELECT filename FROM WNthresh');
+    NTmode = fetch(conn,'SELECT NTmode FROM WNthresh');
+    spikeidx_NT = cell2mat(fetch(conn,'SELECT spikeidx FROM WNthresh'));
+    close(conn);
+    filename = filename(strcmp(string(NTmode),"subunit"));
+    NTmode = NTmode(strcmp(string(NTmode),"subunit"));
+    spikeidx_NT = spikeidx_NT(strcmp(string(NTmode),"subunit"));
+
+catch
+    csv_filename = '/Users/abhishekde/Desktop/MatlabCode/Abhishek/CSV_PHPmyadmin_files/WNthresh.csv';
+    [filename, NTmode, spikeIdx] = get_WNthreshdata_from_csvfile(csv_filename, 'subunit');
+    spikeidx_NT = str2num(cell2mat(spikeIdx));
+end
+
+
+
+% Pulling out the RFs
+RF = [];
+for ii=1:numel(filename)
+    WN = nex2stro(findfile(char(filename(ii))));
+    x = WN.sum.exptParams.rf_x;
+    y = WN.sum.exptParams.rf_y;
+    
+    RF = [RF; sqrt(x^2 + y^2)/10];
+ 
+end
+
+% Comparing RFs across cell types
+group = [ones(size(LUMidx)) 2*ones(size(DOidx)) 3*ones(size(hardtoclassifyidx))];
+data = RF([LUMidx'; DOidx'; hardtoclassifyidx']); 
+p1 = kruskalwallis(data,group','off');
